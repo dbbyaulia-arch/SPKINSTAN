@@ -1,0 +1,67 @@
+{
+  "spk": {
+    "title": "SURAT PERJANJIAN KERJA SAMA PEKERJAAN JASA",
+    "pasal1": {
+      "heading": "PASAL 1: LINGKUP PEKERJAAN & ADDENDUM",
+      "template": "PIHAK PERTAMA sepakat melaksanakan pekerjaan \"{projectTitle}\" untuk PIHAK KEDUA sesuai spesifikasi teknis yang disetujui."
+    },
+    "pasal2": {
+      "heading": "PASAL 2: NILAI PEKERJAAN & HAK RETENSI",
+      "template": "Total nilai imbalan sebesar Rp {projectAmount} dengan Uang Muka (DP) sebesar {dpPercent}%. Pelunasan dikirimkan ke rekening {bankInfo}."
+    },
+    "pasal3": {
+      "heading": "PASAL 3: KLAUSUL KHUSUS PROTEKSI HUKUM PERDATA"
+    }
+  },
+  "nda": {
+    "title": "PERJANJIAN KERAHASIAAN INFORMASI (NON-DISCLOSURE AGREEMENT)",
+    "pasal1": {
+      "heading": "PASAL 1: CAKUPAN INFORMASI RAHASIA",
+      "template": "Informasi Rahasia mencakup \"{ndaScope}\" yang diserahterimakan selama masa kerja sama."
+    },
+    "pasal2": {
+      "heading": "PASAL 2: JANGKA WAKTU & DENDA PELANGGARAN",
+      "template": "Kerahasiaan berlaku selama {ndaYears} tahun. Pelanggaran atas kerahasiaan dikenakan denda kewajiban ganti rugi sebesar Rp {ndaPenalty} sesuai Pasal 1365 KUHPerdata."
+    }
+  },
+  "bast": {
+    "title": "BERITA ACARA SERAH TERIMA PEKERJAAN (BAST)",
+    "pasal1": {
+      "heading": "PASAL 1: SERAH TERIMA PEKERJAAN FINAL",
+      "template": "PIHAK PERTAMA menyerahkan hasil pekerjaan akhir berdasarkan SPK Referensi \"{bastRef}\" kepada PIHAK KEDUA pada tanggal {bastDate}."
+    },
+    "pasal2": {
+      "heading": "PASAL 2: MASA GARANSI & PELEPASAN TUNTUTAN",
+      "template": "PIHAK KEDUA menerima pekerjaan dalam kondisi baik dengan masa garansi perbaikan bug selama {bastWarranty} hari kerja."
+    }
+  },
+  "protectionClauses": {
+    "clauseRevision": {
+      "label": "Pembatasan Scope & Revisi (Maks 2x)",
+      "description": "Permintaan di luar acuan dianggap addendum biaya baru.",
+      "legalText": "Pekerjaan mencakup maksimal 2 (dua) kali revisi. Permintaan perubahan di luar acuan dinilai sebagai Addendum biaya baru."
+    },
+    "clauseSla": {
+      "label": "SLA Evaluasi Feedback Klien (5 Hari)",
+      "description": "Jika 5 hari tidak ada feedback, dianggap auto-approved.",
+      "legalText": "PIHAK KEDUA wajib memberikan masukan dalam 5 (lima) hari kerja. Apabila melebihi batas waktu, pekerjaan dianggap disetujui penuh (auto-approved)."
+    },
+    "clauseRetention": {
+      "label": "Retensi Hak Master File Pasca-Pelunasan",
+      "description": "File Figma/Source Code dikirim hanya setelah lunas 100%.",
+      "legalText": "Seluruh hak guna aset master file (Figma/Source Code) diserahkan secara sah hanya setelah pelunasan 100% diterima."
+    },
+    "clauseDp": {
+      "label": "DP Non-Refundable (Pasal 1464 KUHPerdata)",
+      "description": "Uang muka hangus jika pembatalan terjadi sepihak dari Klien.",
+      "legalText": "Uang Muka (DP) bersifat tidak dapat ditarik kembali (non-refundable) sesuai Pasal 1464 KUHPerdata jika pembatalan terjadi sepihak oleh PIHAK KEDUA."
+    }
+  },
+  "legalBases": [
+    "Pasal 1320 KUHPerdata (Syarat Sah Perikatan)",
+    "Pasal 1338 KUHPerdata (Pacta Sunt Servanda)",
+    "Pasal 1464 KUHPerdata (Ketentuan Uang Muka / DP)",
+    "Pasal 1365 KUHPerdata & UU Rahasia Dagang",
+    "Pasal 1812 KUHPerdata & UU Hak Cipta No. 28/2014"
+  ]
+}
