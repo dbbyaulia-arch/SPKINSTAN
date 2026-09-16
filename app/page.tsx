@@ -30,6 +30,12 @@ import {
   Sparkles
 } from 'lucide-react';
 
+declare global {
+  interface Window {
+    fbq?: (event: string, action: string, data?: object) => void;
+  }
+}
+
 interface Review {
   id: string;
   name: string;
@@ -125,6 +131,14 @@ export default function Home() {
       setIsLoadingQris(true);
       setModalStep('qris');
 
+      // Sinyal Meta Pixel: Pengguna Menekan Tombol Bayar
+      if (typeof window !== 'undefined' && window.fbq) {
+        window.fbq('track', 'InitiateCheckout', {
+          value: selectedPackage === 'SINGLE' ? 19999 : 49999,
+          currency: 'IDR',
+        });
+      }
+
       const res = await fetch('/api/qris/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -163,6 +177,14 @@ export default function Home() {
           setIsPaidStatus(true);
           setShowCheckoutModal(false);
           setShowSuccessModal(true);
+
+          // Sinyal Meta Pixel jika sukses dari Webhook Polling
+          if (typeof window !== 'undefined' && window.fbq) {
+            window.fbq('track', 'Purchase', {
+              value: selectedPackage === 'SINGLE' ? 19999 : 49999,
+              currency: 'IDR',
+            });
+          }
         }
       } catch (err) {
         console.error('Polling error:', err);
@@ -284,6 +306,14 @@ export default function Home() {
     setShowCheckoutModal(false);
     setIsPaidStatus(true);
     setShowSuccessModal(true);
+
+    // Sinyal Meta Pixel: Pembayaran Sukses (Konversi Iklan)
+    if (typeof window !== 'undefined' && window.fbq) {
+      window.fbq('track', 'Purchase', {
+        value: selectedPackage === 'SINGLE' ? 19999 : 49999,
+        currency: 'IDR',
+      });
+    }
   };
 
   const handleShareWhatsApp = () => {
