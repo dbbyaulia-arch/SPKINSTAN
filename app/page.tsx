@@ -66,6 +66,7 @@ export default function Home() {
   const [isExporting, setIsExporting] = useState(false);
 
   const [sessionId, setSessionId] = useState('');
+  const [mayarPaymentId, setMayarPaymentId] = useState<string | null>(null);
   const [timeLeft, setTimeLeft] = useState(899);
 
   // Mayar API, QRIS & Polling States
@@ -205,11 +206,12 @@ export default function Home() {
 
   // Verifikasi Pembayaran Manual via API saat tombol diklik
   const handleManualCheckPayment = async () => {
-    if (!sessionId || isVerifyingPayment) return;
+    const targetCheckId = mayarPaymentId || sessionId;
+    if (!targetCheckId || isVerifyingPayment) return;
     setIsVerifyingPayment(true);
 
     try {
-      const res = await fetch(`/api/qris/status/${sessionId}`);
+      const res = await fetch(`/api/qris/status/${targetCheckId}`);
       if (res.ok) {
         const data = await res.json();
         if (data.status === 'PAID' || data.paid === true) {
@@ -229,11 +231,25 @@ export default function Home() {
   // Listener untuk pesan postMessage dari Iframe Mayar
   useEffect(() => {
     const handleMayarMessage = (event: MessageEvent) => {
+      if (!event.data) return;
+
+      let payload = event.data;
+      if (typeof payload === 'string') {
+        try {
+          payload = JSON.parse(payload);
+        } catch (e) {
+          // Abaikan jika string biasa
+        }
+      }
+
+      console.log('Pesan dari Iframe Mayar:', payload);
+
       if (
-        event.data &&
-        (event.data.type === 'mayar_payment_success' ||
-          event.data.status === 'success' ||
-          event.data.event === 'payment.success')
+        payload.type === 'mayar_payment_success' ||
+        payload.status === 'success' ||
+        payload.event === 'payment.success' ||
+        payload.action === 'payment_success' ||
+        (typeof payload === 'string' && payload.includes('success'))
       ) {
         handlePaymentSuccess();
       }
@@ -304,13 +320,16 @@ export default function Home() {
 
       const data = await res.json();
       if (res.ok && data.success) {
+        const realMayarId = data.paymentId || data.id || data.data?.id || currentSession;
+        setMayarPaymentId(realMayarId);
+
         if (data.paymentUrl) {
           setPaymentUrl(data.paymentUrl);
         }
         if (data.qrString) {
           setQrCodeData(data.qrString);
         }
-        startPollingStatus(currentSession);
+        startPollingStatus(realMayarId);
       } else {
         console.error('Mayar Payment Generation Error:', data.message || 'Gagal membuat pembayaran Mayar');
       }
