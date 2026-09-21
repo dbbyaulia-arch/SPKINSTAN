@@ -11,10 +11,9 @@ export async function GET(
     const sessionId = searchParams.get('sessionId') || params.id;
 
     if (!sessionId) {
-      return NextResponse.json({ isPaid: false, message: 'Session ID tidak ada' });
+      return NextResponse.json({ isPaid: false, message: 'Session ID tidak ditemukan' });
     }
 
-    // 1. Baca data dari Redis
     const rawTxn = await redis.get<string>(`txn:${sessionId}`);
 
     if (!rawTxn) {
@@ -30,7 +29,7 @@ export async function GET(
       status: txnData?.status || 'PENDING',
     });
   } catch (error) {
-    console.error('Error check Redis status:', error);
-    return NextResponse.json({ isPaid: false, error: 'Failed to read status' }, { status: 500 });
+    console.error('Error checking status in Redis:', error);
+    return NextResponse.json({ isPaid: false, error: 'Database read failed' }, { status: 500 });
   }
 }

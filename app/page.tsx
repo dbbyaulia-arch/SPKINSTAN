@@ -219,68 +219,45 @@ export default function Home() {
     }
   }, [shouldAutoDownload, paidDocs, selectedPackage, paidDocTarget]);
 
-  // Manual Check & Force Check
-  const handleManualCheckPayment = async (forcePass = false) => {
-    if (forcePass) {
-      handlePaymentSuccess();
-      return;
-    }
-
-    if ((!sessionId && !mayarPaymentId) || isVerifyingPayment) return;
+  // Verifikasi Pembayaran Ketat Tanpa Bypass (Membaca Server Redis)
+  const handleManualCheckPayment = async () => {
+    if (!sessionId || isVerifyingPayment) return;
     setIsVerifyingPayment(true);
 
     try {
-      const targetId = mayarPaymentId || sessionId;
-      const res = await fetch(`/api/qris/status/${targetId}?sessionId=${sessionId}&mayarId=${mayarPaymentId || ''}`);
+      const res = await fetch(`/api/qris/status/${sessionId}?sessionId=${sessionId}`);
 
       if (res.ok) {
         const data = await res.json();
-        if (
-          data.isPaid === true ||
-          data.status === 'PAID' ||
-          data.paid === true ||
-          data.status === 'SUCCESS' ||
-          data.status === 'SETTLED'
-        ) {
+
+        // Wajib tervalidasi LUNAS dari server Redis
+        if (data.isPaid === true && data.status === 'PAID') {
           handlePaymentSuccess();
           return;
         }
       }
 
-      // Jika API belum mendeteksi tapi user mengeklik ulang
-      const confirmBypass = confirm('Sistem API belum mengembalikan status PAID. Jika di layar Mayar Anda sudah muncul tulisan "Transaction Success", tekan OK untuk langsung verifikasi & buka PDF.');
-      if (confirmBypass) {
-        handlePaymentSuccess();
-      }
+      alert('Pembayaran belum terdeteksi di server. Silakan selesaikan proses transfer/scan QRIS terlebih dahulu.');
     } catch (err) {
-      console.error('Pengecekan pembayaran gagal:', err);
-      const confirmBypass = confirm('Gagal terhubung ke server verifikasi. Jika pembayaran di layar Mayar sudah berhasil ("Transaction Success"), tekan OK untuk langsung unduh PDF.');
-      if (confirmBypass) {
-        handlePaymentSuccess();
-      }
+      console.error('Verifikasi pembayaran gagal:', err);
+      alert('Gagal terhubung ke server verifikasi. Silakan periksa koneksi internet Anda.');
     } finally {
       setIsVerifyingPayment(false);
     }
   };
 
-  // Polling Real-time
+  // Polling Real-time Ketat ke Server Redis
   const startPollingStatus = (currentSession: string, mayarId?: string) => {
     stopPolling();
     pollingRef.current = setInterval(async () => {
       try {
-        const targetId = mayarId || currentSession;
-        const res = await fetch(`/api/qris/status/${targetId}?sessionId=${currentSession}&mayarId=${mayarId || ''}`);
+        const res = await fetch(`/api/qris/status/${currentSession}?sessionId=${currentSession}`);
 
         if (!res.ok) return;
 
         const data = await res.json();
-        if (
-          data.isPaid === true ||
-          data.status === 'PAID' ||
-          data.paid === true ||
-          data.status === 'SUCCESS' ||
-          data.status === 'SETTLED'
-        ) {
+        // Wajib strict PAID dari Redis
+        if (data.isPaid === true && data.status === 'PAID') {
           handlePaymentSuccess();
         }
       } catch (err) {
@@ -289,7 +266,7 @@ export default function Home() {
     }, 3000);
   };
 
-  // PostMessage Event Listener dari Mayar
+  // PostMessage Event Listener dari Mayar (Validasi Spesifik Event)
   useEffect(() => {
     const handleMayarMessage = (event: MessageEvent) => {
       if (!event.data) return;
@@ -299,17 +276,14 @@ export default function Home() {
         try {
           payload = JSON.parse(payload);
         } catch (e) {
-          // ignore
+          return;
         }
       }
 
-      const strPayload = JSON.stringify(payload).toLowerCase();
+      // Hanya izinkan jika event tipe khusus payment_success dikirim
       if (
-        strPayload.includes('success') ||
-        strPayload.includes('paid') ||
-        strPayload.includes('settled') ||
-        payload.type === 'mayar_payment_success' ||
-        payload.status === 'success'
+        payload?.type === 'mayar_payment_success' ||
+        (payload?.event === 'payment.received' && payload?.status === 'PAID')
       ) {
         handlePaymentSuccess();
       }
@@ -1615,7 +1589,7 @@ export default function Home() {
               </div>
             )}
 
-            {/* STEP 2: Payment Process View (Embedded Iframe & Bypass Confirmation Button) */}
+            {/* STEP 2: Payment Process View (Direct Verifier Only - Strict Verification) */}
             {modalStep === 'qris' && (
               <div className="space-y-4 text-center">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -1718,31 +1692,21 @@ export default function Home() {
                   <span>Sistem memverifikasi pelunasan secara real-time...</span>
                 </div>
 
-                {/* Tombol Utama: Cek Status & Tombol Konfirmasi Langsung */}
+                {/* Tombol Verifikasi Ketat Server Redis (Tanpa Bypass) */}
                 <div className="space-y-2 pt-1">
-                  {/* Tombol Utama Hijau: Dipasang Force Pass opsional jika layar Mayar di atas sudah "Transaction Success" */}
-                  <button
-                    type="button"
-                    onClick={() => handleManualCheckPayment(true)}
-                    className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 transition animate-pulse"
-                  >
-                    <Check className="w-4 h-4" />
-                    <span>SAYA SUDAH BAYAR (KONFIRMASI & BUKA PDF)</span>
-                  </button>
-
                   <button
                     type="button"
                     disabled={isVerifyingPayment}
-                    onClick={() => handleManualCheckPayment(false)}
-                    className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition border border-slate-300"
+                    onClick={handleManualCheckPayment}
+                    className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white font-black text-xs rounded-xl shadow-md flex items-center justify-center gap-2 transition"
                   >
                     {isVerifyingPayment ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <Loader2 className="w-4 h-4 animate-spin" />
                     ) : (
-                      <CheckCircle className="w-3.5 h-3.5 text-slate-500" />
+                      <CheckCircle className="w-4 h-4" />
                     )}
                     <span>
-                      {isVerifyingPayment ? 'Mengecek Server...' : 'Cek Ulang Server API'}
+                      {isVerifyingPayment ? 'Mengecek Server...' : 'CEK STATUS PEMBAYARAN'}
                     </span>
                   </button>
 
