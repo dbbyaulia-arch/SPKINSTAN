@@ -1,30 +1,52 @@
 import { NextResponse } from 'next/server';
 
-export async function POST(request: Request) {
+export async function POST(req: Request) {
   try {
-    const { sessionId, packageType } = await request.json();
-    const amount = packageType === 'BUNDLING' ? 49999 : 19999;
+    const body = await req.json();
+    
+    const { 
+      sessionId, 
+      amount, 
+      customerName, 
+      customerMobile, 
+      customerEmail 
+    } = body;
 
-    // 1. Simpan Status awal PENDING ke Upstash Redis (TTL 15 Menit = 900 Detik)
-    const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
-    const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+    const response = await fetch('https://api.mayar.id/hl/v1/payment/create', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.MAYAR_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: customerName || 'Klien SPKInstan',
+        email: customerEmail || `client-${Date.now()}@spkinstan.com`,
+        mobile: customerMobile || '081234567890',
+        amount: amount,
+        // Format [Ref: sessionId] wajib agar regex Webhook bekerja
+        description: `Pembayaran Lisensi Dokumen [Ref: ${sessionId}]`,
+      }),
+    });
 
-    if (redisUrl && redisToken) {
-      await fetch(`${redisUrl}/set/${sessionId}/PENDING/EX/900`, {
-        headers: { Authorization: `Bearer ${redisToken}` },
-      });
+    const data = await response.json();
+
+    if (!response.ok) {
+      return NextResponse.json(
+        { success: false, message: data.message || 'Gagal membuat tagihan di Mayar' },
+        { status: response.status }
+      );
     }
-
-    // 2. Generate string QRIS DOKU / Mock Payload
-    const qrString = `00020101021226680016ID.DOKU.WWW01189360091400000000000215${sessionId}5204581253033605405${amount}5802ID5909SPKINSTAN6007JAKARTA6304ABCD`;
 
     return NextResponse.json({
       success: true,
-      sessionId,
-      qrString,
+      paymentUrl: data.data?.link || data.data?.url,
+      qrString: data.data?.qrString,
     });
   } catch (error) {
-    console.error('API QRIS Generate Error:', error);
-    return NextResponse.json({ success: false }, { status: 500 });
+    console.error('Mayar API Error:', error);
+    return NextResponse.json(
+      { success: false, message: 'Terjadi kesalahan pada server' },
+      { status: 500 }
+    );
   }
 }

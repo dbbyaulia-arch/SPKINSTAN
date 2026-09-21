@@ -1,29 +1,32 @@
 import { NextResponse } from 'next/server';
+import { Redis } from '@upstash/redis';
+
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL!,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+});
 
 export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  req: Request,
+  { params }: { params: Promise<{ id: string }> | { id: string } }
 ) {
-  const { id } = await params;
-
   try {
-    const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
-    const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+    // Unwarp params (dukungan Next.js 14 & Next.js 15)
+    const resolvedParams = await params;
+    const sessionId = resolvedParams.id;
 
-    if (!redisUrl || !redisToken) {
-      return NextResponse.json({ status: 'PENDING' });
+    if (!sessionId) {
+      return NextResponse.json({ status: 'PENDING', paid: false });
     }
 
-    const res = await fetch(`${redisUrl}/get/${id}`, {
-      headers: { Authorization: `Bearer ${redisToken}` },
-      cache: 'no-store',
+    const status = await redis.get(`session:${sessionId}`);
+
+    return NextResponse.json({
+      status: status || 'PENDING',
+      paid: status === 'PAID',
     });
-
-    const data = await res.json();
-    const status = data.result || 'PENDING';
-
-    return NextResponse.json({ status });
   } catch (error) {
-    return NextResponse.json({ status: 'PENDING' });
+    console.error('Check status error:', error);
+    return NextResponse.json({ status: 'PENDING', paid: false });
   }
 }

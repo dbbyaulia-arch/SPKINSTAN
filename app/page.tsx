@@ -27,7 +27,10 @@ import {
   Download,
   Send,
   Star,
-  Sparkles
+  Sparkles,
+  Plus,
+  Trash2,
+  Loader2
 } from 'lucide-react';
 
 declare global {
@@ -47,49 +50,61 @@ export default function Home() {
   const [activeDocTab, setActiveDocTab] = useState<'SPK' | 'NDA' | 'BAST'>('SPK');
   const [selectedPackage, setSelectedPackage] = useState<'SINGLE' | 'BUNDLING'>('SINGLE');
   const [currentWizardStep, setCurrentWizardStep] = useState(1);
-  const [isPaidStatus, setIsPaidStatus] = useState(false);
+
+  // Per-document Payment License state
+  const [paidDocs, setPaidDocs] = useState<{ SPK: boolean; NDA: boolean; BAST: boolean }>({
+    SPK: false,
+    NDA: false,
+    BAST: false,
+  });
+  const [paidDocTarget, setPaidDocTarget] = useState<'SPK' | 'NDA' | 'BAST'>('SPK');
+
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [modalStep, setModalStep] = useState<'download_choice' | 'upsell' | 'qris'>('download_choice');
   const [mobileViewMode, setMobileViewMode] = useState<'form' | 'preview'>('form');
   const [isExporting, setIsExporting] = useState(false);
 
-  const [sessionId, setSessionId] = useState('SPK-98A7B2');
+  const [sessionId, setSessionId] = useState('');
   const [timeLeft, setTimeLeft] = useState(899);
 
-  // QRIS API & Polling States
+  // Mayar API, QRIS & Polling States
   const [qrCodeData, setQrCodeData] = useState<string | null>(null);
+  const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
   const [isLoadingQris, setIsLoadingQris] = useState(false);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
   // Form State
-  const [freelancerName, setFreelancerName] = useState('Budi Pratama, S.Kom');
-  const [freelancerWa, setFreelancerWa] = useState('081234567890');
-  const [clientName, setClientName] = useState('PT Digital Inovasi Nusantara');
-  const [clientWa, setClientWa] = useState('089876543210');
+  const [freelancerName, setFreelancerName] = useState('');
+  const [freelancerEmail, setFreelancerEmail] = useState('');
+  const [freelancerWa, setFreelancerWa] = useState('');
+  const [clientName, setClientName] = useState('');
+  const [clientWa, setClientWa] = useState('');
 
   // SPK Fields
-  const [projectTitle, setProjectTitle] = useState('Pengembangan Aplikasi Web Dashboard & API Integration');
-  const [projectAmount, setProjectAmount] = useState('7500000');
-  const [dpPercent, setDpPercent] = useState('50');
-  const [bankInfo, setBankInfo] = useState('BCA 1234567890 a.n Budi Pratama');
+  const [projectTitle, setProjectTitle] = useState('');
+  const [projectAmount, setProjectAmount] = useState('');
+  const [dpPercent, setDpPercent] = useState('');
+  const [bankInfo, setBankInfo] = useState('');
 
   // NDA Fields
-  const [ndaScope, setNdaScope] = useState('Source Code, Skema Database, Aset Desain Figma, & Strategi Bisnis');
-  const [ndaYears, setNdaYears] = useState('2');
-  const [ndaPenalty, setNdaPenalty] = useState('25000000');
+  const [ndaScope, setNdaScope] = useState('');
+  const [ndaYears, setNdaYears] = useState('');
+  const [ndaPenalty, setNdaPenalty] = useState('');
 
   // BAST Fields
-  const [bastRef, setBastRef] = useState('SPK/2026/DEV/009');
-  const [bastWarranty, setBastWarranty] = useState('14');
-  const [bastDate, setBastDate] = useState('2026-09-15');
+  const [bastRef, setBastRef] = useState('');
+  const [bastWarranty, setBastWarranty] = useState('');
+  const [bastDate, setBastDate] = useState('');
 
   // Clause Checkboxes
   const [clauseRevision, setClauseRevision] = useState(true);
   const [clauseSla, setClauseSla] = useState(true);
   const [clauseRetention, setClauseRetention] = useState(true);
   const [clauseDp, setClauseDp] = useState(true);
-  const [customClause, setCustomClause] = useState('');
+  
+  // Custom Dynamic Clauses Array
+  const [customClauses, setCustomClauses] = useState<string[]>(['']);
 
   // Signature Pad Canvas
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -99,9 +114,12 @@ export default function Home() {
   // Testimonials
   const [reviews, setReviews] = useState<Review[]>([]);
 
+  const generateNewSessionId = () => {
+    return 'SPK-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+  };
+
   useEffect(() => {
-    const randomId = 'SPK-' + Math.random().toString(36).substring(2, 8).toUpperCase();
-    setSessionId(randomId);
+    setSessionId(generateNewSessionId());
   }, []);
 
   useEffect(() => {
@@ -111,7 +129,6 @@ export default function Home() {
     }
   }, [showCheckoutModal, modalStep, timeLeft]);
 
-  // Clean up polling interval when component unmounts or modal closes
   const stopPolling = () => {
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
@@ -125,66 +142,132 @@ export default function Home() {
     }
   }, [showCheckoutModal]);
 
-  // Handle QRIS Generation Request via API
+  // Dynamic Custom Clauses Handlers
+  const handleAddCustomClause = () => {
+    setCustomClauses((prev) => [...prev, '']);
+  };
+
+  const handleCustomClauseChange = (index: number, value: string) => {
+    const updated = [...customClauses];
+    updated[index] = value;
+    setCustomClauses(updated);
+  };
+
+  const handleRemoveCustomClause = (index: number) => {
+    setCustomClauses((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // Memanggil API backend Mayar saat tombol bayar diklik
   const handleRequestQris = async () => {
+    if (isLoadingQris) return;
+
+    setIsLoadingQris(true);
+    setModalStep('qris');
+    setPaidDocTarget(activeDocTab);
+    setQrCodeData(null);
+    setPaymentUrl(null);
+
+    const currentSession = generateNewSessionId();
+    setSessionId(currentSession);
+    setTimeLeft(899);
+
+    const amount = selectedPackage === 'SINGLE' ? 1000 : 49999;
+
+    if (typeof window !== 'undefined' && window.fbq) {
+      window.fbq('track', 'InitiateCheckout', {
+        value: amount,
+        currency: 'IDR',
+      });
+    }
+
+    const targetName = clientName || freelancerName || 'Klien SPKInstan';
+    const cleanName = targetName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const targetEmail = freelancerEmail.trim() || (cleanName 
+      ? `${cleanName}@spkinstan.com` 
+      : `client-${Date.now()}@spkinstan.com`);
+
     try {
-      setIsLoadingQris(true);
-      setModalStep('qris');
-
-      // Sinyal Meta Pixel: Pengguna Menekan Tombol Bayar
-      if (typeof window !== 'undefined' && window.fbq) {
-        window.fbq('track', 'InitiateCheckout', {
-          value: selectedPackage === 'SINGLE' ? 19999 : 49999,
-          currency: 'IDR',
-        });
-      }
-
       const res = await fetch('/api/qris/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sessionId,
+          sessionId: currentSession,
           packageType: selectedPackage,
+          amount,
+          docType: activeDocTab,
+          customerName: targetName,
+          customerMobile: clientWa || freelancerWa || '081234567890',
+          customerEmail: targetEmail,
         }),
       });
 
       const data = await res.json();
-      if (data.success && (data.qrString || data.qrContent)) {
-        setQrCodeData(data.qrString || data.qrContent);
+      if (res.ok && data.success) {
+        if (data.paymentUrl) {
+          setPaymentUrl(data.paymentUrl);
+        }
+        if (data.qrString) {
+          setQrCodeData(data.qrString);
+        }
+        startPollingStatus(currentSession);
       } else {
-        setQrCodeData(`SPKINSTAN_PAY_${sessionId}`);
+        console.error('Mayar Payment Generation Error:', data.message || 'Gagal membuat pembayaran Mayar');
       }
-      startPollingStatus(sessionId);
     } catch (err) {
-      console.error('Gagal memuat QRIS DOKU:', err);
-      setQrCodeData(`SPKINSTAN_PAY_${sessionId}`);
-      startPollingStatus(sessionId);
+      console.error('Network error during Mayar payment generation:', err);
     } finally {
       setIsLoadingQris(false);
     }
   };
 
-  // Handle Polling Status Redis
+  // Polling Status Real-time
   const startPollingStatus = (id: string) => {
     stopPolling();
     pollingRef.current = setInterval(async () => {
       try {
         const res = await fetch(`/api/qris/status/${id}`);
+
+        if (!res.ok) {
+          console.warn(`Polling status warning (${res.status}): Endpoint belum siap`);
+          return;
+        }
+
         const data = await res.json();
 
-        if (data.status === 'PAID') {
+        if (data.status === 'PAID' || data.paid === true) {
           stopPolling();
-          setIsPaidStatus(true);
+
+          // 1. Set status dokumen ke lunas
+          if (selectedPackage === 'BUNDLING') {
+            setPaidDocs({ SPK: true, NDA: true, BAST: true });
+          } else {
+            setPaidDocs((prev) => ({ ...prev, [paidDocTarget]: true }));
+          }
+
+          // 2. Tampilkan mode preview agar elemen A4 ter-render penuh di layar HP/Desktop
+          setMobileViewMode('preview');
           setShowCheckoutModal(false);
           setShowSuccessModal(true);
 
-          // Sinyal Meta Pixel jika sukses dari Webhook Polling
           if (typeof window !== 'undefined' && window.fbq) {
             window.fbq('track', 'Purchase', {
               value: selectedPackage === 'SINGLE' ? 19999 : 49999,
               currency: 'IDR',
             });
           }
+
+          // 3. Upaya auto-download otomatis setelah DOM ter-render
+          setTimeout(async () => {
+            try {
+              if (selectedPackage === 'BUNDLING') {
+                await captureDocumentToPdf('SPK');
+              } else {
+                await captureDocumentToPdf(paidDocTarget);
+              }
+            } catch (autoErr) {
+              console.warn('Auto download terblokir browser, user dapat menekan tombol di modal sukses:', autoErr);
+            }
+          }, 800);
         }
       } catch (err) {
         console.error('Polling error:', err);
@@ -253,36 +336,59 @@ export default function Home() {
     setSignatureDataUrl(null);
   };
 
-  const handleDownloadPDF = async () => {
-    const element = document.getElementById('a4-document-preview');
-    if (!element) return;
+  // Helper Capture PDF per Dokumen
+  const captureDocumentToPdf = async (docType: 'SPK' | 'NDA' | 'BAST') => {
+    setActiveDocTab(docType);
+    
+    // Pastikan view mobile beralih ke preview agar DOM tidak tersembunyi
+    setMobileViewMode('preview');
+    await new Promise((resolve) => setTimeout(resolve, 350));
 
+    const element = document.getElementById('a4-document-preview');
+    if (!element) {
+      console.error('Elemen #a4-document-preview tidak ditemukan di DOM');
+      return;
+    }
+
+    const html2canvasPro = (await import('html2canvas-pro')).default;
+    const { jsPDF } = await import('jspdf');
+
+    const canvas = await html2canvasPro(element, {
+      scale: 2,
+      useCORS: true,
+      logging: false,
+    });
+
+    const imgData = canvas.toDataURL('image/jpeg', 0.98);
+    const pdf = new jsPDF({
+      orientation: 'portrait',
+      unit: 'in',
+      format: 'a4',
+    });
+
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+    pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+    pdf.save(`SPKInstan_${docType}_${(freelancerName || 'Freelancer').replace(/\s+/g, '_')}_CLEAN.pdf`);
+  };
+
+  // PDF Export Handler untuk Ekspor Manual / Klik Tombol
+  const handleDownloadPDF = async (specificDoc?: 'SPK' | 'NDA' | 'BAST') => {
     try {
       setIsExporting(true);
-      await new Promise((resolve) => setTimeout(resolve, 150));
 
-      const html2canvasPro = (await import('html2canvas-pro')).default;
-      const { jsPDF } = await import('jspdf');
-
-      const canvas = await html2canvasPro(element, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-      });
-
-      const imgData = canvas.toDataURL('image/jpeg', 0.98);
-
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'in',
-        format: 'a4',
-      });
-
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-
-      pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`SPKInstan_${activeDocTab}_${freelancerName.replace(/\s+/g, '_')}.pdf`);
+      if (specificDoc) {
+        await captureDocumentToPdf(specificDoc);
+      } else if (selectedPackage === 'BUNDLING') {
+        await captureDocumentToPdf('SPK');
+        await new Promise((r) => setTimeout(r, 400));
+        await captureDocumentToPdf('NDA');
+        await new Promise((r) => setTimeout(r, 400));
+        await captureDocumentToPdf('BAST');
+      } else {
+        await captureDocumentToPdf(activeDocTab);
+      }
     } catch (err) {
       console.error('Gagal membuat PDF:', err);
     } finally {
@@ -297,27 +403,24 @@ export default function Home() {
 
   const handleFinishForm = () => {
     setMobileViewMode('preview');
-    setModalStep('download_choice');
-    setShowCheckoutModal(true);
-  };
-
-  const handleSimulatePayment = () => {
-    stopPolling();
-    setShowCheckoutModal(false);
-    setIsPaidStatus(true);
-    setShowSuccessModal(true);
-
-    // Sinyal Meta Pixel: Pembayaran Sukses (Konversi Iklan)
-    if (typeof window !== 'undefined' && window.fbq) {
-      window.fbq('track', 'Purchase', {
-        value: selectedPackage === 'SINGLE' ? 19999 : 49999,
-        currency: 'IDR',
-      });
+    if (!paidDocs[activeDocTab]) {
+      setModalStep('download_choice');
+      setShowCheckoutModal(true);
+    } else {
+      setShowSuccessModal(true);
     }
   };
 
-  const handleShareWhatsApp = () => {
-    const text = `Halo ${clientName},\n\nBerikut dikirimkan draf resmi *${activeDocTab} Perjanjian Kerja Sama* untuk proyek "${projectTitle}" yang telah diterbitkan secara legal.\n\n*Penyedia Jasa:* ${freelancerName}\n*Status Dokumen:* Sah (Terverifikasi Pelunasan)\n\nMohon diperiksa dan ditandatangani kembali. Terima kasih!`;
+  const handleShareWhatsApp = (specificDoc?: 'SPK' | 'NDA' | 'BAST') => {
+    const targetDoc = specificDoc || activeDocTab;
+    let text = '';
+    
+    if (selectedPackage === 'BUNDLING' && !specificDoc) {
+      text = `Halo ${clientName || 'Klien'},\n\nBerikut dikirimkan draf resmi *Paket Perjanjian Kerja Sama (SPK, NDA, & BAST)* untuk proyek "${projectTitle || 'Pekerjaan Jasa'}" yang telah diterbitkan secara legal.\n\n*Penyedia Jasa:* ${freelancerName || 'Debby Aulia'}\n*Status Dokumen:* Sah (Terverifikasi Pelunasan PRO)\n\nMohon diperiksa dan ditandatangani kembali. Terima kasih!`;
+    } else {
+      text = `Halo ${clientName || 'Klien'},\n\nBerikut dikirimkan draf resmi *${targetDoc} Perjanjian Kerja Sama* untuk proyek "${projectTitle || 'Pekerjaan Jasa'}" yang telah diterbitkan secara legal.\n\n*Penyedia Jasa:* ${freelancerName || 'Debby Aulia'}\n*Status Dokumen:* Sah (Terverifikasi Pelunasan)\n\nMohon diperiksa dan ditandatangani kembali. Terima kasih!`;
+    }
+    
     window.open(`https://wa.me/${clientWa}?text=${encodeURIComponent(text)}`, '_blank');
   };
 
@@ -391,7 +494,7 @@ export default function Home() {
               </h1>
 
               <p className="text-slate-500 text-xs sm:text-sm md:text-base font-medium leading-relaxed max-w-xl mx-auto">
-                Hasilkan SPK, NDA, & BAST sah dalam 2 menit. Bebas ghosting klien, kepastian pembayaran, dan revisi terstruktur langsung dari HP.
+                Hasikan SPK, NDA, & BAST sah dalam 2 menit. Bebas ghosting klien, kepastian pembayaran, dan revisi terstruktur langsung dari HP.
               </p>
 
               {/* Package Selector Pills */}
@@ -565,6 +668,19 @@ export default function Home() {
                             type="text"
                             value={freelancerName}
                             onChange={(e) => setFreelancerName(e.target.value)}
+                            placeholder="cth: Debby Aulia"
+                            className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1">
+                            Email Freelancer (Untuk Struk / Kuitansi Payment)
+                          </label>
+                          <input
+                            type="email"
+                            value={freelancerEmail}
+                            onChange={(e) => setFreelancerEmail(e.target.value)}
+                            placeholder="cth: debby@gmail.com"
                             className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                           />
                         </div>
@@ -576,6 +692,7 @@ export default function Home() {
                             type="text"
                             value={freelancerWa}
                             onChange={(e) => setFreelancerWa(e.target.value)}
+                            placeholder="cth: 081234567890"
                             className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                           />
                         </div>
@@ -593,6 +710,7 @@ export default function Home() {
                             type="text"
                             value={clientName}
                             onChange={(e) => setClientName(e.target.value)}
+                            placeholder="cth: PT Digital Inovasi Nusantara"
                             className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                           />
                         </div>
@@ -604,6 +722,7 @@ export default function Home() {
                             type="text"
                             value={clientWa}
                             onChange={(e) => setClientWa(e.target.value)}
+                            placeholder="cth: 089876543210"
                             className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                           />
                         </div>
@@ -624,6 +743,7 @@ export default function Home() {
                               type="text"
                               value={projectTitle}
                               onChange={(e) => setProjectTitle(e.target.value)}
+                              placeholder="cth: Pengembangan Aplikasi Web Dashboard & API Integration"
                               className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                             />
                           </div>
@@ -636,6 +756,7 @@ export default function Home() {
                                 type="number"
                                 value={projectAmount}
                                 onChange={(e) => setProjectAmount(e.target.value)}
+                                placeholder="cth: 7500000"
                                 className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                               />
                             </div>
@@ -647,6 +768,7 @@ export default function Home() {
                                 type="number"
                                 value={dpPercent}
                                 onChange={(e) => setDpPercent(e.target.value)}
+                                placeholder="cth: 50"
                                 className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                               />
                             </div>
@@ -659,6 +781,7 @@ export default function Home() {
                               type="text"
                               value={bankInfo}
                               onChange={(e) => setBankInfo(e.target.value)}
+                              placeholder="cth: BCA 1234567890 a.n Debby Aulia"
                               className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                             />
                           </div>
@@ -675,6 +798,7 @@ export default function Home() {
                               type="text"
                               value={ndaScope}
                               onChange={(e) => setNdaScope(e.target.value)}
+                              placeholder="cth: Source Code, Skema Database, Aset Desain Figma, & Strategi Bisnis"
                               className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                             />
                           </div>
@@ -687,6 +811,7 @@ export default function Home() {
                                 type="number"
                                 value={ndaYears}
                                 onChange={(e) => setNdaYears(e.target.value)}
+                                placeholder="cth: 2"
                                 className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                               />
                             </div>
@@ -698,6 +823,7 @@ export default function Home() {
                                 type="number"
                                 value={ndaPenalty}
                                 onChange={(e) => setNdaPenalty(e.target.value)}
+                                placeholder="cth: 25000000"
                                 className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                               />
                             </div>
@@ -715,6 +841,7 @@ export default function Home() {
                               type="text"
                               value={bastRef}
                               onChange={(e) => setBastRef(e.target.value)}
+                              placeholder="cth: SPK/2026/DEV/009"
                               className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                             />
                           </div>
@@ -727,6 +854,7 @@ export default function Home() {
                                 type="number"
                                 value={bastWarranty}
                                 onChange={(e) => setBastWarranty(e.target.value)}
+                                placeholder="cth: 14"
                                 className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                               />
                             </div>
@@ -738,6 +866,7 @@ export default function Home() {
                                 type="date"
                                 value={bastDate}
                                 onChange={(e) => setBastDate(e.target.value)}
+                                placeholder="cth: 2026-09-15"
                                 className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                               />
                             </div>
@@ -806,17 +935,42 @@ export default function Home() {
                         </div>
                       </label>
 
-                      <div className="pt-2 border-t border-slate-100">
-                        <label className="block text-xs font-semibold text-slate-700 mb-1">
-                          + Tambah Pasal Khusus Mandiri (Opsional)
-                        </label>
-                        <textarea
-                          rows={2}
-                          value={customClause}
-                          onChange={(e) => setCustomClause(e.target.value)}
-                          placeholder="Contoh: Klien wajib memberikan materi konten maksimal H+3 sejak SPK ditandatangani."
-                          className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all"
-                        />
+                      {/* Dynamic Multiple Custom Clauses Section */}
+                      <div className="pt-3 border-t border-slate-100 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <label className="block text-xs font-bold text-slate-700">
+                            + Tambah Klausul Khusus Mandiri
+                          </label>
+                          <button
+                            type="button"
+                            onClick={handleAddCustomClause}
+                            className="text-xs text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1 bg-blue-50 px-2 py-1 rounded-lg border border-blue-200 transition-all"
+                          >
+                            <Plus className="w-3.5 h-3.5" /> Tambah Klausul
+                          </button>
+                        </div>
+
+                        {customClauses.map((clause, idx) => (
+                          <div key={idx} className="flex items-center gap-2">
+                            <textarea
+                              rows={2}
+                              value={clause}
+                              onChange={(e) => handleCustomClauseChange(idx, e.target.value)}
+                              placeholder={`cth: Klien wajib memberikan materi konten maksimal H+3 sejak SPK ditandatangani.`}
+                              className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all"
+                            />
+                            {customClauses.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveCustomClause(idx)}
+                                className="text-red-500 hover:text-red-700 p-2 hover:bg-red-50 rounded-lg transition-all"
+                                title="Hapus Klausul Ini"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     </div>
                   )}
@@ -920,8 +1074,8 @@ export default function Home() {
                     onContextMenu={(e) => e.preventDefault()}
                     className="w-full min-h-[780px] bg-white text-slate-950 font-serif p-4 sm:p-10 relative overflow-x-auto select-none shadow-xl rounded-xl"
                   >
-                    {/* Watermark Overlay Layer (Versi Gratis) */}
-                    {!isPaidStatus && (
+                    {/* Watermark Overlay Layer */}
+                    {!paidDocs[activeDocTab] && (
                       <>
                         <div
                           className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden"
@@ -936,7 +1090,7 @@ export default function Home() {
                               fontFamily: 'sans-serif'
                             }}
                           >
-                            SPKINSTAN
+                            SPKINSTAN DRAFT
                           </span>
                         </div>
                         <div
@@ -951,7 +1105,7 @@ export default function Home() {
                             className="text-[10px] font-bold uppercase tracking-wider font-sans"
                             style={{ color: 'rgba(15, 23, 42, 0.7)' }}
                           >
-                            Dibuat via SPKInstan (Versi Gratis)
+                            Dibuat via SPKInstan (Versi Draf)
                           </span>
                         </div>
                       </>
@@ -967,7 +1121,7 @@ export default function Home() {
                           {activeDocTab === 'BAST' && 'BERITA ACARA SERAH TERIMA PEKERJAAN (BAST)'}
                         </h2>
                         <p className="text-[10px] sm:text-[11px] text-slate-600">
-                          Nomor Registrasi Perikatan: SPK/2026/09/{sessionId.split('-')[1]}
+                          Nomor Registrasi Perikatan: SPK/2026/09/{sessionId ? sessionId.split('-')[1] : '000000'}
                         </p>
                       </div>
 
@@ -981,13 +1135,13 @@ export default function Home() {
                         <div className="grid grid-cols-12 gap-1">
                           <span className="col-span-1 font-bold">1.</span>
                           <div className="col-span-11">
-                            <strong>PIHAK PERTAMA (Penyedia Jasa):</strong> {freelancerName} (No. WA: {freelancerWa}).
+                            <strong>PIHAK PERTAMA (Penyedia Jasa):</strong> {freelancerName || 'Debby Aulia'} (No. WA: {freelancerWa || '081234567890'}).
                           </div>
                         </div>
                         <div className="grid grid-cols-12 gap-1">
                           <span className="col-span-1 font-bold">2.</span>
                           <div className="col-span-11">
-                            <strong>PIHAK KEDUA (Pemberi Kerja):</strong> {clientName} (No. WA: {clientWa}).
+                            <strong>PIHAK KEDUA (Pemberi Kerja):</strong> {clientName || 'PT Digital Inovasi Nusantara'} (No. WA: {clientWa || '089876543210'}).
                           </div>
                         </div>
                       </div>
@@ -1003,17 +1157,17 @@ export default function Home() {
                             <div className="space-y-1">
                               <strong>PASAL 1: LINGKUP PEKERJAAN & ADDENDUM</strong>
                               <p className="text-justify">
-                                PIHAK PERTAMA sepakat melaksanakan pekerjaan <strong>"{projectTitle}"</strong> untuk PIHAK KEDUA sesuai spesifikasi teknis yang disetujui.
+                                PIHAK PERTAMA sepakat melaksanakan pekerjaan <strong>"{projectTitle || 'Pengembangan Aplikasi Web Dashboard & API Integration'}"</strong> untuk PIHAK KEDUA sesuai spesifikasi teknis yang disetujui.
                               </p>
                             </div>
                             <div className="space-y-1">
                               <strong>PASAL 2: NILAI PEKERJAAN & HAK RETENSI</strong>
                               <p className="text-justify">
-                                Total nilai imbalan sebesar <strong>Rp {formatRupiah(projectAmount)}</strong> dengan Uang Muka (DP) sebesar <strong>{dpPercent}%</strong>. Pelunasan dikirimkan ke rekening <strong>{bankInfo}</strong>.
+                                Total nilai imbalan sebesar <strong>Rp {formatRupiah(projectAmount || '7500000')}</strong> dengan Uang Muka (DP) sebesar <strong>{dpPercent || '50'}%</strong>. Pelunasan dikirimkan ke rekening <strong>{bankInfo || 'BCA 1234567890 a.n Debby Aulia'}</strong>.
                               </p>
                             </div>
 
-                            {(clauseRevision || clauseSla || clauseRetention || clauseDp || customClause.trim() !== '') && (
+                            {(clauseRevision || clauseSla || clauseRetention || clauseDp || customClauses.some((c) => c.trim() !== '')) && (
                               <div className="space-y-1">
                                 <strong>PASAL 3: KLAUSUL KHUSUS PROTEKSI HUKUM PERDATA</strong>
                                 <ol className="list-decimal pl-4 space-y-1 mt-1">
@@ -1029,7 +1183,9 @@ export default function Home() {
                                   {clauseDp && (
                                     <li>Uang Muka (DP) bersifat tidak dapat ditarik kembali (non-refundable) sesuai Pasal 1464 KUHPerdata jika pembatalan terjadi sepihak oleh PIHAK KEDUA.</li>
                                   )}
-                                  {customClause.trim() !== '' && <li>{customClause}</li>}
+                                  {customClauses.map((c, i) =>
+                                    c.trim() !== '' ? <li key={i}>{c}</li> : null
+                                  )}
                                 </ol>
                               </div>
                             )}
@@ -1041,13 +1197,13 @@ export default function Home() {
                             <div className="space-y-1">
                               <strong>PASAL 1: CAKUPAN INFORMASI RAHASIA</strong>
                               <p className="text-justify">
-                                Informasi Rahasia mencakup <strong>"{ndaScope}"</strong> yang diserahterimakan selama masa kerja sama.
+                                Informasi Rahasia mencakup <strong>"{ndaScope || 'Source Code, Skema Database, Aset Desain Figma, & Strategi Bisnis'}"</strong> yang diserahterimakan selama masa kerja sama.
                               </p>
                             </div>
                             <div className="space-y-1">
                               <strong>PASAL 2: JANGKA WAKTU & DENDA PELANGGARAN</strong>
                               <p className="text-justify">
-                                Kerahasiaan berlaku selama <strong>{ndaYears} tahun</strong>. Pelanggaran atas kerahasiaan dikenakan denda kewajiban ganti rugi sebesar <strong>Rp {formatRupiah(ndaPenalty)}</strong> sesuai Pasal 1365 KUHPerdata.
+                                Kerahasiaan berlaku selama <strong>{ndaYears || '2'} tahun</strong>. Pelanggaran atas kerahasiaan dikenakan denda kewajiban ganti rugi sebesar <strong>Rp {formatRupiah(ndaPenalty || '25000000')}</strong> sesuai Pasal 1365 KUHPerdata.
                               </p>
                             </div>
                           </>
@@ -1058,13 +1214,13 @@ export default function Home() {
                             <div className="space-y-1">
                               <strong>PASAL 1: SERAH TERIMA PEKERJAAN FINAL</strong>
                               <p className="text-justify">
-                                PIHAK PERTAMA menyerahkan hasil pekerjaan akhir berdasarkan SPK Referensi <strong>"{bastRef}"</strong> kepada PIHAK KEDUA pada tanggal <strong>{bastDate}</strong>.
+                                PIHAK PERTAMA menyerahkan hasil pekerjaan akhir berdasarkan SPK Referensi <strong>"{bastRef || 'SPK/2026/DEV/009'}"</strong> kepada PIHAK KEDUA pada tanggal <strong>{bastDate || '2026-09-15'}</strong>.
                               </p>
                             </div>
                             <div className="space-y-1">
                               <strong>PASAL 2: MASA GARANSI & PELEPASAN TUNTUTAN</strong>
                               <p className="text-justify">
-                                PIHAK KEDUA menerima pekerjaan dalam kondisi baik dengan masa garansi perbaikan bug selama <strong>{bastWarranty} hari kerja</strong>.
+                                PIHAK KEDUA menerima pekerjaan dalam kondisi baik dengan masa garansi perbaikan bug selama <strong>{bastWarranty || '14'} hari kerja</strong>.
                               </p>
                             </div>
                           </>
@@ -1084,7 +1240,7 @@ export default function Home() {
                               </div>
                             )}
                           </div>
-                          <p className="font-bold underline">{freelancerName}</p>
+                          <p className="font-bold underline">{freelancerName || 'Debby Aulia'}</p>
                         </div>
                         <div className="space-y-12">
                           <p className="font-bold">PIHAK KEDUA (Pemberi Kerja)</p>
@@ -1093,7 +1249,7 @@ export default function Home() {
                               {!isExporting && '( Tanda Tangan & Nama Terang )'}
                             </div>
                           </div>
-                          <p className="font-bold underline">{clientName}</p>
+                          <p className="font-bold underline">{clientName || 'PT Digital Inovasi Nusantara'}</p>
                         </div>
                       </div>
                     </div>
@@ -1107,9 +1263,9 @@ export default function Home() {
                       Status Dokumen Draf
                     </span>
                     <span className="text-sm font-extrabold text-slate-900">
-                      {isPaidStatus ? (
+                      {paidDocs[activeDocTab] ? (
                         <span className="text-emerald-600 flex items-center gap-1">
-                          <CheckCircle className="w-4 h-4 inline" /> Lisensi PRO (Tanpa Watermark)
+                          <CheckCircle className="w-4 h-4 inline" /> Terverifikasi Lunas ({activeDocTab})
                         </span>
                       ) : (
                         <span>Draf Gratis (Terdapat Watermark)</span>
@@ -1118,25 +1274,23 @@ export default function Home() {
                   </div>
 
                   <div className="w-full sm:w-auto flex flex-col sm:flex-row items-center gap-2">
-                    {/* Free Download Button Always Available */}
                     <button
                       type="button"
                       onClick={handleFreeDownload}
                       className="w-full sm:w-auto px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-full text-xs transition-all flex items-center justify-center gap-1.5 border border-slate-300"
                     >
                       <Download className="w-4 h-4 text-slate-600" />
-                      <span>Download Gratis (Ada Watermark)</span>
+                      <span>Download Draf Watermark</span>
                     </button>
 
-                    {/* Paid Pro Download Button */}
-                    {isPaidStatus ? (
+                    {paidDocs[activeDocTab] ? (
                       <button
                         type="button"
-                        onClick={handleDownloadPDF}
+                        onClick={() => handleDownloadPDF(activeDocTab)}
                         className="w-full sm:w-auto px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-full text-xs transition-all shadow-md flex items-center justify-center gap-1.5"
                       >
                         <Download className="w-4 h-4" />
-                        <span>Unduh PDF HD Clean</span>
+                        <span>Unduh PDF Clean (Tanpa Watermark)</span>
                       </button>
                     ) : (
                       <button
@@ -1213,8 +1367,8 @@ export default function Home() {
 
       {/* Download Choice & Payment Modal */}
       {showCheckoutModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white max-w-md w-full rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-5">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white max-w-lg w-full rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-5 my-8">
             
             {/* STEP 1: Main Download Choice Modal */}
             {modalStep === 'download_choice' && (
@@ -1223,7 +1377,7 @@ export default function Home() {
                   <div className="flex items-center gap-2">
                     <Sparkles className="w-5 h-5 text-amber-500" />
                     <span className="text-xs font-extrabold text-slate-900 uppercase">
-                      Dokumen Berhasil Dibuat!
+                      Pilih Paket Lisensi Dokumen
                     </span>
                   </div>
                   <button
@@ -1236,164 +1390,77 @@ export default function Home() {
                 </div>
 
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  Dokumen legal perdata Anda telah siap. Silakan pilih metode unduh di bawah ini:
+                  Silakan bayar melalui Mayar Payment Gateway untuk menghapus watermark dan membuka PDF HD legal:
                 </p>
 
                 <div className="space-y-3">
-                  {/* Option A: Download Gratis */}
-                  <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50 hover:border-slate-300 transition-all space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-800">Versi Gratis</span>
-                      <span className="bg-slate-200 text-slate-700 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">
-                        Rp 0 (Free)
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-500 leading-relaxed">
-                      Unduh PDF legal lengkap secara langsung. Terdapat watermark halus "SPKINSTAN" pada hasil dokumen.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={handleFreeDownload}
-                      className="w-full py-2.5 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-1.5"
-                    >
-                      <Download className="w-4 h-4" />
-                      <span>Unduh Versi Gratis (Dengan Watermark)</span>
-                    </button>
-                  </div>
-
-                  {/* Option B: Download Berbayar Pro (Clean) */}
-                  <div className="p-4 rounded-2xl border-2 border-emerald-500/80 bg-emerald-50/40 hover:bg-emerald-50 transition-all space-y-3">
+                  <div className="p-4 rounded-2xl border-2 border-emerald-500/80 bg-emerald-50/40 space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-emerald-900 flex items-center gap-1">
                         <ShieldCheck className="w-4 h-4 text-emerald-600" /> Versi PRO Clean (Tanpa Watermark)
                       </span>
-                      <span className="bg-emerald-600 text-white text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">
-                        Rekomendasi Legal
-                      </span>
                     </div>
 
-                    <p className="text-[11px] text-slate-600 leading-relaxed">
-                      Dokumen PDF HD 100% bersih tanpa watermark, siap dikirim resmi ke Klien atau dicetak fisik.
-                    </p>
-
-                    {/* Sub Choice: Single vs Bundling */}
                     <div className="space-y-2 pt-1">
                       <div
                         onClick={() => setSelectedPackage('SINGLE')}
-                        className={`p-2.5 rounded-xl border text-xs cursor-pointer flex items-center justify-between transition-all ${
+                        className={`p-3 rounded-xl border text-xs cursor-pointer flex items-center justify-between transition-all ${
                           selectedPackage === 'SINGLE'
                             ? 'bg-white border-emerald-600 font-bold shadow-sm'
                             : 'bg-white/60 border-slate-200 text-slate-700'
                         }`}
                       >
-                        <span>Single Document ({activeDocTab})</span>
-                        <span className="font-extrabold text-slate-900">Rp 19.999</span>
+                        <div>
+                          <span className="block font-bold">Dokumen Satuan ({activeDocTab})</span>
+                          <span className="text-[10px] text-slate-500 font-normal">Unduh 1 dokumen PDF pilihan</span>
+                        </div>
+                        <span className="font-extrabold text-slate-900 text-sm">Rp 19.999</span>
                       </div>
 
                       <div
                         onClick={() => setSelectedPackage('BUNDLING')}
-                        className={`p-2.5 rounded-xl border text-xs cursor-pointer flex items-center justify-between transition-all ${
+                        className={`p-3 rounded-xl border text-xs cursor-pointer flex items-center justify-between transition-all ${
                           selectedPackage === 'BUNDLING'
                             ? 'bg-white border-emerald-600 font-bold shadow-sm'
                             : 'bg-white/60 border-slate-200 text-slate-700'
                         }`}
                       >
-                        <div className="flex items-center gap-1.5">
-                          <span>Paket Bundling (SPK + NDA + BAST)</span>
-                          <span className="bg-amber-500 text-white text-[9px] px-1 py-0.2 rounded font-black uppercase">
-                            -60%
-                          </span>
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold">Paket Bundling Proteksi 3-in-1</span>
+                            <span className="bg-amber-500 text-white text-[9px] px-1 py-0.2 rounded font-black uppercase">
+                              -60%
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-slate-500 font-normal">Unduh sekaligus 3 Dokumen (SPK + NDA + BAST)</span>
                         </div>
-                        <span className="font-extrabold text-emerald-700">Rp 49.999</span>
+                        <span className="font-extrabold text-emerald-700 text-sm">Rp 49.999</span>
                       </div>
                     </div>
 
                     <button
                       type="button"
+                      disabled={isLoadingQris}
                       onClick={handleRequestQris}
-                      className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition-all shadow-md flex items-center justify-center gap-1.5"
+                      className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white font-bold rounded-xl text-xs transition-all shadow-md flex items-center justify-center gap-1.5"
                     >
-                      <Unlock className="w-4 h-4" />
-                      <span>Bayar & Unduh PDF HD Tanpa Watermark</span>
+                      {isLoadingQris ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Unlock className="w-4 h-4" />
+                      )}
+                      <span>
+                        {isLoadingQris
+                          ? 'Memproses...'
+                          : `Bayar via Mayar Payment Gateway (${selectedPackage === 'SINGLE' ? 'Rp 19.999' : 'Rp 49.999'})`}
+                      </span>
                     </button>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* STEP 2: Package Upsell Upgrade */}
-            {modalStep === 'upsell' && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                  <span className="text-xs font-bold text-slate-900 uppercase">Pilih Paket Dokumen PRO</span>
-                  <button
-                    type="button"
-                    onClick={() => setShowCheckoutModal(false)}
-                    className="text-slate-400 hover:text-slate-600"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-
-                <div className="space-y-3">
-                  <div
-                    onClick={() => setSelectedPackage('SINGLE')}
-                    className={`flex items-center justify-between p-3.5 rounded-2xl border-2 cursor-pointer transition-all ${
-                      selectedPackage === 'SINGLE'
-                        ? 'border-blue-600 bg-blue-50/50'
-                        : 'border-slate-200 bg-slate-50'
-                    }`}
-                  >
-                    <div className="space-y-0.5">
-                      <span className="text-xs font-bold text-slate-900 block">Dokumen Satuan</span>
-                      <span className="text-[11px] text-slate-500">1x Dokumen PDF Tanpa Watermark</span>
-                    </div>
-                    <span className="text-sm font-extrabold text-slate-900">Rp 19.999</span>
-                  </div>
-
-                  <div
-                    onClick={() => setSelectedPackage('BUNDLING')}
-                    className={`flex items-center justify-between p-3.5 rounded-2xl border-2 cursor-pointer transition-all ${
-                      selectedPackage === 'BUNDLING'
-                        ? 'border-blue-600 bg-blue-50/50'
-                        : 'border-slate-200 bg-slate-50'
-                    }`}
-                  >
-                    <div className="space-y-0.5">
-                      <span className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
-                        <span>Paket Proteksi 3-in-1</span>
-                        <span className="bg-amber-500 text-white text-[9px] px-1.5 py-0.2 rounded font-black uppercase">
-                          Hemat 60%
-                        </span>
-                      </span>
-                      <span className="text-[11px] text-slate-500">SPK Proyek + NDA Kerahasiaan + BAST Final</span>
-                    </div>
-                    <span className="text-sm font-extrabold text-emerald-600">Rp 49.999</span>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <button
-                    type="button"
-                    onClick={handleRequestQris}
-                    className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl text-xs transition-all shadow-md flex items-center justify-center gap-2"
-                  >
-                    <span>Lanjut ke Pembayaran QRIS</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setModalStep('download_choice')}
-                    className="w-full py-2 text-xs text-slate-500 hover:text-slate-700 font-semibold"
-                  >
-                    ← Kembali ke Pilihan Unduh
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* STEP 3: QRIS Payment Display */}
+            {/* STEP 2: Payment Process View */}
             {modalStep === 'qris' && (
               <div className="space-y-4 text-center">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -1406,49 +1473,62 @@ export default function Home() {
                 </div>
 
                 <div>
-                  <h3 className="font-extrabold text-slate-900 text-base">Scan QRIS untuk Pelunasan PRO</h3>
+                  <h3 className="font-extrabold text-slate-900 text-base">Pembayaran Lisensi Dokumen</h3>
                   <div className="text-2xl font-black text-slate-900 mt-1">
                     {selectedPackage === 'SINGLE' ? 'Rp 19.999' : 'Rp 49.999'}
                   </div>
+                  <p className="text-[11px] text-slate-500">
+                    Paket: <strong>{selectedPackage === 'SINGLE' ? `Single Document (${activeDocTab})` : 'Bundling (SPK + NDA + BAST)'}</strong>
+                  </p>
                 </div>
 
-                <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 inline-block">
+                <div className="bg-slate-50 p-2 sm:p-3 rounded-2xl border border-slate-200 overflow-hidden w-full">
                   {isLoadingQris ? (
-                    <div className="w-40 h-40 mx-auto rounded-lg bg-slate-100 flex items-center justify-center text-xs text-slate-500 animate-pulse font-sans font-bold">
-                      Membuat QRIS DOKU...
+                    <div className="w-full h-64 sm:h-80 rounded-xl bg-slate-100 flex items-center justify-center text-xs text-slate-500 animate-pulse font-sans font-bold gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
+                      <span>Menyiapkan Payment Gateway Mayar...</span>
+                    </div>
+                  ) : paymentUrl ? (
+                    <iframe
+                      src={paymentUrl}
+                      title="Mayar Payment Gateway"
+                      className="w-full h-[420px] rounded-xl border-0 shadow-inner bg-white"
+                      allow="payment"
+                    />
+                  ) : qrCodeData ? (
+                    <div className="p-4 space-y-2">
+                      <img
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrCodeData)}`}
+                        alt="QRIS Barcode Mayar"
+                        className="w-48 h-48 mx-auto rounded-lg shadow-sm"
+                      />
+                      <span className="block text-[10px] font-bold text-slate-400">
+                        Scan QRIS via Aplikasi M-Banking / E-Wallet pilihan Anda
+                      </span>
                     </div>
                   ) : (
-                    <img
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(qrCodeData || 'SPKINSTAN_SIMULATED_PAYMENT')}`}
-                      alt="QRIS Barcode"
-                      className="w-40 h-40 mx-auto rounded-lg"
-                    />
+                    <div className="w-full h-48 rounded-xl bg-red-50 text-red-500 flex items-center justify-center text-xs p-4 text-center font-sans font-medium">
+                      Gagal memuat metode pembayaran. Silakan coba kembali beberapa saat.
+                    </div>
                   )}
-                  <span className="block text-[10px] font-bold text-slate-400 mt-1">
-                    DOKU Payment Gateway / Dynamic QRIS
+                  <span className="block text-[10px] font-bold text-slate-400 mt-2">
+                    Secured by Mayar Payment Gateway (QRIS, VA, E-Wallet)
                   </span>
                 </div>
 
-                <div className="text-[11px] text-slate-500 flex items-center justify-center gap-2">
+                <div className="text-[11px] text-emerald-600 font-semibold flex items-center justify-center gap-2 bg-emerald-50 p-2.5 rounded-xl border border-emerald-200">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-                  <span>Auto-Polling Status Pembayaran setiap 3 detik...</span>
+                  <span>Mengecek status pembayaran secara otomatis...</span>
                 </div>
 
-                <div className="space-y-2">
-                  <button
-                    type="button"
-                    onClick={handleSimulatePayment}
-                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl text-xs shadow-md"
-                  >
-                    [Simulasi Test] Selesaikan Pembayaran Now
-                  </button>
+                <div className="space-y-2 pt-1">
                   <button
                     type="button"
                     onClick={() => {
                       stopPolling();
                       setModalStep('download_choice');
                     }}
-                    className="w-full py-1.5 text-slate-400 hover:text-slate-600 font-semibold text-xs"
+                    className="w-full py-2.5 text-slate-500 hover:text-slate-800 font-semibold text-xs border border-slate-200 rounded-xl"
                   >
                     Batal Transaksi
                   </button>
@@ -1459,7 +1539,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* Success Modal */}
+      {/* Success & Download Receipt Modal */}
       {showSuccessModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white max-w-md w-full rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-5 text-center">
@@ -1468,30 +1548,80 @@ export default function Home() {
             </div>
 
             <div>
-              <h3 className="font-extrabold text-slate-900 text-lg">Pembayaran Berhasil!</h3>
+              <h3 className="font-extrabold text-slate-900 text-lg">Pembayaran Terverifikasi Lunas!</h3>
               <p className="text-xs text-slate-500 mt-1">
-                Watermark SPKINSTAN telah dicabut. Dokumen PDF HD legal Anda siap diunduh dan dibagikan.
+                Watermark SPKINSTAN telah resmi dicabut. Dokumen PDF Clean (Tanpa Watermark) Anda siap diunduh.
               </p>
             </div>
 
-            <div className="space-y-2.5">
-              <button
-                type="button"
-                onClick={handleDownloadPDF}
-                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl text-xs shadow-md flex items-center justify-center gap-2"
-              >
-                <Download className="w-4 h-4" />
-                <span>Unduh PDF HD Tanpa Watermark</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleShareWhatsApp}
-                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl text-xs shadow-md flex items-center justify-center gap-2"
-              >
-                <Send className="w-4 h-4" />
-                <span>Kirim Langsung ke WhatsApp Klien</span>
-              </button>
-            </div>
+            {selectedPackage === 'BUNDLING' ? (
+              <div className="space-y-3 pt-2 text-left">
+                <span className="text-xs font-bold text-slate-700 block text-center uppercase tracking-wider">
+                  Paket Bundling 3 Dokumen (Lunas)
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => handleDownloadPDF()}
+                  className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-2xl text-xs shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 animate-bounce"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>KLIK UNDUH SEMUA DOKUMEN (SPK + NDA + BAST)</span>
+                </button>
+
+                <div className="grid grid-cols-3 gap-1.5 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadPDF('SPK')}
+                    className="py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-xl text-[11px] text-center border border-slate-200"
+                  >
+                    1. Unduh SPK
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadPDF('NDA')}
+                    className="py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-xl text-[11px] text-center border border-slate-200"
+                  >
+                    2. Unduh NDA
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadPDF('BAST')}
+                    className="py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-xl text-[11px] text-center border border-slate-200"
+                  >
+                    3. Unduh BAST
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleShareWhatsApp()}
+                  className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl text-xs shadow-md flex items-center justify-center gap-2"
+                >
+                  <Send className="w-4 h-4" />
+                  <span>Kirim Paket Bundling ke WA Klien</span>
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                <button
+                  type="button"
+                  onClick={() => handleDownloadPDF(paidDocTarget)}
+                  className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-2xl text-xs shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 animate-bounce"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>KLIK UNDUH PDF CLEAN (TANPA WATERMARK)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleShareWhatsApp(paidDocTarget)}
+                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl text-xs shadow-md flex items-center justify-center gap-2"
+                >
+                  <Send className="w-4 h-4" />
+                  <span>Kirim Langsung ke WhatsApp Klien</span>
+                </button>
+              </div>
+            )}
 
             <div className="pt-4 border-t border-slate-100">
               <div className="bg-emerald-50/80 border border-emerald-200/80 rounded-2xl p-4 text-center space-y-2.5">
@@ -1519,7 +1649,7 @@ export default function Home() {
               onClick={() => setShowSuccessModal(false)}
               className="text-xs text-slate-400 hover:text-slate-600 pt-2"
             >
-              Tutup Kembali
+              Tutup Modal
             </button>
           </div>
         </div>
@@ -1533,18 +1663,22 @@ export default function Home() {
           className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-full text-xs transition-all flex items-center justify-center gap-1 border border-slate-300"
         >
           <Download className="w-3.5 h-3.5 text-slate-600" />
-          <span>Gratis</span>
+          <span>Draf Watermark</span>
         </button>
         <button
           type="button"
           onClick={() => {
-            setModalStep('download_choice');
-            setShowCheckoutModal(true);
+            if (paidDocs[activeDocTab]) {
+              handleDownloadPDF(activeDocTab);
+            } else {
+              setModalStep('download_choice');
+              setShowCheckoutModal(true);
+            }
           }}
           className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-full text-xs transition-all shadow-md flex items-center justify-center gap-1"
         >
           <Unlock className="w-3.5 h-3.5" />
-          <span>Versi Pro (Clean)</span>
+          <span>{paidDocs[activeDocTab] ? 'Unduh PDF Clean' : 'Versi Pro (Clean)'}</span>
         </button>
       </div>
 
