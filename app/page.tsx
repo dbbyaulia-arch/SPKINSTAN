@@ -1584,36 +1584,55 @@ export default function Home() {
                   </p>
                 </div>
 
-                <div className="bg-slate-50 p-2 sm:p-3 rounded-2xl border border-slate-200 overflow-hidden w-full">
+                {/* Container QRIS & Payment Link */}
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 overflow-hidden w-full space-y-4">
                   {isLoadingQris ? (
-                    <div className="w-full h-64 sm:h-80 rounded-xl bg-slate-100 flex items-center justify-center text-xs text-slate-500 animate-pulse font-sans font-bold gap-2">
+                    <div className="w-full h-64 rounded-xl bg-slate-100 flex items-center justify-center text-xs text-slate-500 animate-pulse font-sans font-bold gap-2">
                       <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
                       <span>Menyiapkan Payment Gateway Mayar...</span>
                     </div>
-                  ) : paymentUrl ? (
-                    <iframe
-                      src={paymentUrl}
-                      title="Mayar Payment Gateway"
-                      className="w-full h-[420px] rounded-xl border-0 shadow-inner bg-white"
-                      allow="payment"
-                    />
                   ) : qrCodeData ? (
-                    <div className="p-4 space-y-2">
+                    /* 1. Tampilan Utama: Scan QRIS Langsung */
+                    <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-sm space-y-3">
+                      <span className="block text-xs font-extrabold text-slate-800 uppercase tracking-wider">
+                        Scan Kode QRIS Di Bawah Ini
+                      </span>
                       <img
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrCodeData)}`}
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(qrCodeData)}`}
                         alt="QRIS Barcode Mayar"
-                        className="w-48 h-48 mx-auto rounded-lg shadow-sm"
+                        className="w-52 h-52 mx-auto rounded-lg shadow-md border border-slate-100"
                       />
-                      <span className="block text-[10px] font-bold text-slate-400">
-                        Scan QRIS via Aplikasi M-Banking / E-Wallet pilihan Anda
+                      <span className="block text-[11px] font-medium text-slate-500">
+                        Dapat discan menggunakan GoPay, OVO, Dana, ShopeePay, BCA, Mandiri, dll.
                       </span>
                     </div>
+                  ) : paymentUrl ? (
+                    /* 2. Fallback Jika QRIS String Tidak Tersedia */
+                    <div className="p-4 bg-white rounded-xl border border-slate-200 space-y-2 text-center">
+                      <p className="text-xs text-slate-600 font-medium">
+                        Tagihan pembayaran telah siap dibuat di Mayar.
+                      </p>
+                    </div>
                   ) : (
-                    <div className="w-full h-48 rounded-xl bg-red-50 text-red-500 flex items-center justify-center text-xs p-4 text-center font-sans font-medium">
+                    <div className="w-full h-32 rounded-xl bg-red-50 text-red-500 flex items-center justify-center text-xs p-4 text-center font-sans font-medium">
                       Gagal memuat metode pembayaran. Silakan coba kembali beberapa saat.
                     </div>
                   )}
-                  <span className="block text-[10px] font-bold text-slate-400 mt-2">
+
+                  {/* Tombol Utama: Buka Link Mayar Resmi di Tab Baru */}
+                  {paymentUrl && (
+                    <a
+                      href={paymentUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 transition"
+                    >
+                      <span>Buka Portal Pembayaran Mayar (VA / E-Wallet)</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </a>
+                  )}
+
+                  <span className="block text-[10px] font-bold text-slate-400">
                     Secured by Mayar Payment Gateway (QRIS, VA, E-Wallet)
                   </span>
                 </div>
