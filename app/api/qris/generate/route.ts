@@ -22,7 +22,8 @@ export async function POST(request: Request) {
         mobile: customerMobile || '081234567890',
         amount: amount || 1000,
         description: `Lisensi Dokumen ${docType} - ${packageType}`,
-        redirectUrl: 'https://spkinstan.vercel.app',
+        // RedirectUrl mengarah ke halaman callback khusus
+        redirectUrl: 'https://spkinstan.vercel.app/payment-success',
       }),
     });
 

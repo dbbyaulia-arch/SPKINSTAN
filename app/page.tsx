@@ -1,3 +1,4 @@
+// app/page.tsx
 'use client';
 
 import clausesData from '@/config/clauses.json';
@@ -266,7 +267,7 @@ export default function Home() {
     }, 3000);
   };
 
-  // PostMessage Event Listener dari Mayar (Validasi Spesifik Event)
+  // PostMessage Event Listener dari Mayar / Callback Payment Success
   useEffect(() => {
     const handleMayarMessage = (event: MessageEvent) => {
       if (!event.data) return;
@@ -276,13 +277,15 @@ export default function Home() {
         try {
           payload = JSON.parse(payload);
         } catch (e) {
-          return;
+          // ignore parsing error for non-json strings
         }
       }
 
-      // Hanya izinkan jika event tipe khusus payment_success dikirim
+      // Tangkap sinyal dari halaman payment-success / iframe Mayar
       if (
+        payload?.type === 'MAYAR_PAYMENT_SUCCESS' ||
         payload?.type === 'mayar_payment_success' ||
+        payload?.status === 'success' ||
         (payload?.event === 'payment.received' && payload?.status === 'PAID')
       ) {
         handlePaymentSuccess();
