@@ -1,104 +1,55 @@
+// app/api/webhooks/mayar/route.ts
 import { NextResponse } from 'next/server';
-import { Redis } from '@upstash/redis';
-import crypto from 'crypto';
+import { redis } from '@/lib/redis';
 
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL!,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-});
-
-export async function POST(req: Request) {
+export async function POST(request: Request) {
   try {
-    const rawBody = await req.text();
-    let body: any;
+    const body = await request.json();
+    console.log('>>> WEBHOOK MAYAR DITERIMA:', body);
 
-    try {
-      body = JSON.parse(rawBody);
-    } catch {
-      return NextResponse.json({ success: false, message: 'Invalid JSON' }, { status: 200 });
-    }
+    // Ambil Payment ID dan Event Status dari Payload Mayar
+    const mayarPaymentId = body?.data?.id || body?.id || body?.paymentId || body?.data?.paymentId;
+    const statusStr = JSON.stringify(body).toUpperCase();
 
-    // 1. Verifikasi Webhook Signature (jika MAYAR_WEBHOOK_SECRET dikonfigurasi)
-    const webhookSecret = process.env.MAYAR_WEBHOOK_SECRET;
-    const signature = req.headers.get('x-mayar-signature') || req.headers.get('X-Mayar-Signature');
+    const isPaid =
+      statusStr.includes('"PAID"') ||
+      statusStr.includes('"SETTLED"') ||
+      statusStr.includes('"SUCCESS"') ||
+      statusStr.includes('PAYMENT.RECEIVED');
 
-    if (webhookSecret && signature) {
-      const expectedSignature = crypto
-        .createHmac('sha256', webhookSecret)
-        .update(rawBody)
-        .digest('hex');
+    if (mayarPaymentId && isPaid) {
+      // 1. Cari sessionId berdasarkan Mayar Payment ID dari Redis
+      let sessionId = await redis.get<string>(`mayar_mapping:${mayarPaymentId}`);
 
-      if (signature !== expectedSignature) {
-        console.warn('[MAYAR WEBHOOK] Signature verification failed');
-      }
-    }
-
-    // 2. Tangani event testing dari Mayar
-    if (body.event === 'testing' || body.type === 'testing') {
-      return NextResponse.json(
-        { success: true, message: 'Test webhook received successfully' },
-        { status: 200 }
-      );
-    }
-
-    const { event, data } = body;
-
-    // 3. Tangani event pembayaran resmi dari Mayar
-    const isSuccessEvent =
-      event === 'payment.received' ||
-      event === 'payment.success' ||
-      event === 'payment.settled' ||
-      data?.status === 'SUCCESS' ||
-      data?.status === 'PAID' ||
-      data?.status === 'SETTLED' ||
-      data?.isPaid === true;
-
-    if (data && isSuccessEvent) {
-      let sessionId: string | null = null;
-      const mayarPaymentId: string | null = data.id || data.paymentId || data.transactionId || null;
-
-      // Extract sessionId dari deskripsi (Format: [Ref: SPK-XXXXXX])
-      if (data.description) {
-        const match = data.description.match(/\[Ref:\s*([^\]]+)\]/);
-        if (match && match[1]) {
-          sessionId = match[1].trim();
+      // Fallback jika sessionId dikirim langsung di customer detail
+      if (!sessionId && body?.data?.customer?.email) {
+        const email = body.data.customer.email;
+        if (email.includes('spk-')) {
+          sessionId = email.split('@')[0].toUpperCase();
         }
       }
 
-      // Fallback jika tidak ditemukan di deskripsi
-      if (!sessionId) {
-        sessionId =
-          data.custom_field?.[0]?.value ||
-          data.customField ||
-          data.metadata?.sessionId ||
-          data.customerMobile ||
-          null;
-      }
-
-      // Dual-Keying Storage ke Upstash Redis (Simpan dengan prefix 'session:' dan raw key)
       if (sessionId) {
-        await redis.set(`session:${sessionId}`, 'PAID', { ex: 86400 });
-        await redis.set(sessionId, 'PAID', { ex: 86400 });
-        console.log(`[MAYAR WEBHOOK] Status PAID saved for sessionId: ${sessionId}`);
-      }
+        // 2. Update status transaksi di Redis menjadi PAID
+        const rawTxn = await redis.get<string>(`txn:${sessionId}`);
+        let txnData = rawTxn ? (typeof rawTxn === 'string' ? JSON.parse(rawTxn) : rawTxn) : {};
 
-      if (mayarPaymentId) {
-        await redis.set(`session:${mayarPaymentId}`, 'PAID', { ex: 86400 });
-        await redis.set(mayarPaymentId, 'PAID', { ex: 86400 });
-        console.log(`[MAYAR WEBHOOK] Status PAID saved for mayarPaymentId: ${mayarPaymentId}`);
-      }
+        txnData = {
+          ...txnData,
+          status: 'PAID',
+          paidAt: new Date().toISOString(),
+        };
 
-      // Simpan pemetaan relasi sessionId <-> mayarPaymentId
-      if (sessionId && mayarPaymentId) {
-        await redis.set(`mapping:${sessionId}`, mayarPaymentId, { ex: 86400 });
-        await redis.set(`mapping:${mayarPaymentId}`, sessionId, { ex: 86400 });
+        await redis.set(`txn:${sessionId}`, JSON.stringify(txnData), { ex: 86400 });
+        console.log(`✅ Status transaksi ${sessionId} BERHASIL DIUPDATE KE 'PAID' via Webhook!`);
+
+        return NextResponse.json({ success: true, message: 'Status updated to PAID' });
       }
     }
 
-    // Selalu kembalikan HTTP 200 OK ke Mayar agar tidak terus berulang (retry)
-    return NextResponse.json({ success: true }, { status: 200 });
+    return NextResponse.json({ success: true, message: 'Webhook received but ignored' });
   } catch (error) {
-    console.error('[MAYAR WEBHOOK ERROR]:', error);
-    return NextResponse.json({ success: false, message: 'Webhook processing error' }, { status: 200 });
+    console.error('Webhook Error:', error);
+    return NextResponse.json({ success: false, message: 'Internal Webhook Error' }, { status: 500 });
   }
 }

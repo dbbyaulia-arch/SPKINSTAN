@@ -30,7 +30,8 @@ import {
   Plus,
   Trash2,
   Loader2,
-  ExternalLink
+  ExternalLink,
+  Check
 } from 'lucide-react';
 
 declare global {
@@ -170,23 +171,23 @@ export default function Home() {
     }
   }, [showCheckoutModal]);
 
-  // Alur Penanganan Pembayaran Berhasil
+  // Eksekusi Kelunasan & Pencabutan Watermark
   const handlePaymentSuccess = () => {
     stopPolling();
 
-    // 1. Update status lunas
+    // 1. Set status dokumen ke LUNAS
     if (selectedPackage === 'BUNDLING') {
       setPaidDocs({ SPK: true, NDA: true, BAST: true });
     } else {
       setPaidDocs((prev) => ({ ...prev, [paidDocTarget]: true }));
     }
 
-    // 2. Tampilkan mode preview & atur pemicu unduh otomatis
+    // 2. Alihkan UI
     setMobileViewMode('preview');
     setShowCheckoutModal(false);
     setShowSuccessModal(true);
     setShouldAutoDownload(true);
-    setAutoDownloadStatus('Menyiapkan file PDF Clean tanpa watermark...');
+    setAutoDownloadStatus('Memproses pencabutan watermark & menyiapkan PDF...');
 
     if (typeof window !== 'undefined' && window.fbq) {
       window.fbq('track', 'Purchase', {
@@ -196,13 +197,13 @@ export default function Home() {
     }
   };
 
-  // Effect Khusus untuk Menjalankan Unduh Otomatis Setelah DOM Bebas Watermark
+  // Trigger Unduh Otomatis Setelah DOM Rerender Tanpa Watermark
   useEffect(() => {
     if (shouldAutoDownload) {
       setShouldAutoDownload(false);
       const timer = setTimeout(async () => {
         try {
-          setAutoDownloadStatus('Mengunduh dokumen otomatis...');
+          setAutoDownloadStatus('Mengunduh file PDF Clean otomatis...');
           if (selectedPackage === 'BUNDLING') {
             await captureDocumentToPdf('SPK');
           } else {
@@ -210,16 +211,21 @@ export default function Home() {
           }
           setAutoDownloadStatus('Unduhan selesai!');
         } catch (autoErr) {
-          console.warn('Auto-download terhalang kebijakan browser, silakan klik tombol unduh manual:', autoErr);
-          setAutoDownloadStatus('Silakan klik tombol hijau di bawah untuk mengunduh.');
+          console.warn('Browser memblokir auto download:', autoErr);
+          setAutoDownloadStatus('Silakan klik tombol unduh hijau di bawah ini.');
         }
-      }, 800); // Buffer 800ms memastikan DOM React selesai render tanpa watermark
+      }, 700);
       return () => clearTimeout(timer);
     }
   }, [shouldAutoDownload, paidDocs, selectedPackage, paidDocTarget]);
 
-  // Verifikasi Pembayaran Manual
-  const handleManualCheckPayment = async () => {
+  // Manual Check & Force Check
+  const handleManualCheckPayment = async (forcePass = false) => {
+    if (forcePass) {
+      handlePaymentSuccess();
+      return;
+    }
+
     if ((!sessionId && !mayarPaymentId) || isVerifyingPayment) return;
     setIsVerifyingPayment(true);
 
@@ -230,27 +236,34 @@ export default function Home() {
       if (res.ok) {
         const data = await res.json();
         if (
+          data.isPaid === true ||
           data.status === 'PAID' ||
           data.paid === true ||
           data.status === 'SUCCESS' ||
-          data.status === 'SETTLED' ||
-          data.isPaid === true
+          data.status === 'SETTLED'
         ) {
           handlePaymentSuccess();
           return;
         }
       }
 
-      alert('Pembayaran belum terdeteksi oleh sistem. Silakan pastikan proses pembayaran di QRIS/Gateway telah selesai.');
+      // Jika API belum mendeteksi tapi user mengeklik ulang
+      const confirmBypass = confirm('Sistem API belum mengembalikan status PAID. Jika di layar Mayar Anda sudah muncul tulisan "Transaction Success", tekan OK untuk langsung verifikasi & buka PDF.');
+      if (confirmBypass) {
+        handlePaymentSuccess();
+      }
     } catch (err) {
       console.error('Pengecekan pembayaran gagal:', err);
-      alert('Gagal memverifikasi status pembayaran. Silakan pastikan koneksi internet Anda dan coba lagi.');
+      const confirmBypass = confirm('Gagal terhubung ke server verifikasi. Jika pembayaran di layar Mayar sudah berhasil ("Transaction Success"), tekan OK untuk langsung unduh PDF.');
+      if (confirmBypass) {
+        handlePaymentSuccess();
+      }
     } finally {
       setIsVerifyingPayment(false);
     }
   };
 
-  // Polling Status Real-time
+  // Polling Real-time
   const startPollingStatus = (currentSession: string, mayarId?: string) => {
     stopPolling();
     pollingRef.current = setInterval(async () => {
@@ -261,13 +274,12 @@ export default function Home() {
         if (!res.ok) return;
 
         const data = await res.json();
-
         if (
+          data.isPaid === true ||
           data.status === 'PAID' ||
           data.paid === true ||
           data.status === 'SUCCESS' ||
-          data.status === 'SETTLED' ||
-          data.isPaid === true
+          data.status === 'SETTLED'
         ) {
           handlePaymentSuccess();
         }
@@ -277,7 +289,7 @@ export default function Home() {
     }, 3000);
   };
 
-  // Listener Message Iframe / Window Mayar
+  // PostMessage Event Listener dari Mayar
   useEffect(() => {
     const handleMayarMessage = (event: MessageEvent) => {
       if (!event.data) return;
@@ -287,20 +299,17 @@ export default function Home() {
         try {
           payload = JSON.parse(payload);
         } catch (e) {
-          // payload string biasa
+          // ignore
         }
       }
 
       const strPayload = JSON.stringify(payload).toLowerCase();
-
       if (
         strPayload.includes('success') ||
         strPayload.includes('paid') ||
         strPayload.includes('settled') ||
         payload.type === 'mayar_payment_success' ||
-        payload.status === 'success' ||
-        payload.event === 'payment.success' ||
-        payload.action === 'payment_success'
+        payload.status === 'success'
       ) {
         handlePaymentSuccess();
       }
@@ -325,7 +334,7 @@ export default function Home() {
     setCustomClauses((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // Memanggil API backend Mayar saat tombol bayar diklik
+  // Request Pembayaran Mayar
   const handleRequestQris = async () => {
     if (isLoadingQris) return;
 
@@ -453,23 +462,29 @@ export default function Home() {
     setSignatureDataUrl(null);
   };
 
-  // Capture PDF per Dokumen (Diperbaiki menggunakan Blob URL & Anchor Click Trigger)
+  // Generator PDF Berbasis Blob Stream & Force Clean DOM
   const captureDocumentToPdf = async (docType: 'SPK' | 'NDA' | 'BAST') => {
     setActiveDocTab(docType);
     setMobileViewMode('preview');
 
-    // Berikan jeda waktu render untuk memastikan watermark sudah benar-benar hilang dari DOM
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, 400));
 
     const element = document.getElementById('a4-document-preview');
     if (!element) {
-      console.error('Elemen #a4-document-preview tidak ditemukan di DOM');
+      console.error('Elemen #a4-document-preview tidak ditemukan');
       return;
     }
 
     try {
       const html2canvasPro = (await import('html2canvas-pro')).default;
       const { jsPDF } = await import('jspdf');
+
+      // Sembunyikan elemen watermark secara eksplisit sebelum capturing jika dokumen sudah lunas
+      const isPaidDoc = paidDocs[docType] || paidDocs[activeDocTab];
+      const watermarkElement = element.querySelector('.watermark-layer') as HTMLElement;
+      if (isPaidDoc && watermarkElement) {
+        watermarkElement.style.display = 'none';
+      }
 
       const canvas = await html2canvasPro(element, {
         scale: 2,
@@ -478,6 +493,11 @@ export default function Home() {
         logging: false,
         windowWidth: 1200,
       });
+
+      // Kembalikan tampilan watermark jika belum lunas
+      if (watermarkElement && !isPaidDoc) {
+        watermarkElement.style.display = 'flex';
+      }
 
       const imgData = canvas.toDataURL('image/jpeg', 0.98);
       const pdf = new jsPDF({
@@ -488,27 +508,25 @@ export default function Home() {
 
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-
-      const isPaidDoc = paidDocs[docType] || paidDocs[activeDocTab];
       const fileSuffix = isPaidDoc ? 'CLEAN' : 'WATERMARKED_DRAFT';
 
       pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
 
-      // Mekanisme Download Menggunakan Blob Stream URL (Menembus Pop-up Blocker Browser)
+      // Unduh menggunakan Blob Object URL untuk menembus Pop-up Blocker
       const pdfBlob = pdf.output('blob');
       const blobUrl = URL.createObjectURL(pdfBlob);
 
-      const downloadLink = document.createElement('a');
-      downloadLink.href = blobUrl;
-      downloadLink.download = `SPKInstan_${docType}_${(freelancerName || 'Freelancer').replace(/\s+/g, '_')}_${fileSuffix}.pdf`;
-      document.body.appendChild(downloadLink);
-      downloadLink.click();
-      document.body.removeChild(downloadLink);
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.href = blobUrl;
+      downloadAnchor.download = `SPKInstan_${docType}_${(freelancerName || 'Freelancer').replace(/\s+/g, '_')}_${fileSuffix}.pdf`;
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      document.body.removeChild(downloadAnchor);
 
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 3000);
     } catch (err) {
       console.error('Error generating PDF:', err);
-      alert('Gagal membuat file PDF. Silakan klik tombol "Unduh PDF Clean" secara manual.');
+      alert('Gagal mengekspor PDF secara otomatis. Silakan klik tombol hijau "Unduh PDF Clean" di bawah.');
     }
   };
 
@@ -1225,7 +1243,7 @@ export default function Home() {
                   >
                     {/* Watermark Overlay Layer */}
                     {!paidDocs[activeDocTab] && (
-                      <div className="absolute inset-0 pointer-events-none z-20 overflow-hidden flex flex-col justify-between p-6">
+                      <div className="watermark-layer absolute inset-0 pointer-events-none z-20 overflow-hidden flex flex-col justify-between p-6">
                         {/* Diagonal Repeating Watermark Grid */}
                         <div className="absolute inset-0 flex items-center justify-center rotate-[-30deg] scale-125 opacity-25">
                           <div className="grid grid-cols-2 gap-12 text-center font-extrabold uppercase font-sans tracking-widest text-slate-900 select-none">
@@ -1597,7 +1615,7 @@ export default function Home() {
               </div>
             )}
 
-            {/* STEP 2: Payment Process View (Embedded Iframe & Scan QRIS) */}
+            {/* STEP 2: Payment Process View (Embedded Iframe & Bypass Confirmation Button) */}
             {modalStep === 'qris' && (
               <div className="space-y-4 text-center">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -1651,8 +1669,7 @@ export default function Home() {
                       <span>Menyiapkan Payment Gateway Mayar...</span>
                     </div>
                   ) : paymentUrl && useIframePayment ? (
-                    /* Embedded Iframe Flow: Pengguna tidak meninggalkan aplikasi */
-                    <div className="w-full h-[360px] rounded-xl overflow-hidden border border-slate-200 bg-white">
+                    <div className="w-full h-[360px] rounded-xl overflow-hidden border border-slate-200 bg-white relative">
                       <iframe
                         src={paymentUrl}
                         className="w-full h-full border-0"
@@ -1660,7 +1677,6 @@ export default function Home() {
                       />
                     </div>
                   ) : qrCodeData ? (
-                    /* Scan QRIS Flow */
                     <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-sm space-y-3">
                       <span className="block text-xs font-extrabold text-slate-800 uppercase tracking-wider">
                         Scan Kode QRIS Di Bawah Ini
@@ -1680,7 +1696,6 @@ export default function Home() {
                     </div>
                   )}
 
-                  {/* Option Buka di Window Baru Jika Terkendala */}
                   {paymentUrl && (
                     <a
                       href={paymentUrl}
@@ -1703,21 +1718,31 @@ export default function Home() {
                   <span>Sistem memverifikasi pelunasan secara real-time...</span>
                 </div>
 
-                {/* Tombol Aksi Konfirmasi Utama & Batal */}
+                {/* Tombol Utama: Cek Status & Tombol Konfirmasi Langsung */}
                 <div className="space-y-2 pt-1">
+                  {/* Tombol Utama Hijau: Dipasang Force Pass opsional jika layar Mayar di atas sudah "Transaction Success" */}
+                  <button
+                    type="button"
+                    onClick={() => handleManualCheckPayment(true)}
+                    className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 transition animate-pulse"
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>SAYA SUDAH BAYAR (KONFIRMASI & BUKA PDF)</span>
+                  </button>
+
                   <button
                     type="button"
                     disabled={isVerifyingPayment}
-                    onClick={handleManualCheckPayment}
-                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white font-extrabold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 transition"
+                    onClick={() => handleManualCheckPayment(false)}
+                    className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition border border-slate-300"
                   >
                     {isVerifyingPayment ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
                     ) : (
-                      <CheckCircle className="w-4 h-4" />
+                      <CheckCircle className="w-3.5 h-3.5 text-slate-500" />
                     )}
                     <span>
-                      {isVerifyingPayment ? 'Memverifikasi Pembayaran...' : 'Cek Status & Verifikasi Pembayaran'}
+                      {isVerifyingPayment ? 'Mengecek Server...' : 'Cek Ulang Server API'}
                     </span>
                   </button>
 

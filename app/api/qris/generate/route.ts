@@ -1,117 +1,60 @@
+// app/api/qris/generate/route.ts
 import { NextResponse } from 'next/server';
-import { Redis } from '@upstash/redis';
+import { redis } from '@/lib/redis';
 
-// Otomatis bersihkan karakter ] jika tersisa di Environment Variable
-const redisUrl = (process.env.UPSTASH_REDIS_REST_URL || '')
-  .replace(/[\]\s]+$/, '')
-  .trim();
-
-const redis = new Redis({
-  url: redisUrl,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-});
-
-export async function POST(req: Request) {
+export async function POST(request: Request) {
   try {
-    const body = await req.json();
+    const body = await request.json();
+    const { sessionId, packageType, amount, docType, customerName, customerMobile, customerEmail } = body;
 
-    const {
-      sessionId,
-      amount,
-      customerName,
-      customerMobile,
-      customerEmail,
-      docType,
-    } = body;
+    const MAYAR_API_KEY = process.env.MAYAR_API_KEY || '';
 
-    if (!sessionId) {
-      return NextResponse.json(
-        { success: false, message: 'Session ID diperlukan' },
-        { status: 400 }
-      );
-    }
-
-    const apiKey = process.env.MAYAR_API_KEY;
-    const baseUrl = process.env.MAYAR_BASE_URL || 'https://api.mayar.id/hl/v1';
-
-    if (!apiKey) {
-      return NextResponse.json(
-        { success: false, message: 'MAYAR_API_KEY belum diset di Vercel Environment Variables.' },
-        { status: 500 }
-      );
-    }
-
-    // 1. Sanitasi & Validasi Nomor HP (Mewajibkan minimal 10 digit)
-    let cleanMobile = (customerMobile || '').toString().replace(/[^0-9]/g, '');
-
-    if (cleanMobile.startsWith('0')) {
-      cleanMobile = '62' + cleanMobile.slice(1);
-    }
-
-    // Fallback jika nomor diisi kurang dari 10 digit (mencegah error 'stringMin')
-    if (cleanMobile.length < 10) {
-      cleanMobile = '6281234567890';
-    }
-
-    const mayarPayload = {
-      name: customerName || 'Klien SPKInstan',
-      email: customerEmail || `client-${Date.now()}@spkinstan.com`,
-      mobile: cleanMobile,
-      amount: Number(amount) || 1000,
-      description: `Pembayaran Lisensi Dokumen ${docType || ''} [Ref: ${sessionId}]`,
-    };
-
-    // 2. Panggil API Mayar
-    const response = await fetch(`${baseUrl}/payment/create`, {
+    // 1. Panggil API Mayar untuk membuat link pembayaran
+    const mayarRes = await fetch('https://api.mayar.id/hl/v1/payment/create', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${apiKey.trim()}`,
+        'Authorization': `Bearer ${MAYAR_API_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(mayarPayload),
+      body: JSON.stringify({
+        name: customerName || 'Klien SPKInstan',
+        email: customerEmail || `client-${Date.now()}@spkinstan.com`,
+        mobile: customerMobile || '081234567890',
+        amount: amount || 1000,
+        description: `Lisensi Dokumen ${docType} - ${packageType}`,
+        redirectUrl: 'https://spkinstan.vercel.app',
+      }),
     });
 
-    const data = await response.json();
+    const mayarData = await mayarRes.json();
+    const paymentId = mayarData?.data?.id || mayarData?.id || mayarData?.data?.paymentId;
+    const paymentUrl = mayarData?.data?.link || mayarData?.link || mayarData?.data?.url;
 
-    if (!response.ok) {
-      console.error('[MAYAR API REJECTED]:', response.status, data);
-      return NextResponse.json(
-        { 
-          success: false, 
-          message: data.message || data.messages || 'Gagal membuat tagihan di Mayar' 
-        },
-        { status: response.status }
-      );
-    }
+    // 2. SIMPAN KE REDIS dengan status 'PENDING'
+    const transactionData = {
+      sessionId,
+      mayarPaymentId: paymentId,
+      status: 'PENDING',
+      docType,
+      packageType,
+      amount,
+      createdAt: new Date().toISOString(),
+    };
 
-    const mayarPaymentId = data.data?.id || data.data?.paymentId || data.id || data.paymentId;
-    const paymentUrl = data.data?.link || data.data?.url || data.link || data.url;
-
-    // 3. Simpan status awal ke Upstash Redis secara aman
-    try {
-      if (mayarPaymentId) {
-        await redis.set(`mapping:${sessionId}`, mayarPaymentId, { ex: 86400 });
-        await redis.set(`mapping:${mayarPaymentId}`, sessionId, { ex: 86400 });
-        await redis.set(`session:${mayarPaymentId}`, 'PENDING', { ex: 86400 });
-      }
-      await redis.set(`session:${sessionId}`, 'PENDING', { ex: 86400 });
-    } catch (redisError) {
-      console.warn('[REDIS WARNING]: Gagal simpan ke Redis, proses pembayaran tetap berlanjut:', redisError);
+    // Simpan key berdasarkan Session ID dan Mayar ID agar mudah dicari oleh Webhook
+    await redis.set(`txn:${sessionId}`, JSON.stringify(transactionData), { ex: 86400 });
+    if (paymentId) {
+      await redis.set(`mayar_mapping:${paymentId}`, sessionId, { ex: 86400 });
     }
 
     return NextResponse.json({
       success: true,
-      mayarPaymentId: mayarPaymentId,
-      paymentId: mayarPaymentId,
-      paymentUrl: paymentUrl,
-      qrString: data.data?.qrString || data.qrString,
+      paymentUrl,
+      mayarPaymentId: paymentId,
+      sessionId,
     });
-
-  } catch (error: any) {
-    console.error('[SERVER ERROR]:', error);
-    return NextResponse.json(
-      { success: false, message: error.message || 'Terjadi kesalahan pada server' },
-      { status: 500 }
-    );
+  } catch (error) {
+    console.error('Error generate QRIS:', error);
+    return NextResponse.json({ success: false, message: 'Gagal membuat pembayaran' }, { status: 500 });
   }
 }
