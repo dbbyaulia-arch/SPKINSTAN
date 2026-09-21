@@ -59,6 +59,7 @@ export default function Home() {
   });
   const [paidDocTarget, setPaidDocTarget] = useState<'SPK' | 'NDA' | 'BAST'>('SPK');
   const [shouldAutoDownload, setShouldAutoDownload] = useState(false);
+  const [autoDownloadStatus, setAutoDownloadStatus] = useState<string>('');
 
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -180,11 +181,12 @@ export default function Home() {
       setPaidDocs((prev) => ({ ...prev, [paidDocTarget]: true }));
     }
 
-    // 2. Set tampilan modal & pemicu unduh otomatis
+    // 2. Tampilkan mode preview & atur pemicu unduh otomatis
     setMobileViewMode('preview');
     setShowCheckoutModal(false);
     setShowSuccessModal(true);
     setShouldAutoDownload(true);
+    setAutoDownloadStatus('Menyiapkan file PDF Clean tanpa watermark...');
 
     if (typeof window !== 'undefined' && window.fbq) {
       window.fbq('track', 'Purchase', {
@@ -200,15 +202,18 @@ export default function Home() {
       setShouldAutoDownload(false);
       const timer = setTimeout(async () => {
         try {
+          setAutoDownloadStatus('Mengunduh dokumen otomatis...');
           if (selectedPackage === 'BUNDLING') {
             await captureDocumentToPdf('SPK');
           } else {
             await captureDocumentToPdf(paidDocTarget);
           }
+          setAutoDownloadStatus('Unduhan selesai!');
         } catch (autoErr) {
           console.warn('Auto-download terhalang kebijakan browser, silakan klik tombol unduh manual:', autoErr);
+          setAutoDownloadStatus('Silakan klik tombol hijau di bawah untuk mengunduh.');
         }
-      }, 500);
+      }, 800); // Buffer 800ms memastikan DOM React selesai render tanpa watermark
       return () => clearTimeout(timer);
     }
   }, [shouldAutoDownload, paidDocs, selectedPackage, paidDocTarget]);
@@ -448,12 +453,13 @@ export default function Home() {
     setSignatureDataUrl(null);
   };
 
-  // Capture PDF per Dokumen
+  // Capture PDF per Dokumen (Diperbaiki menggunakan Blob URL & Anchor Click Trigger)
   const captureDocumentToPdf = async (docType: 'SPK' | 'NDA' | 'BAST') => {
     setActiveDocTab(docType);
-
     setMobileViewMode('preview');
-    await new Promise((resolve) => setTimeout(resolve, 350));
+
+    // Berikan jeda waktu render untuk memastikan watermark sudah benar-benar hilang dari DOM
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
     const element = document.getElementById('a4-document-preview');
     if (!element) {
@@ -461,30 +467,49 @@ export default function Home() {
       return;
     }
 
-    const html2canvasPro = (await import('html2canvas-pro')).default;
-    const { jsPDF } = await import('jspdf');
+    try {
+      const html2canvasPro = (await import('html2canvas-pro')).default;
+      const { jsPDF } = await import('jspdf');
 
-    const canvas = await html2canvasPro(element, {
-      scale: 2,
-      useCORS: true,
-      logging: false,
-    });
+      const canvas = await html2canvasPro(element, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        logging: false,
+        windowWidth: 1200,
+      });
 
-    const imgData = canvas.toDataURL('image/jpeg', 0.98);
-    const pdf = new jsPDF({
-      orientation: 'portrait',
-      unit: 'in',
-      format: 'a4',
-    });
+      const imgData = canvas.toDataURL('image/jpeg', 0.98);
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'in',
+        format: 'a4',
+      });
 
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
 
-    const isPaidDoc = paidDocs[docType];
-    const fileSuffix = isPaidDoc ? 'CLEAN' : 'WATERMARKED_DRAFT';
+      const isPaidDoc = paidDocs[docType] || paidDocs[activeDocTab];
+      const fileSuffix = isPaidDoc ? 'CLEAN' : 'WATERMARKED_DRAFT';
 
-    pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
-    pdf.save(`SPKInstan_${docType}_${(freelancerName || 'Freelancer').replace(/\s+/g, '_')}_${fileSuffix}.pdf`);
+      pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+
+      // Mekanisme Download Menggunakan Blob Stream URL (Menembus Pop-up Blocker Browser)
+      const pdfBlob = pdf.output('blob');
+      const blobUrl = URL.createObjectURL(pdfBlob);
+
+      const downloadLink = document.createElement('a');
+      downloadLink.href = blobUrl;
+      downloadLink.download = `SPKInstan_${docType}_${(freelancerName || 'Freelancer').replace(/\s+/g, '_')}_${fileSuffix}.pdf`;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
+    } catch (err) {
+      console.error('Error generating PDF:', err);
+      alert('Gagal membuat file PDF. Silakan klik tombol "Unduh PDF Clean" secara manual.');
+    }
   };
 
   // PDF Export Handler
@@ -496,9 +521,9 @@ export default function Home() {
         await captureDocumentToPdf(specificDoc);
       } else if (selectedPackage === 'BUNDLING') {
         await captureDocumentToPdf('SPK');
-        await new Promise((r) => setTimeout(r, 400));
+        await new Promise((r) => setTimeout(r, 600));
         await captureDocumentToPdf('NDA');
-        await new Promise((r) => setTimeout(r, 400));
+        await new Promise((r) => setTimeout(r, 600));
         await captureDocumentToPdf('BAST');
       } else {
         await captureDocumentToPdf(activeDocTab);
@@ -1728,6 +1753,14 @@ export default function Home() {
               </p>
             </div>
 
+            {/* Indikator Status Auto-Download */}
+            {autoDownloadStatus && (
+              <div className="bg-blue-50 border border-blue-200 text-blue-700 px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-2">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>{autoDownloadStatus}</span>
+              </div>
+            )}
+
             {selectedPackage === 'BUNDLING' ? (
               <div className="space-y-3 pt-2 text-left">
                 <span className="text-xs font-bold text-slate-700 block text-center uppercase tracking-wider">
@@ -1737,7 +1770,7 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={() => handleDownloadPDF()}
-                  className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-2xl text-xs shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 animate-bounce"
+                  className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-2xl text-xs shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2"
                 >
                   <Download className="w-4 h-4" />
                   <span>KLIK UNDUH SEMUA DOKUMEN (SPK + NDA + BAST)</span>
@@ -1781,7 +1814,7 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={() => handleDownloadPDF(paidDocTarget)}
-                  className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-2xl text-xs shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 animate-bounce"
+                  className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-2xl text-xs shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2"
                 >
                   <Download className="w-4 h-4" />
                   <span>KLIK UNDUH PDF CLEAN (TANPA WATERMARK)</span>
