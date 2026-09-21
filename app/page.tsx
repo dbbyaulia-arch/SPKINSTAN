@@ -29,7 +29,8 @@ import {
   Sparkles,
   Plus,
   Trash2,
-  Loader2
+  Loader2,
+  ExternalLink
 } from 'lucide-react';
 
 declare global {
@@ -57,10 +58,11 @@ export default function Home() {
     BAST: false,
   });
   const [paidDocTarget, setPaidDocTarget] = useState<'SPK' | 'NDA' | 'BAST'>('SPK');
+  const [shouldAutoDownload, setShouldAutoDownload] = useState(false);
 
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [modalStep, setModalStep] = useState<'download_choice' | 'upsell' | 'qris'>('download_choice');
+  const [modalStep, setModalStep] = useState<'download_choice' | 'qris'>('download_choice');
   const [mobileViewMode, setMobileViewMode] = useState<'form' | 'preview'>('form');
   const [isExporting, setIsExporting] = useState(false);
 
@@ -73,6 +75,7 @@ export default function Home() {
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
   const [isLoadingQris, setIsLoadingQris] = useState(false);
   const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
+  const [useIframePayment, setUseIframePayment] = useState(true);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
   // Form State
@@ -166,21 +169,22 @@ export default function Home() {
     }
   }, [showCheckoutModal]);
 
-  // Fungsi Terpusat saat Pembayaran Berhasil (Hapus Watermark & Auto-Download)
+  // Alur Penanganan Pembayaran Berhasil
   const handlePaymentSuccess = () => {
     stopPolling();
 
-    // 1. Set status dokumen ke lunas (Otomatis Menghilangkan watermark dari DOM)
+    // 1. Update status lunas
     if (selectedPackage === 'BUNDLING') {
       setPaidDocs({ SPK: true, NDA: true, BAST: true });
     } else {
       setPaidDocs((prev) => ({ ...prev, [paidDocTarget]: true }));
     }
 
-    // 2. Tampilkan mode preview & beralih ke modal sukses
+    // 2. Set tampilan modal & pemicu unduh otomatis
     setMobileViewMode('preview');
     setShowCheckoutModal(false);
     setShowSuccessModal(true);
+    setShouldAutoDownload(true);
 
     if (typeof window !== 'undefined' && window.fbq) {
       window.fbq('track', 'Purchase', {
@@ -188,22 +192,28 @@ export default function Home() {
         currency: 'IDR',
       });
     }
-
-    // 3. Picu otomatis unduh PDF Clean tanpa watermark
-    setTimeout(async () => {
-      try {
-        if (selectedPackage === 'BUNDLING') {
-          await captureDocumentToPdf('SPK');
-        } else {
-          await captureDocumentToPdf(paidDocTarget);
-        }
-      } catch (autoErr) {
-        console.warn('Auto download terblokir browser, dapat klik manual di modal sukses:', autoErr);
-      }
-    }, 600);
   };
 
-  // 1. Verifikasi Pembayaran Manual via API saat tombol diklik
+  // Effect Khusus untuk Menjalankan Unduh Otomatis Setelah DOM Bebas Watermark
+  useEffect(() => {
+    if (shouldAutoDownload) {
+      setShouldAutoDownload(false);
+      const timer = setTimeout(async () => {
+        try {
+          if (selectedPackage === 'BUNDLING') {
+            await captureDocumentToPdf('SPK');
+          } else {
+            await captureDocumentToPdf(paidDocTarget);
+          }
+        } catch (autoErr) {
+          console.warn('Auto-download terhalang kebijakan browser, silakan klik tombol unduh manual:', autoErr);
+        }
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [shouldAutoDownload, paidDocs, selectedPackage, paidDocTarget]);
+
+  // Verifikasi Pembayaran Manual
   const handleManualCheckPayment = async () => {
     if ((!sessionId && !mayarPaymentId) || isVerifyingPayment) return;
     setIsVerifyingPayment(true);
@@ -235,7 +245,7 @@ export default function Home() {
     }
   };
 
-  // 2. Polling Status Real-time
+  // Polling Status Real-time
   const startPollingStatus = (currentSession: string, mayarId?: string) => {
     stopPolling();
     pollingRef.current = setInterval(async () => {
@@ -262,7 +272,7 @@ export default function Home() {
     }, 3000);
   };
 
-  // 3. Listener untuk pesan postMessage dari Iframe Mayar
+  // Listener Message Iframe / Window Mayar
   useEffect(() => {
     const handleMayarMessage = (event: MessageEvent) => {
       if (!event.data) return;
@@ -272,7 +282,7 @@ export default function Home() {
         try {
           payload = JSON.parse(payload);
         } catch (e) {
-          // Payload berupa string biasa
+          // payload string biasa
         }
       }
 
@@ -438,7 +448,7 @@ export default function Home() {
     setSignatureDataUrl(null);
   };
 
-  // Helper Capture PDF per Dokumen
+  // Capture PDF per Dokumen
   const captureDocumentToPdf = async (docType: 'SPK' | 'NDA' | 'BAST') => {
     setActiveDocTab(docType);
 
@@ -1467,7 +1477,7 @@ export default function Home() {
         </section>
       </main>
 
-      {/* Download Choice & Payment Modal */}
+      {/* Download Choice & Integrated Payment Modal */}
       {showCheckoutModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white max-w-lg w-full rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-5 my-8">
@@ -1562,7 +1572,7 @@ export default function Home() {
               </div>
             )}
 
-            {/* STEP 2: Payment Process View */}
+            {/* STEP 2: Payment Process View (Embedded Iframe & Scan QRIS) */}
             {modalStep === 'qris' && (
               <div className="space-y-4 text-center">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -1584,15 +1594,48 @@ export default function Home() {
                   </p>
                 </div>
 
-                {/* Container QRIS & Payment Link */}
-                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 overflow-hidden w-full space-y-4">
+                {/* Switch Modus Tampilan Pembayaran */}
+                {paymentUrl && (
+                  <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-bold">
+                    <button
+                      type="button"
+                      onClick={() => setUseIframePayment(true)}
+                      className={`flex-1 py-1.5 rounded-lg transition-all ${
+                        useIframePayment ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+                      }`}
+                    >
+                      Portal Langsung Modal
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setUseIframePayment(false)}
+                      className={`flex-1 py-1.5 rounded-lg transition-all ${
+                        !useIframePayment ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+                      }`}
+                    >
+                      Scan Barcode QRIS
+                    </button>
+                  </div>
+                )}
+
+                {/* Container QRIS / Embedded Iframe */}
+                <div className="bg-slate-50 p-2 sm:p-4 rounded-2xl border border-slate-200 overflow-hidden w-full space-y-3">
                   {isLoadingQris ? (
                     <div className="w-full h-64 rounded-xl bg-slate-100 flex items-center justify-center text-xs text-slate-500 animate-pulse font-sans font-bold gap-2">
                       <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
                       <span>Menyiapkan Payment Gateway Mayar...</span>
                     </div>
+                  ) : paymentUrl && useIframePayment ? (
+                    /* Embedded Iframe Flow: Pengguna tidak meninggalkan aplikasi */
+                    <div className="w-full h-[360px] rounded-xl overflow-hidden border border-slate-200 bg-white">
+                      <iframe
+                        src={paymentUrl}
+                        className="w-full h-full border-0"
+                        title="Mayar Payment Gateway"
+                      />
+                    </div>
                   ) : qrCodeData ? (
-                    /* 1. Tampilan Utama: Scan QRIS Langsung */
+                    /* Scan QRIS Flow */
                     <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-sm space-y-3">
                       <span className="block text-xs font-extrabold text-slate-800 uppercase tracking-wider">
                         Scan Kode QRIS Di Bawah Ini
@@ -1606,29 +1649,22 @@ export default function Home() {
                         Dapat discan menggunakan GoPay, OVO, Dana, ShopeePay, BCA, Mandiri, dll.
                       </span>
                     </div>
-                  ) : paymentUrl ? (
-                    /* 2. Fallback Jika QRIS String Tidak Tersedia */
-                    <div className="p-4 bg-white rounded-xl border border-slate-200 space-y-2 text-center">
-                      <p className="text-xs text-slate-600 font-medium">
-                        Tagihan pembayaran telah siap dibuat di Mayar.
-                      </p>
-                    </div>
                   ) : (
                     <div className="w-full h-32 rounded-xl bg-red-50 text-red-500 flex items-center justify-center text-xs p-4 text-center font-sans font-medium">
                       Gagal memuat metode pembayaran. Silakan coba kembali beberapa saat.
                     </div>
                   )}
 
-                  {/* Tombol Utama: Buka Link Mayar Resmi di Tab Baru */}
+                  {/* Option Buka di Window Baru Jika Terkendala */}
                   {paymentUrl && (
                     <a
                       href={paymentUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 transition"
+                      className="text-[11px] font-bold text-blue-600 hover:text-blue-800 flex items-center justify-center gap-1 pt-1"
                     >
-                      <span>Buka Portal Pembayaran Mayar (VA / E-Wallet)</span>
-                      <ArrowRight className="w-4 h-4" />
+                      <span>Buka Portal Mayar di Tab Baru (Jika Iframe Terkendala)</span>
+                      <ExternalLink className="w-3 h-3" />
                     </a>
                   )}
 
@@ -1639,7 +1675,7 @@ export default function Home() {
 
                 <div className="text-[11px] text-emerald-600 font-semibold flex items-center justify-center gap-2 bg-emerald-50 p-2.5 rounded-xl border border-emerald-200">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-                  <span>Mengecek status pembayaran secara otomatis...</span>
+                  <span>Sistem memverifikasi pelunasan secara real-time...</span>
                 </div>
 
                 {/* Tombol Aksi Konfirmasi Utama & Batal */}
