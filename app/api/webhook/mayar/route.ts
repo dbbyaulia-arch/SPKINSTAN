@@ -1,30 +1,36 @@
 import { NextResponse } from 'next/server';
 import { Redis } from '@upstash/redis';
 
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL!,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-});
+const redis = Redis.fromEnv();
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
 
-    // Ambil deskripsi transaksi untuk ekstrak sessionId
-    const description = body.data?.description || '';
-    const match = description.match(/\[Ref:\s*([^\]]+)\]/);
-    const sessionId = match ? match[1] : null;
+    // 1. Tangani event testing dari tombol "Test Webhook" Mayar
+    if (body.event === 'testing') {
+      return NextResponse.json({ success: true, message: 'Test webhook received' }, { status: 200 });
+    }
 
-    if (body.event === 'payment.received' || body.status === 'SUCCESS' || body.status === 'PAID') {
+    // 2. Tangani event pembayaran asli dari Mayar
+    const { event, data } = body;
+
+    // Cek jika transaksi berhasil
+    if (data && (event === 'payment.received' || data.status === 'SUCCESS')) {
+      // Ambil identifier transaksi (misal ID session atau nomor hp customer)
+      const sessionId = data.custom_field?.[0]?.value || data.customerMobile || data.id;
+
       if (sessionId) {
-        // Update status di Redis menjadi PAID
-        await redis.set(`session:${sessionId}`, 'PAID', { ex: 86400 });
+        // Simpan status PAID ke Upstash Redis
+        await redis.set(`qris_status:${sessionId}`, JSON.stringify({ status: 'PAID', paid: true }));
       }
     }
 
-    return NextResponse.json({ received: true });
+    // Selalu kembalikan response 200 OK ke Mayar
+    return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
-    console.error('Mayar Webhook Error:', error);
-    return NextResponse.json({ error: 'Webhook Handler Failed' }, { status: 500 });
+    console.error('Webhook Error:', error);
+    // Kembalikan status 200/400 secara terkontrol
+    return NextResponse.json({ success: false, message: 'Invalid payload' }, { status: 400 });
   }
 }
