@@ -206,12 +206,12 @@ export default function Home() {
 
   // Verifikasi Pembayaran Manual via API saat tombol diklik
   const handleManualCheckPayment = async () => {
-    const targetCheckId = mayarPaymentId || sessionId;
-    if (!targetCheckId || isVerifyingPayment) return;
+    // Gunakan sessionId lokal (SPK-XXXXXX) secara konsisten dengan Redis Webhook
+    if (!sessionId || isVerifyingPayment) return;
     setIsVerifyingPayment(true);
 
     try {
-      const res = await fetch(`/api/qris/status/${targetCheckId}`);
+      const res = await fetch(`/api/qris/status/${sessionId}`);
       if (res.ok) {
         const data = await res.json();
         if (data.status === 'PAID' || data.paid === true) {
@@ -329,7 +329,9 @@ export default function Home() {
         if (data.qrString) {
           setQrCodeData(data.qrString);
         }
-        startPollingStatus(realMayarId);
+        
+        // KRUSIAL: Polling wajib menggunakan currentSession (SPK-XXXXXX) sesuai key Redis Webhook
+        startPollingStatus(currentSession);
       } else {
         console.error('Mayar Payment Generation Error:', data.message || 'Gagal membuat pembayaran Mayar');
       }
