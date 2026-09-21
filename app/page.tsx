@@ -122,6 +122,29 @@ export default function Home() {
     setSessionId(generateNewSessionId());
   }, []);
 
+  // Proteksi Ketat: Anti-Inspect & Anti-Shortcut (F12, Ctrl+Shift+I, Ctrl+P, PrintScreen) jika belum bayar
+  useEffect(() => {
+    const isPaid = paidDocs[activeDocTab];
+    if (isPaid) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        e.key === 'F12' ||
+        (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j' || e.key === 'C' || e.key === 'c')) ||
+        (e.ctrlKey && (e.key === 'u' || e.key === 'U' || e.key === 's' || e.key === 'S' || e.key === 'p' || e.key === 'P'))
+      ) {
+        e.preventDefault();
+        e.stopPropagation();
+        alert('Proteksi Keamanan: Fitur inspect, cetak langsung, dan simpan draf dibatasi. Silakan lakukan pembayaran untuk mendapatkan PDF HD Clean tanpa watermark.');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [paidDocs, activeDocTab]);
+
   useEffect(() => {
     if (showCheckoutModal && modalStep === 'qris' && timeLeft > 0) {
       const timer = setInterval(() => setTimeLeft((prev) => prev - 1), 1000);
@@ -142,11 +165,11 @@ export default function Home() {
     }
   }, [showCheckoutModal]);
 
-  // Fungsi Terpusat saat Pembayaran Berhasil
+  // Fungsi Terpusat saat Pembayaran Berhasil (Hapus Watermark & Auto-Download PDF Clean)
   const handlePaymentSuccess = () => {
     stopPolling();
 
-    // 1. Set status dokumen ke lunas (Menghilangkan watermark)
+    // 1. Set status dokumen ke lunas (Otomatis Menghilangkan watermark dari DOM)
     if (selectedPackage === 'BUNDLING') {
       setPaidDocs({ SPK: true, NDA: true, BAST: true });
     } else {
@@ -165,7 +188,7 @@ export default function Home() {
       });
     }
 
-    // 3. Picu otomatis unduh PDF Clean
+    // 3. Picu otomatis unduh PDF Clean tanpa watermark
     setTimeout(async () => {
       try {
         if (selectedPackage === 'BUNDLING') {
@@ -387,8 +410,11 @@ export default function Home() {
     const pdfWidth = pdf.internal.pageSize.getWidth();
     const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
 
+    const isPaidDoc = paidDocs[docType];
+    const fileSuffix = isPaidDoc ? 'CLEAN' : 'WATERMARKED_DRAFT';
+
     pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
-    pdf.save(`SPKInstan_${docType}_${(freelancerName || 'Freelancer').replace(/\s+/g, '_')}_CLEAN.pdf`);
+    pdf.save(`SPKInstan_${docType}_${(freelancerName || 'Freelancer').replace(/\s+/g, '_')}_${fileSuffix}.pdf`);
   };
 
   // PDF Export Handler
@@ -452,6 +478,15 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col justify-between font-sans antialiased selection:bg-blue-100 selection:text-blue-700 pb-20 md:pb-0">
       
+      {/* CSS Anti-Print untuk Draf Belum Lunas */}
+      {!paidDocs[activeDocTab] && (
+        <style font-sans>{`
+          @media print {
+            body { display: none !important; }
+          }
+        `}</style>
+      )}
+
       {/* Header */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/80">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -1081,7 +1116,7 @@ export default function Home() {
                   </span>
                   <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full">
                     <Shield className="w-3 h-3 text-blue-600" />
-                    Proteksi Anti-Inspect & Watermark SPKINSTAN
+                    Proteksi Anti-Inspect & Anti-Screenshot Active
                   </span>
                 </div>
 
@@ -1090,43 +1125,33 @@ export default function Home() {
                   <div
                     id="a4-document-preview"
                     onContextMenu={(e) => e.preventDefault()}
-                    className="w-full min-h-[780px] bg-white text-slate-950 font-serif p-4 sm:p-10 relative overflow-x-auto select-none shadow-xl rounded-xl"
+                    className={`w-full min-h-[780px] bg-white text-slate-950 font-serif p-4 sm:p-10 relative overflow-x-auto shadow-xl rounded-xl ${
+                      !paidDocs[activeDocTab] ? 'select-none' : ''
+                    }`}
                   >
-                    {/* Watermark Overlay Layer */}
+                    {/* Strict Watermark Overlay Layer (Permanen Ter-capture di PDF Gratis jika Belum Bayar) */}
                     {!paidDocs[activeDocTab] && (
-                      <>
-                        <div
-                          className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden"
-                          style={{ zIndex: 20 }}
-                        >
-                          <span
-                            className="text-5xl sm:text-7xl font-extrabold uppercase select-none whitespace-nowrap"
-                            style={{
-                              display: 'inline-block',
-                              transform: 'rotate(-30deg)',
-                              color: 'rgba(15, 23, 42, 0.12)',
-                              fontFamily: 'sans-serif'
-                            }}
-                          >
-                            SPKINSTAN DRAFT
-                          </span>
+                      <div className="absolute inset-0 pointer-events-none z-20 overflow-hidden flex flex-col justify-between p-6">
+                        {/* Diagonal Repeating Watermark Grid */}
+                        <div className="absolute inset-0 flex items-center justify-center rotate-[-30deg] scale-125 opacity-25">
+                          <div className="grid grid-cols-2 gap-12 text-center font-extrabold uppercase font-sans tracking-widest text-slate-900 select-none">
+                            <span className="text-4xl sm:text-6xl border-4 border-slate-900 p-2 rounded-xl">SPKINSTAN DRAFT</span>
+                            <span className="text-4xl sm:text-6xl border-4 border-slate-900 p-2 rounded-xl">SPKINSTAN DRAFT</span>
+                            <span className="text-4xl sm:text-6xl border-4 border-slate-900 p-2 rounded-xl">SPKINSTAN DRAFT</span>
+                            <span className="text-4xl sm:text-6xl border-4 border-slate-900 p-2 rounded-xl">SPKINSTAN DRAFT</span>
+                          </div>
                         </div>
-                        <div
-                          className="absolute bottom-6 right-6 pointer-events-none flex items-center gap-1.5 px-3 py-1.5 rounded-lg border"
-                          style={{
-                            zIndex: 20,
-                            backgroundColor: 'rgba(241, 245, 249, 0.95)',
-                            borderColor: 'rgba(15, 23, 42, 0.2)'
-                          }}
-                        >
-                          <span
-                            className="text-[10px] font-bold uppercase tracking-wider font-sans"
-                            style={{ color: 'rgba(15, 23, 42, 0.7)' }}
-                          >
-                            Dibuat via SPKInstan (Versi Draf)
-                          </span>
+
+                        {/* Top Watermark Banner */}
+                        <div className="w-full bg-slate-900/10 border border-slate-900/20 text-slate-900 text-center py-1 rounded-lg text-[10px] font-black uppercase tracking-widest font-sans">
+                          --- DRAF GRATIS TERPROTEKSI WATERMARK SPKINSTAN - TIDAK SAH UNTUK TRANSAKSI TANPA PELUNASAN ---
                         </div>
-                      </>
+
+                        {/* Bottom Right Stamp */}
+                        <div className="self-end bg-slate-900 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider font-sans opacity-85 shadow-md">
+                          Dibuat via SPKInstan (Versi Draf Gratis)
+                        </div>
+                      </div>
                     )}
 
                     {/* Legal Contract Content */}
