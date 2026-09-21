@@ -204,22 +204,30 @@ export default function Home() {
     }, 600);
   };
 
-  // Verifikasi Pembayaran Manual via API saat tombol diklik
+  // 1. Verifikasi Pembayaran Manual via API saat tombol diklik (Updated)
   const handleManualCheckPayment = async () => {
-    // Gunakan sessionId lokal (SPK-XXXXXX) secara konsisten dengan Redis Webhook
-    if (!sessionId || isVerifyingPayment) return;
+    if ((!sessionId && !mayarPaymentId) || isVerifyingPayment) return;
     setIsVerifyingPayment(true);
 
     try {
-      const res = await fetch(`/api/qris/status/${sessionId}`);
+      const targetId = mayarPaymentId || sessionId;
+      const res = await fetch(`/api/qris/status/${targetId}?sessionId=${sessionId}&mayarId=${mayarPaymentId || ''}`);
+
       if (res.ok) {
         const data = await res.json();
-        if (data.status === 'PAID' || data.paid === true) {
+        if (
+          data.status === 'PAID' ||
+          data.paid === true ||
+          data.status === 'SUCCESS' ||
+          data.status === 'SETTLED' ||
+          data.isPaid === true
+        ) {
           handlePaymentSuccess();
           return;
         }
       }
-      alert('Pembayaran belum terdeteksi oleh sistem. Silakan selesaikan pembayaran terlebih dahulu melalui QRIS/Gateway.');
+
+      alert('Pembayaran belum terdeteksi oleh sistem. Silakan pastikan proses pembayaran di QRIS/Gateway telah selesai.');
     } catch (err) {
       console.error('Pengecekan pembayaran gagal:', err);
       alert('Gagal memverifikasi status pembayaran. Silakan pastikan koneksi internet Anda dan coba lagi.');
@@ -228,7 +236,34 @@ export default function Home() {
     }
   };
 
-  // Listener untuk pesan postMessage dari Iframe Mayar
+  // 2. Polling Status Real-time (Updated)
+  const startPollingStatus = (currentSession: string, mayarId?: string) => {
+    stopPolling();
+    pollingRef.current = setInterval(async () => {
+      try {
+        const targetId = mayarId || currentSession;
+        const res = await fetch(`/api/qris/status/${targetId}?sessionId=${currentSession}&mayarId=${mayarId || ''}`);
+
+        if (!res.ok) return;
+
+        const data = await res.json();
+
+        if (
+          data.status === 'PAID' ||
+          data.paid === true ||
+          data.status === 'SUCCESS' ||
+          data.status === 'SETTLED' ||
+          data.isPaid === true
+        ) {
+          handlePaymentSuccess();
+        }
+      } catch (err) {
+        console.error('Polling error:', err);
+      }
+    }, 3000);
+  };
+
+  // 3. Listener untuk pesan postMessage dari Iframe Mayar (Updated)
   useEffect(() => {
     const handleMayarMessage = (event: MessageEvent) => {
       if (!event.data) return;
@@ -238,18 +273,22 @@ export default function Home() {
         try {
           payload = JSON.parse(payload);
         } catch (e) {
-          // Abaikan jika string biasa
+          // Jika berupa string biasa
         }
       }
 
       console.log('Pesan dari Iframe Mayar:', payload);
 
+      const strPayload = JSON.stringify(payload).toLowerCase();
+
       if (
+        strPayload.includes('success') ||
+        strPayload.includes('paid') ||
+        strPayload.includes('settled') ||
         payload.type === 'mayar_payment_success' ||
         payload.status === 'success' ||
         payload.event === 'payment.success' ||
-        payload.action === 'payment_success' ||
-        (typeof payload === 'string' && payload.includes('success'))
+        payload.action === 'payment_success'
       ) {
         handlePaymentSuccess();
       }
@@ -257,7 +296,7 @@ export default function Home() {
 
     window.addEventListener('message', handleMayarMessage);
     return () => window.removeEventListener('message', handleMayarMessage);
-  }, [paidDocTarget, selectedPackage]);
+  }, [paidDocTarget, selectedPackage, mayarPaymentId, sessionId]);
 
   // Dynamic Custom Clauses Handlers
   const handleAddCustomClause = () => {
@@ -329,9 +368,9 @@ export default function Home() {
         if (data.qrString) {
           setQrCodeData(data.qrString);
         }
-        
-        // KRUSIAL: Polling wajib menggunakan currentSession (SPK-XXXXXX) sesuai key Redis Webhook
-        startPollingStatus(currentSession);
+
+        // Jalankan polling dengan mengirimkan keduanya: currentSession dan realMayarId
+        startPollingStatus(currentSession, realMayarId);
       } else {
         console.error('Mayar Payment Generation Error:', data.message || 'Gagal membuat pembayaran Mayar');
       }
@@ -340,26 +379,6 @@ export default function Home() {
     } finally {
       setIsLoadingQris(false);
     }
-  };
-
-  // Polling Status Real-time
-  const startPollingStatus = (id: string) => {
-    stopPolling();
-    pollingRef.current = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/qris/status/${id}`);
-
-        if (!res.ok) return;
-
-        const data = await res.json();
-
-        if (data.status === 'PAID' || data.paid === true) {
-          handlePaymentSuccess();
-        }
-      } catch (err) {
-        console.error('Polling error:', err);
-      }
-    }, 3000);
   };
 
   const formatRupiah = (val: string) => (val ? parseInt(val, 10).toLocaleString('id-ID') : '0');
