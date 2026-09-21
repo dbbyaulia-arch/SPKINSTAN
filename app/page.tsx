@@ -225,7 +225,7 @@ export default function Home() {
     setSessionId(currentSession);
     setTimeLeft(899);
 
-    const amount = selectedPackage === 'SINGLE' ? 19999 : 49999;
+    const amount = selectedPackage === 'SINGLE' ? 1000 : 49999;
 
     if (typeof window !== 'undefined' && window.fbq) {
       window.fbq('track', 'InitiateCheckout', {
@@ -526,7 +526,7 @@ export default function Home() {
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    Dokumen Satuan — Rp 1000
+                    Dokumen Satuan — Rp 1.000
                   </button>
                   <button
                     onClick={() => setSelectedPackage('BUNDLING')}
@@ -1432,7 +1432,7 @@ export default function Home() {
                           <span className="block font-bold">Dokumen Satuan ({activeDocTab})</span>
                           <span className="text-[10px] text-slate-500 font-normal">Unduh 1 dokumen PDF pilihan</span>
                         </div>
-                        <span className="font-extrabold text-slate-900 text-sm">Rp 19.999</span>
+                        <span className="font-extrabold text-slate-900 text-sm">Rp 1.000</span>
                       </div>
 
                       <div
@@ -1470,7 +1470,7 @@ export default function Home() {
                       <span>
                         {isLoadingQris
                           ? 'Memproses...'
-                          : `Bayar via Mayar Payment Gateway (${selectedPackage === 'SINGLE' ? 'Rp 19.999' : 'Rp 49.999'})`}
+                          : `Bayar via Mayar Payment Gateway (${selectedPackage === 'SINGLE' ? 'Rp 1.000' : 'Rp 49.999'})`}
                       </span>
                     </button>
                   </div>
@@ -1493,7 +1493,7 @@ export default function Home() {
                 <div>
                   <h3 className="font-extrabold text-slate-900 text-base">Pembayaran Lisensi Dokumen</h3>
                   <div className="text-2xl font-black text-slate-900 mt-1">
-                    {selectedPackage === 'SINGLE' ? 'Rp 19.999' : 'Rp 49.999'}
+                    {selectedPackage === 'SINGLE' ? 'Rp 1.000' : 'Rp 49.999'}
                   </div>
                   <p className="text-[11px] text-slate-500">
                     Paket: <strong>{selectedPackage === 'SINGLE' ? `Single Document (${activeDocTab})` : 'Bundling (SPK + NDA + BAST)'}</strong>
