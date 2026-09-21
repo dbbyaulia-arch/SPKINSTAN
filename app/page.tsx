@@ -160,7 +160,7 @@ export default function Home() {
 
     if (typeof window !== 'undefined' && window.fbq) {
       window.fbq('track', 'Purchase', {
-        value: selectedPackage === 'SINGLE' ? 19999 : 49999,
+        value: selectedPackage === 'SINGLE' ? 1000 : 49999,
         currency: 'IDR',
       });
     }
@@ -526,7 +526,7 @@ export default function Home() {
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    Dokumen Satuan — Rp 19.999
+                    Dokumen Satuan — Rp 1000
                   </button>
                   <button
                     onClick={() => setSelectedPackage('BUNDLING')}
