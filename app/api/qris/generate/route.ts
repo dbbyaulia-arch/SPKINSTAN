@@ -16,7 +16,6 @@ export async function POST(req: Request) {
       customerName,
       customerMobile,
       customerEmail,
-      packageType,
       docType,
     } = body;
 
@@ -30,6 +29,15 @@ export async function POST(req: Request) {
     const apiKey = process.env.MAYAR_API_KEY;
     const baseUrl = process.env.MAYAR_BASE_URL || 'https://api.mayar.id/hl/v1';
 
+    if (!apiKey) {
+      console.error('[MAYAR GENERATE ERROR]: MAYAR_API_KEY belum dikonfigurasi');
+      return NextResponse.json(
+        { success: false, message: 'MAYAR_API_KEY belum dikonfigurasi' },
+        { status: 500 }
+      );
+    }
+
+    // 1. Panggil API Mayar untuk membuat transaksi
     const response = await fetch(`${baseUrl}/payment/create`, {
       method: 'POST',
       headers: {
@@ -41,7 +49,6 @@ export async function POST(req: Request) {
         email: customerEmail || `client-${Date.now()}@spkinstan.com`,
         mobile: customerMobile || '081234567890',
         amount: amount || 1000,
-        // Format [Ref: sessionId] wajib agar regex Webhook bekerja
         description: `Pembayaran Lisensi Dokumen ${docType || ''} [Ref: ${sessionId}]`,
       }),
     });
@@ -49,6 +56,7 @@ export async function POST(req: Request) {
     const data = await response.json();
 
     if (!response.ok) {
+      console.error('[MAYAR API RESPONSE ERROR]:', data);
       return NextResponse.json(
         { success: false, message: data.message || 'Gagal membuat tagihan di Mayar' },
         { status: response.status }
@@ -56,24 +64,30 @@ export async function POST(req: Request) {
     }
 
     const mayarPaymentId = data.data?.id || data.data?.paymentId || data.id || data.paymentId;
+    const paymentUrl = data.data?.link || data.data?.url || data.link || data.url;
 
-    // Menyimpan pemetaan (mapping) awal antara sessionId dengan mayarPaymentId ke dalam Upstash Redis
-    if (mayarPaymentId) {
-      await redis.set(`mapping:${sessionId}`, mayarPaymentId, { ex: 86400 });
-      await redis.set(`mapping:${mayarPaymentId}`, sessionId, { ex: 86400 });
-      await redis.set(`session:${mayarPaymentId}`, 'PENDING', { ex: 86400 });
+    // 2. Simpan pemetaan ke Redis secara Non-Blocking (Safe Try-Catch)
+    try {
+      if (mayarPaymentId) {
+        await redis.set(`mapping:${sessionId}`, mayarPaymentId, { ex: 86400 });
+        await redis.set(`mapping:${mayarPaymentId}`, sessionId, { ex: 86400 });
+        await redis.set(`session:${mayarPaymentId}`, 'PENDING', { ex: 86400 });
+      }
+      await redis.set(`session:${sessionId}`, 'PENDING', { ex: 86400 });
+    } catch (redisError) {
+      console.warn('[REDIS SAVE WARNING]: Gagal menyimpan ke Redis, tetap melanjutkan:', redisError);
     }
-    await redis.set(`session:${sessionId}`, 'PENDING', { ex: 86400 });
 
+    // 3. Kembalikan response ke Frontend
     return NextResponse.json({
       success: true,
       mayarPaymentId: mayarPaymentId,
       paymentId: mayarPaymentId,
-      paymentUrl: data.data?.link || data.data?.url || data.link || data.url,
+      paymentUrl: paymentUrl,
       qrString: data.data?.qrString || data.qrString,
     });
   } catch (error) {
-    console.error('Mayar API Generate Error:', error);
+    console.error('[MAYAR API GENERATE SERVER ERROR]:', error);
     return NextResponse.json(
       { success: false, message: 'Terjadi kesalahan pada server saat membuat tagihan' },
       { status: 500 }
