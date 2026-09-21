@@ -72,6 +72,7 @@ export default function Home() {
   const [qrCodeData, setQrCodeData] = useState<string | null>(null);
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
   const [isLoadingQris, setIsLoadingQris] = useState(false);
+  const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
   // Form State
@@ -200,6 +201,29 @@ export default function Home() {
         console.warn('Auto download terblokir browser, dapat klik manual di modal sukses:', autoErr);
       }
     }, 600);
+  };
+
+  // Verifikasi Pembayaran Manual via API saat tombol diklik
+  const handleManualCheckPayment = async () => {
+    if (!sessionId || isVerifyingPayment) return;
+    setIsVerifyingPayment(true);
+
+    try {
+      const res = await fetch(`/api/qris/status/${sessionId}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.status === 'PAID' || data.paid === true) {
+          handlePaymentSuccess();
+          return;
+        }
+      }
+      alert('Pembayaran belum terdeteksi oleh sistem. Silakan selesaikan pembayaran terlebih dahulu melalui QRIS/Gateway.');
+    } catch (err) {
+      console.error('Pengecekan pembayaran gagal:', err);
+      alert('Gagal memverifikasi status pembayaran. Silakan pastikan koneksi internet Anda dan coba lagi.');
+    } finally {
+      setIsVerifyingPayment(false);
+    }
   };
 
   // Listener untuk pesan postMessage dari Iframe Mayar
@@ -547,7 +571,7 @@ export default function Home() {
               </h1>
 
               <p className="text-slate-500 text-xs sm:text-sm md:text-base font-medium leading-relaxed max-w-xl mx-auto">
-                Hasilkan SPK, NDA, & BAST sah dalam 2 menit. Bebas ghosting klien, kepastian pembayaran, dan revisi terstruktur langsung dari HP.
+                Hasilkn SPK, NDA, & BAST sah dalam 2 menit. Bebas ghosting klien, kepastian pembayaran, dan revisi terstruktur langsung dari HP.
               </p>
 
               {/* Package Selector Pills */}
@@ -1568,11 +1592,18 @@ export default function Home() {
                 <div className="space-y-2 pt-1">
                   <button
                     type="button"
-                    onClick={handlePaymentSuccess}
-                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 transition"
+                    disabled={isVerifyingPayment}
+                    onClick={handleManualCheckPayment}
+                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white font-extrabold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 transition"
                   >
-                    <CheckCircle className="w-4 h-4" />
-                    <span>Saya Sudah Bayar & Unduh PDF Clean</span>
+                    {isVerifyingPayment ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <CheckCircle className="w-4 h-4" />
+                    )}
+                    <span>
+                      {isVerifyingPayment ? 'Memverifikasi Pembayaran...' : 'Cek Status & Verifikasi Pembayaran'}
+                    </span>
                   </button>
 
                   <button
