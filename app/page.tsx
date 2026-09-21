@@ -102,7 +102,7 @@ export default function Home() {
   const [clauseSla, setClauseSla] = useState(true);
   const [clauseRetention, setClauseRetention] = useState(true);
   const [clauseDp, setClauseDp] = useState(true);
-  
+
   // Custom Dynamic Clauses Array
   const [customClauses, setCustomClauses] = useState<string[]>(['']);
 
@@ -142,6 +142,60 @@ export default function Home() {
     }
   }, [showCheckoutModal]);
 
+  // Fungsi Terpusat saat Pembayaran Berhasil
+  const handlePaymentSuccess = () => {
+    stopPolling();
+
+    // 1. Set status dokumen ke lunas (Menghilangkan watermark)
+    if (selectedPackage === 'BUNDLING') {
+      setPaidDocs({ SPK: true, NDA: true, BAST: true });
+    } else {
+      setPaidDocs((prev) => ({ ...prev, [paidDocTarget]: true }));
+    }
+
+    // 2. Tampilkan mode preview & beralih ke modal sukses
+    setMobileViewMode('preview');
+    setShowCheckoutModal(false);
+    setShowSuccessModal(true);
+
+    if (typeof window !== 'undefined' && window.fbq) {
+      window.fbq('track', 'Purchase', {
+        value: selectedPackage === 'SINGLE' ? 19999 : 49999,
+        currency: 'IDR',
+      });
+    }
+
+    // 3. Picu otomatis unduh PDF Clean
+    setTimeout(async () => {
+      try {
+        if (selectedPackage === 'BUNDLING') {
+          await captureDocumentToPdf('SPK');
+        } else {
+          await captureDocumentToPdf(paidDocTarget);
+        }
+      } catch (autoErr) {
+        console.warn('Auto download terblokir browser, dapat klik manual di modal sukses:', autoErr);
+      }
+    }, 600);
+  };
+
+  // Listener untuk pesan postMessage dari Iframe Mayar
+  useEffect(() => {
+    const handleMayarMessage = (event: MessageEvent) => {
+      if (
+        event.data &&
+        (event.data.type === 'mayar_payment_success' ||
+          event.data.status === 'success' ||
+          event.data.event === 'payment.success')
+      ) {
+        handlePaymentSuccess();
+      }
+    };
+
+    window.addEventListener('message', handleMayarMessage);
+    return () => window.removeEventListener('message', handleMayarMessage);
+  }, [paidDocTarget, selectedPackage]);
+
   // Dynamic Custom Clauses Handlers
   const handleAddCustomClause = () => {
     setCustomClauses((prev) => [...prev, '']);
@@ -171,7 +225,7 @@ export default function Home() {
     setSessionId(currentSession);
     setTimeLeft(899);
 
-    const amount = selectedPackage === 'SINGLE' ? 1000 : 49999;
+    const amount = selectedPackage === 'SINGLE' ? 19999 : 49999;
 
     if (typeof window !== 'undefined' && window.fbq) {
       window.fbq('track', 'InitiateCheckout', {
@@ -182,9 +236,9 @@ export default function Home() {
 
     const targetName = clientName || freelancerName || 'Klien SPKInstan';
     const cleanName = targetName.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const targetEmail = freelancerEmail.trim() || (cleanName 
-      ? `${cleanName}@spkinstan.com` 
-      : `client-${Date.now()}@spkinstan.com`);
+    const targetEmail =
+      freelancerEmail.trim() ||
+      (cleanName ? `${cleanName}@spkinstan.com` : `client-${Date.now()}@spkinstan.com`);
 
     try {
       const res = await fetch('/api/qris/generate', {
@@ -227,47 +281,12 @@ export default function Home() {
       try {
         const res = await fetch(`/api/qris/status/${id}`);
 
-        if (!res.ok) {
-          console.warn(`Polling status warning (${res.status}): Endpoint belum siap`);
-          return;
-        }
+        if (!res.ok) return;
 
         const data = await res.json();
 
         if (data.status === 'PAID' || data.paid === true) {
-          stopPolling();
-
-          // 1. Set status dokumen ke lunas
-          if (selectedPackage === 'BUNDLING') {
-            setPaidDocs({ SPK: true, NDA: true, BAST: true });
-          } else {
-            setPaidDocs((prev) => ({ ...prev, [paidDocTarget]: true }));
-          }
-
-          // 2. Tampilkan mode preview agar elemen A4 ter-render penuh di layar HP/Desktop
-          setMobileViewMode('preview');
-          setShowCheckoutModal(false);
-          setShowSuccessModal(true);
-
-          if (typeof window !== 'undefined' && window.fbq) {
-            window.fbq('track', 'Purchase', {
-              value: selectedPackage === 'SINGLE' ? 19999 : 49999,
-              currency: 'IDR',
-            });
-          }
-
-          // 3. Upaya auto-download otomatis setelah DOM ter-render
-          setTimeout(async () => {
-            try {
-              if (selectedPackage === 'BUNDLING') {
-                await captureDocumentToPdf('SPK');
-              } else {
-                await captureDocumentToPdf(paidDocTarget);
-              }
-            } catch (autoErr) {
-              console.warn('Auto download terblokir browser, user dapat menekan tombol di modal sukses:', autoErr);
-            }
-          }, 800);
+          handlePaymentSuccess();
         }
       } catch (err) {
         console.error('Polling error:', err);
@@ -339,8 +358,7 @@ export default function Home() {
   // Helper Capture PDF per Dokumen
   const captureDocumentToPdf = async (docType: 'SPK' | 'NDA' | 'BAST') => {
     setActiveDocTab(docType);
-    
-    // Pastikan view mobile beralih ke preview agar DOM tidak tersembunyi
+
     setMobileViewMode('preview');
     await new Promise((resolve) => setTimeout(resolve, 350));
 
@@ -373,7 +391,7 @@ export default function Home() {
     pdf.save(`SPKInstan_${docType}_${(freelancerName || 'Freelancer').replace(/\s+/g, '_')}_CLEAN.pdf`);
   };
 
-  // PDF Export Handler untuk Ekspor Manual / Klik Tombol
+  // PDF Export Handler
   const handleDownloadPDF = async (specificDoc?: 'SPK' | 'NDA' | 'BAST') => {
     try {
       setIsExporting(true);
@@ -414,13 +432,13 @@ export default function Home() {
   const handleShareWhatsApp = (specificDoc?: 'SPK' | 'NDA' | 'BAST') => {
     const targetDoc = specificDoc || activeDocTab;
     let text = '';
-    
+
     if (selectedPackage === 'BUNDLING' && !specificDoc) {
       text = `Halo ${clientName || 'Klien'},\n\nBerikut dikirimkan draf resmi *Paket Perjanjian Kerja Sama (SPK, NDA, & BAST)* untuk proyek "${projectTitle || 'Pekerjaan Jasa'}" yang telah diterbitkan secara legal.\n\n*Penyedia Jasa:* ${freelancerName || 'Debby Aulia'}\n*Status Dokumen:* Sah (Terverifikasi Pelunasan PRO)\n\nMohon diperiksa dan ditandatangani kembali. Terima kasih!`;
     } else {
       text = `Halo ${clientName || 'Klien'},\n\nBerikut dikirimkan draf resmi *${targetDoc} Perjanjian Kerja Sama* untuk proyek "${projectTitle || 'Pekerjaan Jasa'}" yang telah diterbitkan secara legal.\n\n*Penyedia Jasa:* ${freelancerName || 'Debby Aulia'}\n*Status Dokumen:* Sah (Terverifikasi Pelunasan)\n\nMohon diperiksa dan ditandatangani kembali. Terima kasih!`;
     }
-    
+
     window.open(`https://wa.me/${clientWa}?text=${encodeURIComponent(text)}`, '_blank');
   };
 
@@ -494,7 +512,7 @@ export default function Home() {
               </h1>
 
               <p className="text-slate-500 text-xs sm:text-sm md:text-base font-medium leading-relaxed max-w-xl mx-auto">
-                Hasikan SPK, NDA, & BAST sah dalam 2 menit. Bebas ghosting klien, kepastian pembayaran, dan revisi terstruktur langsung dari HP.
+                Hasilkan SPK, NDA, & BAST sah dalam 2 menit. Bebas ghosting klien, kepastian pembayaran, dan revisi terstruktur langsung dari HP.
               </p>
 
               {/* Package Selector Pills */}
@@ -1521,14 +1539,24 @@ export default function Home() {
                   <span>Mengecek status pembayaran secara otomatis...</span>
                 </div>
 
+                {/* Tombol Aksi Konfirmasi Utama & Batal */}
                 <div className="space-y-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={handlePaymentSuccess}
+                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 transition"
+                  >
+                    <CheckCircle className="w-4 h-4" />
+                    <span>Saya Sudah Bayar & Unduh PDF Clean</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => {
                       stopPolling();
                       setModalStep('download_choice');
                     }}
-                    className="w-full py-2.5 text-slate-500 hover:text-slate-800 font-semibold text-xs border border-slate-200 rounded-xl"
+                    className="w-full py-2 text-slate-400 hover:text-slate-600 font-medium text-[11px]"
                   >
                     Batal Transaksi
                   </button>
