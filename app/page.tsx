@@ -192,7 +192,7 @@ export default function Home() {
 
     if (typeof window !== 'undefined' && window.fbq) {
       window.fbq('track', 'Purchase', {
-        value: selectedPackage === 'SINGLE' ? 1000 : 49999,
+        value: selectedPackage === 'SINGLE' ? 1000 : 1000,
         currency: 'IDR',
       });
     }
@@ -325,7 +325,7 @@ export default function Home() {
     setSessionId(currentSession);
     setTimeLeft(899);
 
-    const amount = selectedPackage === 'SINGLE' ? 1000 : 49999;
+    const amount = selectedPackage === 'SINGLE' ? 1000 : 1000;
 
     if (typeof window !== 'undefined' && window.fbq) {
       window.fbq('track', 'InitiateCheckout', {
@@ -439,7 +439,20 @@ export default function Home() {
     setSignatureDataUrl(null);
   };
 
-  // Generator PDF Berbasis Blob Stream & Force Clean DOM
+  // Fungsi untuk menghanguskan lisensi di Redis
+  const consumePaymentLicense = async (currentSessionId: string) => {
+    try {
+      await fetch('/api/qris/consume', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: currentSessionId }),
+      });
+    } catch (err) {
+      console.error('Gagal mengonsumsi lisensi di server:', err);
+    }
+  };
+
+  // Generator PDF Berbasis Blob Stream & Force Clean DOM (Dengan Peraturan 1x Download)
   const captureDocumentToPdf = async (docType: 'SPK' | 'NDA' | 'BAST') => {
     setActiveDocTab(docType);
     setMobileViewMode('preview');
@@ -501,9 +514,26 @@ export default function Home() {
       document.body.removeChild(downloadAnchor);
 
       setTimeout(() => URL.revokeObjectURL(blobUrl), 3000);
+
+      // =========================================================
+      // LOGIKA SINGLE-USE (1x DOWNLOAD SAJA)
+      // =========================================================
+      if (isPaidDoc) {
+        // 1. Hanguskan lisensi di Redis
+        if (sessionId) {
+          await consumePaymentLicense(sessionId);
+        }
+
+        // 2. Reset status paidDocs di React State agar watermark langsung muncul kembali
+        if (selectedPackage === 'BUNDLING') {
+          setPaidDocs({ SPK: false, NDA: false, BAST: false });
+        } else {
+          setPaidDocs((prev) => ({ ...prev, [docType]: false }));
+        }
+      }
     } catch (err) {
       console.error('Error generating PDF:', err);
-      alert('Gagal mengekspor PDF secara otomatis. Silakan klik tombol hijau "Unduh PDF Clean" di bawah.');
+      alert('Gagal mengekspor PDF secara otomatis.');
     }
   };
 
@@ -661,7 +691,7 @@ export default function Home() {
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    <span>Paket Bundling Proteksi (3-in-1) — Rp 49.999</span>
+                    <span>Paket Bundling Proteksi (3-in-1) — Rp 1.000</span>
                     <span className="bg-amber-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider whitespace-nowrap">
                       Hemat 60%
                     </span>
@@ -1566,7 +1596,7 @@ export default function Home() {
                           </div>
                           <span className="text-[10px] text-slate-500 font-normal">Unduh sekaligus 3 Dokumen (SPK + NDA + BAST)</span>
                         </div>
-                        <span className="font-extrabold text-emerald-700 text-sm">Rp 49.999</span>
+                        <span className="font-extrabold text-emerald-700 text-sm">Rp 1.000</span>
                       </div>
                     </div>
 
@@ -1584,7 +1614,7 @@ export default function Home() {
                       <span>
                         {isLoadingQris
                           ? 'Memproses...'
-                          : `Bayar via Mayar Payment Gateway (${selectedPackage === 'SINGLE' ? 'Rp 1.000' : 'Rp 49.999'})`}
+                          : 'Bayar via Mayar Payment Gateway (Rp 1.000)'}
                       </span>
                     </button>
                   </div>
@@ -1607,7 +1637,7 @@ export default function Home() {
                 <div>
                   <h3 className="font-extrabold text-slate-900 text-base">Pembayaran Lisensi Dokumen</h3>
                   <div className="text-2xl font-black text-slate-900 mt-1">
-                    {selectedPackage === 'SINGLE' ? 'Rp 1.000' : 'Rp 49.999'}
+                    Rp 1.000
                   </div>
                   <p className="text-[11px] text-slate-500">
                     Paket: <strong>{selectedPackage === 'SINGLE' ? `Single Document (${activeDocTab})` : 'Bundling (SPK + NDA + BAST)'}</strong>
