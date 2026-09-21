@@ -1,30 +1,48 @@
 import { NextResponse } from 'next/server';
+import { Redis } from '@upstash/redis';
+
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL!,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+});
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    
-    const { 
-      sessionId, 
-      amount, 
-      customerName, 
-      customerMobile, 
-      customerEmail 
+
+    const {
+      sessionId,
+      amount,
+      customerName,
+      customerMobile,
+      customerEmail,
+      packageType,
+      docType,
     } = body;
 
-    const response = await fetch('https://api.mayar.id/hl/v1/payment/create', {
+    if (!sessionId) {
+      return NextResponse.json(
+        { success: false, message: 'Session ID diperlukan' },
+        { status: 400 }
+      );
+    }
+
+    const apiKey = process.env.MAYAR_API_KEY;
+    const baseUrl = process.env.MAYAR_BASE_URL || 'https://api.mayar.id/hl/v1';
+
+    const response = await fetch(`${baseUrl}/payment/create`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${process.env.MAYAR_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         name: customerName || 'Klien SPKInstan',
         email: customerEmail || `client-${Date.now()}@spkinstan.com`,
         mobile: customerMobile || '081234567890',
-        amount: amount,
+        amount: amount || 1000,
         // Format [Ref: sessionId] wajib agar regex Webhook bekerja
-        description: `Pembayaran Lisensi Dokumen [Ref: ${sessionId}]`,
+        description: `Pembayaran Lisensi Dokumen ${docType || ''} [Ref: ${sessionId}]`,
       }),
     });
 
@@ -37,15 +55,27 @@ export async function POST(req: Request) {
       );
     }
 
+    const mayarPaymentId = data.data?.id || data.data?.paymentId || data.id || data.paymentId;
+
+    // Menyimpan pemetaan (mapping) awal antara sessionId dengan mayarPaymentId ke dalam Upstash Redis
+    if (mayarPaymentId) {
+      await redis.set(`mapping:${sessionId}`, mayarPaymentId, { ex: 86400 });
+      await redis.set(`mapping:${mayarPaymentId}`, sessionId, { ex: 86400 });
+      await redis.set(`session:${mayarPaymentId}`, 'PENDING', { ex: 86400 });
+    }
+    await redis.set(`session:${sessionId}`, 'PENDING', { ex: 86400 });
+
     return NextResponse.json({
       success: true,
-      paymentUrl: data.data?.link || data.data?.url,
-      qrString: data.data?.qrString,
+      mayarPaymentId: mayarPaymentId,
+      paymentId: mayarPaymentId,
+      paymentUrl: data.data?.link || data.data?.url || data.link || data.url,
+      qrString: data.data?.qrString || data.qrString,
     });
   } catch (error) {
-    console.error('Mayar API Error:', error);
+    console.error('Mayar API Generate Error:', error);
     return NextResponse.json(
-      { success: false, message: 'Terjadi kesalahan pada server' },
+      { success: false, message: 'Terjadi kesalahan pada server saat membuat tagihan' },
       { status: 500 }
     );
   }
