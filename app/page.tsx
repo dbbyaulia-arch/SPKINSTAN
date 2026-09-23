@@ -510,7 +510,7 @@ export default function Home() {
     }
   };
 
-  // Generator PDF Berbasis Multi-Page A4 Standar
+  // Generator PDF Berbasis Multi-Page Container A4 Standar (.a4-page)
   const captureDocumentToPdf = async (docType: 'SPK' | 'NDA' | 'BAST') => {
     setActiveDocTab(docType);
     setMobileViewMode('preview');
@@ -530,63 +530,49 @@ export default function Home() {
       const html2canvasPro = (await import('html2canvas-pro')).default;
       const { jsPDF } = await import('jspdf');
 
-      const isPaidDoc = paidDocs[docType] || paidDocs[activeDocTab];
-      const watermarkElement = element.querySelector('.watermark-layer') as HTMLElement;
-      if (isPaidDoc && watermarkElement) {
-        watermarkElement.style.display = 'none';
-      }
-
-      const canvas = await html2canvasPro(element, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        logging: false,
-        windowWidth: 1200,
-      });
-
-      if (watermarkElement && !isPaidDoc) {
-        watermarkElement.style.display = 'flex';
-      }
-
-      const imgData = canvas.toDataURL('image/jpeg', 0.98);
-
-      const pageWidthInches = 8.27; // Lebar standar A4
-      const pageHeightInches = 11.69; // Tinggi standar A4
-      const imgScaledHeight = (canvas.height * pageWidthInches) / canvas.width;
-
       const pdf = new jsPDF({
         orientation: 'portrait',
-        unit: 'in',
+        unit: 'mm',
         format: 'a4',
       });
 
-      let heightLeft = imgScaledHeight;
-      let position = 0;
+      // Cari seluruh kontainer halaman individual .a4-page
+      const pageElements = element.querySelectorAll('.a4-page');
 
-      // Halaman Pertama
-      pdf.addImage(imgData, 'JPEG', 0, position, pageWidthInches, imgScaledHeight);
-      heightLeft -= pageHeightInches;
+      for (let i = 0; i < pageElements.length; i++) {
+        const pageEl = pageElements[i] as HTMLElement;
+        const isPaidDoc = paidDocs[docType] || paidDocs[activeDocTab];
 
-      // Halaman Selanjutnya (Multi-Page Loop) jika dokumen panjang
-      while (heightLeft > 0) {
-        position = heightLeft - imgScaledHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'JPEG', 0, position, pageWidthInches, imgScaledHeight);
-        heightLeft -= pageHeightInches;
+        const watermarkElement = pageEl.querySelector('.watermark-layer') as HTMLElement;
+        if (isPaidDoc && watermarkElement) {
+          watermarkElement.style.display = 'none';
+        }
+
+        // Render kanvas khusus untuk halaman ini saja secara presisi
+        const canvas = await html2canvasPro(pageEl, {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          logging: false,
+        });
+
+        if (watermarkElement && !isPaidDoc) {
+          watermarkElement.style.display = 'flex';
+        }
+
+        const imgData = canvas.toDataURL('image/jpeg', 0.98);
+
+        // Tambahkan halaman baru di PDF jika bukan halaman pertama
+        if (i > 0) pdf.addPage();
+
+        // Tempelkan gambar pas berukuran A4 (210mm x 297mm)
+        pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
       }
 
+      const isPaidDoc = paidDocs[docType] || paidDocs[activeDocTab];
       const fileSuffix = isPaidDoc ? 'CLEAN' : 'WATERMARKED_DRAFT';
-      const pdfBlob = pdf.output('blob');
-      const blobUrl = URL.createObjectURL(pdfBlob);
 
-      const downloadAnchor = document.createElement('a');
-      downloadAnchor.href = blobUrl;
-      downloadAnchor.download = `SPKInstan_${docType}_${(freelancerName || 'PihakPertama').replace(/\s+/g, '_')}_${fileSuffix}.pdf`;
-      document.body.appendChild(downloadAnchor);
-      downloadAnchor.click();
-      document.body.removeChild(downloadAnchor);
-
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 3000);
+      pdf.save(`SPKInstan_${docType}_${(freelancerName || 'PihakPertama').replace(/\s+/g, '_')}_${fileSuffix}.pdf`);
 
       if (isPaidDoc) {
         if (sessionId) {
@@ -601,7 +587,7 @@ export default function Home() {
       }
     } catch (err) {
       console.error('Error generating PDF:', err);
-      alert('Gagal mengekspor PDF secara otomatis.');
+      alert('Gagal mengekspor PDF.');
     } finally {
       setIsExporting(false);
     }
@@ -1425,7 +1411,7 @@ export default function Home() {
                 <div className="flex items-center justify-between bg-white px-4 py-2.5 rounded-2xl border border-slate-200 shadow-sm text-xs">
                   <span className="flex items-center gap-1.5 font-bold text-slate-700">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    Live Preview Dokumen (SPKInstan Signature Template)
+                    Live Preview Dokumen (Multi-Page A4 Container)
                   </span>
                   <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full">
                     <Shield className="w-3 h-3 text-blue-600" />
@@ -1433,237 +1419,283 @@ export default function Home() {
                   </span>
                 </div>
 
-                {/* Printable A4 Paper Container - SPKInstan Signature Template */}
-                <div className="relative bg-slate-300/40 p-2 sm:p-6 rounded-3xl overflow-hidden border border-slate-200">
+                {/* Printable A4 Paper Container - SPKInstan Signature Multi-Page Template */}
+                <div className="relative bg-slate-300/40 p-2 sm:p-6 rounded-3xl border border-slate-200 overflow-x-auto">
                   <div
                     id="a4-document-preview"
                     onContextMenu={(e) => e.preventDefault()}
                     onCopy={(e) => e.preventDefault()}
                     onCut={(e) => e.preventDefault()}
                     onDragStart={(e) => e.preventDefault()}
-                    className={`w-full min-h-[842px] bg-white text-slate-900 font-sans relative overflow-hidden shadow-xl rounded-2xl border border-slate-200/80 ${
+                    className={`flex flex-col gap-8 items-center w-full ${
                       !paidDocs[activeDocTab] ? 'select-none' : ''
                     }`}
                   >
-                    {/* 1. Header Top Accent Floating Bar */}
-                    <div className="pt-5 px-6 sm:px-10">
-                      <div className="h-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 w-full rounded-full shadow-xs" />
-                    </div>
-
-                    {/* Watermark Overlay Minimalis */}
-                    {!paidDocs[activeDocTab] && (
-                      <div className="watermark-layer absolute inset-0 pointer-events-none z-20 flex items-center justify-center overflow-hidden">
-                        <span className="text-5xl sm:text-7xl font-black tracking-[0.25em] text-slate-300/25 uppercase select-none font-sans -rotate-12 transform">
-                          SPKINSTAN
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Document Inner Wrapper */}
-                    <div className="p-6 sm:p-10 pt-4 space-y-6 text-[12px] sm:text-[13px] leading-relaxed text-slate-700 relative z-10">
+                    {/* === HALAMAN 1 (A4 Container) === */}
+                    <div className="a4-page w-[794px] min-h-[1123px] h-[1123px] bg-white text-slate-900 font-sans p-10 relative flex flex-col justify-between shadow-xl rounded-xl border border-slate-200 overflow-hidden shrink-0">
                       
-                      {/* 2. Brand Header & Document Information Box */}
-                      <div className="flex items-start justify-between pb-4 border-b border-slate-200/80 gap-4">
-                        <div className="space-y-1">
-                          <span className="text-[10px] font-bold tracking-widest text-blue-600 uppercase">
-                            Pihak Pertama
+                      {/* Watermark Overlay Minimalis Halaman 1 */}
+                      {!paidDocs[activeDocTab] && (
+                        <div className="watermark-layer absolute inset-0 pointer-events-none z-20 flex items-center justify-center overflow-hidden">
+                          <span className="text-5xl sm:text-7xl font-black tracking-[0.25em] text-slate-300/25 uppercase select-none font-sans -rotate-12 transform">
+                            SPKINSTAN
                           </span>
-                          <h1 className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight leading-tight">
-                            {freelancerName || 'Nama Pihak Pertama'}
-                          </h1>
-                          {freelancerEmail && (
-                            <p className="text-[11px] text-slate-500">{freelancerEmail}</p>
-                          )}
                         </div>
+                      )}
 
-                        {/* Kotak Informasi Nomor & Tanggal Bersih */}
-                        <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3 text-right space-y-1 min-w-[170px]">
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                            Nomor Dokumen
-                          </p>
-                          <p className="font-mono text-[11px] font-extrabold text-slate-900">
-                            {docNumber || '001/SPK/IX/2026'}
-                          </p>
-                          <p className="text-[10px] text-slate-500 pt-0.5">{getTodayFormattedDate()}</p>
-                        </div>
-                      </div>
+                      <div className="space-y-6 text-[12px] sm:text-[13px] leading-relaxed text-slate-700 relative z-10">
+                        {/* Header Top Accent Floating Bar */}
+                        <div className="h-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 w-full rounded-full shadow-xs mb-4" />
 
-                      {/* 3. Document Title Block */}
-                      <div className="border-l-4 border-blue-600 pl-4 py-1">
-                        <h2 className="text-base sm:text-lg font-black tracking-wide text-slate-900 uppercase">
-                          {activeDocTab === 'SPK' && 'PERJANJIAN KERJA SAMA PEKERJAAN JASA'}
-                          {activeDocTab === 'NDA' && 'PERJANJIAN KERAHASIAAN INFORMASI (NDA)'}
-                          {activeDocTab === 'BAST' && 'BERITA ACARA SERAH TERIMA PEKERJAAN (BAST)'}
-                        </h2>
-                        <p className="text-[11px] font-medium text-slate-500">
-                          Dokumen Hukum Perikatan Perdata Resmi
-                        </p>
-                      </div>
-
-                      {/* 4. Parties Identification Paragraph */}
-                      <div className="bg-slate-50/70 border border-slate-200/80 rounded-2xl p-4 space-y-2">
-                        <p className="text-slate-600">
-                          Pada hari ini, <strong>{getTodayFormattedDate()}</strong>, yang bertanda tangan di bawah ini sepakat mengikatkan diri dalam perikatan hukum:
-                        </p>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                          <div className="bg-white p-2.5 rounded-xl border border-slate-200/60">
-                            <span className="text-[10px] font-bold text-blue-600 uppercase block">PIHAK PERTAMA</span>
-                            <span className="font-bold text-slate-900">{freelancerName || '-'}</span>
+                        {/* Brand Header & Document Information Box */}
+                        <div className="flex items-start justify-between pb-4 border-b border-slate-200/80 gap-4">
+                          <div className="space-y-1">
+                            <span className="text-[10px] font-bold tracking-widest text-blue-600 uppercase">
+                              Pihak Pertama
+                            </span>
+                            <h1 className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight leading-tight">
+                              {freelancerName || 'Nama Pihak Pertama'}
+                            </h1>
+                            {freelancerEmail && (
+                              <p className="text-[11px] text-slate-500">{freelancerEmail}</p>
+                            )}
                           </div>
-                          <div className="bg-white p-2.5 rounded-xl border border-slate-200/60">
-                            <span className="text-[10px] font-bold text-indigo-600 uppercase block">PIHAK KEDUA</span>
-                            <span className="font-bold text-slate-900">{clientName || '-'}</span>
+
+                          <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3 text-right space-y-1 min-w-[170px]">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                              Nomor Dokumen
+                            </p>
+                            <p className="font-mono text-[11px] font-extrabold text-slate-900">
+                              {docNumber || '001/SPK/IX/2026'}
+                            </p>
+                            <p className="text-[10px] text-slate-500 pt-0.5">{getTodayFormattedDate()}</p>
                           </div>
                         </div>
-                      </div>
 
-                      {/* 5. Document Clauses */}
-                      <div className="space-y-3.5">
-                        {activeDocTab === 'SPK' && (
-                          <>
-                            <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-1">
-                              <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                                <span className="w-2 h-2 rounded-full bg-blue-600" />
-                                Pasal 1 — Ruang Lingkup Pekerjaan
-                              </h3>
-                              <p className="text-slate-600 pl-3.5">
-                                PIHAK PERTAMA melaksanakan pekerjaan <strong>"{projectTitle || 'Pengembangan Aplikasi Web & API Integration'}"</strong> sesuai spesifikasi teknis yang disetujui PIHAK KEDUA.
-                              </p>
+                        {/* Document Title Block */}
+                        <div className="border-l-4 border-blue-600 pl-4 py-1">
+                          <h2 className="text-base sm:text-lg font-black tracking-wide text-slate-900 uppercase">
+                            {activeDocTab === 'SPK' && 'PERJANJIAN KERJA SAMA PEKERJAAN JASA'}
+                            {activeDocTab === 'NDA' && 'PERJANJIAN KERAHASIAAN INFORMASI (NDA)'}
+                            {activeDocTab === 'BAST' && 'BERITA ACARA SERAH TERIMA PEKERJAAN (BAST)'}
+                          </h2>
+                          <p className="text-[11px] font-medium text-slate-500">
+                            Dokumen Hukum Perikatan Perdata Resmi
+                          </p>
+                        </div>
+
+                        {/* Parties Identification Paragraph */}
+                        <div className="bg-slate-50/70 border border-slate-200/80 rounded-2xl p-4 space-y-2">
+                          <p className="text-slate-600">
+                            Pada hari ini, <strong>{getTodayFormattedDate()}</strong>, yang bertanda tangan di bawah ini sepakat mengikatkan diri dalam perikatan hukum:
+                          </p>
+                          <div className="grid grid-cols-2 gap-3 pt-1">
+                            <div className="bg-white p-2.5 rounded-xl border border-slate-200/60">
+                              <span className="text-[10px] font-bold text-blue-600 uppercase block">PIHAK PERTAMA</span>
+                              <span className="font-bold text-slate-900">{freelancerName || '-'}</span>
                             </div>
-
-                            <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-1">
-                              <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                                <span className="w-2 h-2 rounded-full bg-blue-600" />
-                                Pasal 2 — Nilai Pekerjaan & Skema Pembayaran
-                              </h3>
-                              <p className="text-slate-600 pl-3.5">
-                                Total imbalan sebesar <strong>Rp {formatRupiah(projectAmount || '7500000')}</strong> dengan Uang Muka (DP) <strong>{dpPercent || '50'}%</strong> via transfer ke <strong>{bankInfo || 'BCA 1234567890 a.n Debby Aulia'}</strong>.
-                              </p>
+                            <div className="bg-white p-2.5 rounded-xl border border-slate-200/60">
+                              <span className="text-[10px] font-bold text-indigo-600 uppercase block">PIHAK KEDUA</span>
+                              <span className="font-bold text-slate-900">{clientName || '-'}</span>
                             </div>
+                          </div>
+                        </div>
 
-                            {(clauseRevision || clauseSla || clauseRetention || clauseDp || customClauses.some((c) => c.trim() !== '')) && (
-                              <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-1.5">
+                        {/* Document Clauses - Page 1 */}
+                        <div className="space-y-3.5">
+                          {activeDocTab === 'SPK' && (
+                            <>
+                              <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-1">
                                 <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                                   <span className="w-2 h-2 rounded-full bg-blue-600" />
-                                  Pasal 3 — Syarat & Ketentuan Khusus
+                                  Pasal 1 — Ruang Lingkup Pekerjaan
                                 </h3>
-                                <ul className="list-disc pl-8 space-y-1 text-slate-600">
-                                  {clauseRevision && <li>Revisi dibatasi maksimal 2 (dua) kali. Permintaan tambahan dianggap addendum terpisah.</li>}
-                                  {clauseSla && <li>Evaluasi feedback dari PIHAK KEDUA maksimal 5 hari kerja. Lebih dari itu dianggap disetujui otomatis.</li>}
-                                  {clauseRetention && <li>Master file/Source code diserahkan penuh setelah pembayaran lunas 100%.</li>}
-                                  {clauseDp && <li>DP tidak dapat dikembalikan (non-refundable) jika pembatalan berasal dari PIHAK KEDUA (Pasal 1464 KUHPerdata).</li>}
-                                  {customClauses.map((c, idx) => c.trim() !== '' ? <li key={idx}>{c}</li> : null)}
-                                </ul>
+                                <p className="text-slate-600 pl-3.5">
+                                  PIHAK PERTAMA melaksanakan pekerjaan <strong>"{projectTitle || 'Pengembangan Aplikasi Web & API Integration'}"</strong> sesuai spesifikasi teknis yang disetujui PIHAK KEDUA.
+                                </p>
                               </div>
-                            )}
-                          </>
+
+                              <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-1">
+                                <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-blue-600" />
+                                  Pasal 2 — Nilai Pekerjaan & Skema Pembayaran
+                                </h3>
+                                <p className="text-slate-600 pl-3.5">
+                                  Total imbalan sebesar <strong>Rp {formatRupiah(projectAmount || '7500000')}</strong> dengan Uang Muka (DP) <strong>{dpPercent || '50'}%</strong> via transfer ke <strong>{bankInfo || 'BCA 1234567890 a.n Debby Aulia'}</strong>.
+                                </p>
+                              </div>
+                            </>
+                          )}
+
+                          {activeDocTab === 'NDA' && (
+                            <>
+                              <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 space-y-1">
+                                <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-indigo-600" />
+                                  Pasal 1 — Cakupan Kerahasiaan
+                                </h3>
+                                <p className="text-slate-600 pl-3.5">
+                                  Mencakup seluruh aset, rahasia dagang, serta informasi <strong>"{ndaScope || 'Source Code, Skema Database, Aset Desain Figma'}"</strong>.
+                                </p>
+                              </div>
+
+                              <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 space-y-1">
+                                <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-indigo-600" />
+                                  Pasal 2 — Masa Berlaku & Denda Sanksi
+                                </h3>
+                                <p className="text-slate-600 pl-3.5">
+                                  Kerahasiaan dijaga selama <strong>{ndaYears || '2'} tahun</strong>. Pelanggaran dikenakan ganti rugi sebesar <strong>Rp {formatRupiah(ndaPenalty || '25000000')}</strong>.
+                                </p>
+                              </div>
+                            </>
+                          )}
+
+                          {activeDocTab === 'BAST' && (
+                            <>
+                              <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 space-y-1">
+                                <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-purple-600" />
+                                  Pasal 1 — Serah Terima Pekerjaan
+                                </h3>
+                                <p className="text-slate-600 pl-3.5">
+                                  PIHAK PERTAMA menyerahkan pekerjaan berdasarkan acuan SPK Referensi <strong>"{bastRef || '001/SPK/IX/2026'}"</strong> secara penuh pada <strong>{bastDate || '23 September 2026'}</strong>.
+                                </p>
+                              </div>
+
+                              <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 space-y-1">
+                                <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-purple-600" />
+                                  Pasal 2 — Masa Garansi Perbaikan
+                                </h3>
+                                <p className="text-slate-600 pl-3.5">
+                                  PIHAK PERTAMA memberikan garansi perbaikan bug selama <strong>{bastWarranty || '14'} hari kerja</strong> terhitung sejak tanggal penandatanganan ini.
+                                </p>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Footer Halaman 1 */}
+                      <div className="pt-4 border-t border-slate-200 flex justify-between items-center text-[11px] text-slate-500 font-mono relative z-10">
+                        <span>Paraf Pihak I: [ ______ ]  |  Paraf Pihak II: [ ______ ]</span>
+                        <span>Halaman 1 dari 2</span>
+                        <span>SPKInstan Legal Document</span>
+                      </div>
+                    </div>
+
+                    {/* === HALAMAN 2 (A4 Container) === */}
+                    <div className="a4-page w-[794px] min-h-[1123px] h-[1123px] bg-white text-slate-900 font-sans p-10 relative flex flex-col justify-between shadow-xl rounded-xl border border-slate-200 overflow-hidden shrink-0">
+                      
+                      {/* Watermark Overlay Minimalis Halaman 2 */}
+                      {!paidDocs[activeDocTab] && (
+                        <div className="watermark-layer absolute inset-0 pointer-events-none z-20 flex items-center justify-center overflow-hidden">
+                          <span className="text-5xl sm:text-7xl font-black tracking-[0.25em] text-slate-300/25 uppercase select-none font-sans -rotate-12 transform">
+                            SPKINSTAN
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="space-y-6 text-[12px] sm:text-[13px] leading-relaxed text-slate-700 relative z-10">
+                        {/* Header Top Accent Floating Bar */}
+                        <div className="h-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 w-full rounded-full shadow-xs mb-4" />
+
+                        {/* Document Clauses - Page 2 */}
+                        {activeDocTab === 'SPK' && (
+                          (clauseRevision || clauseSla || clauseRetention || clauseDp || customClauses.some((c) => c.trim() !== '')) && (
+                            <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-1.5">
+                              <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-blue-600" />
+                                Pasal 3 — Syarat & Ketentuan Khusus
+                              </h3>
+                              <ul className="list-disc pl-8 space-y-1 text-slate-600">
+                                {clauseRevision && <li>Revisi dibatasi maksimal 2 (dua) kali. Permintaan tambahan dianggap addendum terpisah.</li>}
+                                {clauseSla && <li>Evaluasi feedback dari PIHAK KEDUA maksimal 5 hari kerja. Lebih dari itu dianggap disetujui otomatis.</li>}
+                                {clauseRetention && <li>Master file/Source code diserahkan penuh setelah pembayaran lunas 100%.</li>}
+                                {clauseDp && <li>DP tidak dapat dikembalikan (non-refundable) jika pembatalan berasal dari PIHAK KEDUA (Pasal 1464 KUHPerdata).</li>}
+                                {customClauses.map((c, idx) => c.trim() !== '' ? <li key={idx}>{c}</li> : null)}
+                              </ul>
+                            </div>
+                          )
                         )}
 
                         {activeDocTab === 'NDA' && (
-                          <>
-                            <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 space-y-1">
-                              <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                                <span className="w-2 h-2 rounded-full bg-indigo-600" />
-                                Pasal 1 — Cakupan Kerahasiaan
-                              </h3>
-                              <p className="text-slate-600 pl-3.5">
-                                Mencakup seluruh aset, rahasia dagang, serta informasi <strong>"{ndaScope || 'Source Code, Skema Database, Aset Desain Figma'}"</strong>.
-                              </p>
-                            </div>
-
-                            <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 space-y-1">
-                              <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                                <span className="w-2 h-2 rounded-full bg-indigo-600" />
-                                Pasal 2 — Masa Berlaku & Denda Sanksi
-                              </h3>
-                              <p className="text-slate-600 pl-3.5">
-                                Kerahasiaan dijaga selama <strong>{ndaYears || '2'} tahun</strong>. Pelanggaran dikenakan ganti rugi sebesar <strong>Rp {formatRupiah(ndaPenalty || '25000000')}</strong>.
-                              </p>
-                            </div>
-                          </>
+                          <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 space-y-1.5">
+                            <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-indigo-600" />
+                              Pasal 3 — Ketentuan Kerahasiaan Tambahan
+                            </h3>
+                            <p className="text-slate-600 pl-3.5">
+                              Segala bentuk penggandaan, pembocoran, atau pemanfaatan informasi rahasia tanpa persetujuan tertulis dari PIHAK KEDUA akan ditindaklanjuti secara hukum sesuai regulasi KUHPerdata dan UU Rahasia Dagang yang berlaku di Indonesia.
+                            </p>
+                          </div>
                         )}
 
                         {activeDocTab === 'BAST' && (
-                          <>
-                            <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 space-y-1">
-                              <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                                <span className="w-2 h-2 rounded-full bg-purple-600" />
-                                Pasal 1 — Serah Terima Pekerjaan
-                              </h3>
-                              <p className="text-slate-600 pl-3.5">
-                                PIHAK PERTAMA menyerahkan pekerjaan berdasarkan acuan SPK Referensi <strong>"{bastRef || '001/SPK/IX/2026'}"</strong> secara penuh pada <strong>{bastDate || '23 September 2026'}</strong>.
-                              </p>
-                            </div>
-
-                            <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 space-y-1">
-                              <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                                <span className="w-2 h-2 rounded-full bg-purple-600" />
-                                Pasal 2 — Masa Garansi Perbaikan
-                              </h3>
-                              <p className="text-slate-600 pl-3.5">
-                                PIHAK PERTAMA memberikan garansi perbaikan bug selama <strong>{bastWarranty || '14'} hari kerja</strong> terhitung sejak tanggal penandatanganan ini.
-                              </p>
-                            </div>
-                          </>
+                          <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 space-y-1.5">
+                            <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-purple-600" />
+                              Pasal 3 — Pengesahan & Retensi Hak
+                            </h3>
+                            <p className="text-slate-600 pl-3.5">
+                              Dengan ditandatanganinya Berita Acara ini, PIHAK KEDUA menyatakan telah menerima seluruh hasil pekerjaan dengan baik dan PIHAK PERTAMA berhak penuh atas pelunasan sisa tagihan sesuai perjanjian awal.
+                            </p>
+                          </div>
                         )}
-                      </div>
 
-                      {/* 6. Signature Enclosure Boxes */}
-                      <div className="pt-6 grid grid-cols-2 gap-4 text-center font-sans">
-                        <div className="bg-slate-50/80 border border-slate-200/80 rounded-2xl p-4 space-y-3">
-                          <span className="text-[10px] font-extrabold text-blue-600 uppercase tracking-wider block">
-                            PIHAK PERTAMA
-                          </span>
-                          <div className="h-16 flex items-center justify-center">
-                            {signatureFirstParty ? (
-                              <img src={signatureFirstParty} alt="Tanda Tangan Pihak Pertama" className="max-h-16 mx-auto object-contain" />
-                            ) : isExporting ? (
-                              <div className="h-16 w-full" />
-                            ) : (
-                              <div className="w-28 h-10 border border-dashed border-slate-300/80 rounded-lg flex items-center justify-center text-[10px] text-slate-400">
-                                [Tanda Tangan]
-                              </div>
-                            )}
+                        {/* Signature Enclosure Boxes (Conditional Render saat PDF) */}
+                        <div className="pt-6 grid grid-cols-2 gap-4 text-center font-sans">
+                          <div className="bg-slate-50/80 border border-slate-200/80 rounded-2xl p-4 space-y-3">
+                            <span className="text-[10px] font-extrabold text-blue-600 uppercase tracking-wider block">
+                              PIHAK PERTAMA
+                            </span>
+                            <div className="h-16 flex items-center justify-center">
+                              {signatureFirstParty ? (
+                                <img src={signatureFirstParty} alt="Tanda Tangan Pihak Pertama" className="max-h-16 mx-auto object-contain" />
+                              ) : isExporting ? (
+                                <div className="h-16 w-full" />
+                              ) : (
+                                <div className="w-28 h-10 border border-dashed border-slate-300/80 rounded-lg flex items-center justify-center text-[10px] text-slate-400">
+                                  [Tanda Tangan]
+                                </div>
+                              )}
+                            </div>
+                            <p className="font-bold underline text-slate-900 text-xs">
+                              {signerFirstParty || freelancerName || 'Pihak Pertama'}
+                            </p>
                           </div>
-                          <p className="font-bold underline text-slate-900 text-xs">
-                            {signerFirstParty || freelancerName || 'Pihak Pertama'}
-                          </p>
-                        </div>
 
-                        <div className="bg-slate-50/80 border border-slate-200/80 rounded-2xl p-4 space-y-3">
-                          <span className="text-[10px] font-extrabold text-indigo-600 uppercase tracking-wider block">
-                            PIHAK KEDUA
-                          </span>
-                          <div className="h-16 flex items-center justify-center">
-                            {signatureSecondParty ? (
-                              <img src={signatureSecondParty} alt="Tanda Tangan Pihak Kedua" className="max-h-16 mx-auto object-contain" />
-                            ) : isExporting ? (
-                              <div className="h-16 w-full" />
-                            ) : (
-                              <div className="w-28 h-10 border border-dashed border-slate-300/80 rounded-lg flex items-center justify-center text-[10px] text-slate-400">
-                                [Tanda Tangan]
-                              </div>
-                            )}
+                          <div className="bg-slate-50/80 border border-slate-200/80 rounded-2xl p-4 space-y-3">
+                            <span className="text-[10px] font-extrabold text-indigo-600 uppercase tracking-wider block">
+                              PIHAK KEDUA
+                            </span>
+                            <div className="h-16 flex items-center justify-center">
+                              {signatureSecondParty ? (
+                                <img src={signatureSecondParty} alt="Tanda Tangan Pihak Kedua" className="max-h-16 mx-auto object-contain" />
+                              ) : isExporting ? (
+                                <div className="h-16 w-full" />
+                              ) : (
+                                <div className="w-28 h-10 border border-dashed border-slate-300/80 rounded-lg flex items-center justify-center text-[10px] text-slate-400">
+                                  [Tanda Tangan]
+                                </div>
+                              )}
+                            </div>
+                            <p className="font-bold underline text-slate-900 text-xs">
+                              {signerSecondParty || clientName || 'Pihak Kedua'}
+                            </p>
                           </div>
-                          <p className="font-bold underline text-slate-900 text-xs">
-                            {signerSecondParty || clientName || 'Pihak Kedua'}
-                          </p>
                         </div>
                       </div>
 
-                      {/* 7. Footer Paraf & Document Identifier */}
-                      <div className="pt-6 border-t border-slate-200/80 flex items-center justify-between text-[11px] text-slate-500 font-mono">
-                        <div>
-                          <span>Paraf Pihak I: [ ______ ]</span>
-                          <span className="mx-3">|</span>
-                          <span>Paraf Pihak II: [ ______ ]</span>
-                        </div>
-                        <div>
-                          <span>SPKInstan Legal Document</span>
-                        </div>
+                      {/* Footer Halaman 2 */}
+                      <div className="pt-4 border-t border-slate-200 flex justify-between items-center text-[11px] text-slate-500 font-mono relative z-10">
+                        <span>Paraf Pihak I: [ ______ ]  |  Paraf Pihak II: [ ______ ]</span>
+                        <span>Halaman 2 dari 2</span>
+                        <span>SPKInstan Legal Document</span>
                       </div>
-
                     </div>
+
                   </div>
                 </div>
 
