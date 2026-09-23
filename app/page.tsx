@@ -66,7 +66,7 @@ export default function Home() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [modalStep, setModalStep] = useState<'download_choice' | 'qris'>('download_choice');
   const [mobileViewMode, setMobileViewMode] = useState<'form' | 'preview'>('form');
-  const [, setIsExporting] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   const [sessionId, setSessionId] = useState('');
   const [mayarPaymentId, setMayarPaymentId] = useState<string | null>(null);
@@ -188,7 +188,6 @@ export default function Home() {
   const handlePaymentSuccess = () => {
     stopPolling();
 
-    // Tampilkan notifikasi "Pembayaran Terdeteksi! Sedang diproses..."
     setIsProcessingSuccess(true);
 
     if (selectedPackage === 'BUNDLING') {
@@ -197,7 +196,6 @@ export default function Home() {
       setPaidDocs((prev) => ({ ...prev, [paidDocTarget]: true }));
     }
 
-    // Beri jeda 2 detik agar pengguna melihat pesan "sedang diproses" sebelum pindah modal
     setTimeout(() => {
       setIsProcessingSuccess(false);
       setMobileViewMode('preview');
@@ -512,16 +510,19 @@ export default function Home() {
     }
   };
 
-  // Generator PDF Berbasis Blob Stream & Force Clean DOM (Format Dinamis Cegah Terpotong)
+  // Generator PDF Berbasis Multi-Page A4 Standar
   const captureDocumentToPdf = async (docType: 'SPK' | 'NDA' | 'BAST') => {
     setActiveDocTab(docType);
     setMobileViewMode('preview');
+    setIsExporting(true);
 
-    await new Promise((resolve) => setTimeout(resolve, 400));
+    // Jeda singkat agar React merender ulang DOM (menghilangkan placeholder TTD)
+    await new Promise((resolve) => setTimeout(resolve, 300));
 
     const element = document.getElementById('a4-document-preview');
     if (!element) {
       console.error('Elemen #a4-document-preview tidak ditemukan');
+      setIsExporting(false);
       return;
     }
 
@@ -549,18 +550,32 @@ export default function Home() {
 
       const imgData = canvas.toDataURL('image/jpeg', 0.98);
 
-      const pdfWidth = 8.27; // Lebar standar A4 dalam Inci
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width; // Tinggi PDF dinamis mengikuti kanvas
-      const fileSuffix = isPaidDoc ? 'CLEAN' : 'WATERMARKED_DRAFT';
+      const pageWidthInches = 8.27; // Lebar standar A4
+      const pageHeightInches = 11.69; // Tinggi standar A4
+      const imgScaledHeight = (canvas.height * pageWidthInches) / canvas.width;
 
       const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'in',
-        format: [pdfWidth, pdfHeight],
+        format: 'a4',
       });
 
-      pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+      let heightLeft = imgScaledHeight;
+      let position = 0;
 
+      // Halaman Pertama
+      pdf.addImage(imgData, 'JPEG', 0, position, pageWidthInches, imgScaledHeight);
+      heightLeft -= pageHeightInches;
+
+      // Halaman Selanjutnya (Multi-Page Loop) jika dokumen panjang
+      while (heightLeft > 0) {
+        position = heightLeft - imgScaledHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', 0, position, pageWidthInches, imgScaledHeight);
+        heightLeft -= pageHeightInches;
+      }
+
+      const fileSuffix = isPaidDoc ? 'CLEAN' : 'WATERMARKED_DRAFT';
       const pdfBlob = pdf.output('blob');
       const blobUrl = URL.createObjectURL(pdfBlob);
 
@@ -587,14 +602,14 @@ export default function Home() {
     } catch (err) {
       console.error('Error generating PDF:', err);
       alert('Gagal mengekspor PDF secara otomatis.');
+    } finally {
+      setIsExporting(false);
     }
   };
 
   // PDF Export Handler
   const handleDownloadPDF = async (specificDoc?: 'SPK' | 'NDA' | 'BAST') => {
     try {
-      setIsExporting(true);
-
       if (specificDoc) {
         await captureDocumentToPdf(specificDoc);
       } else if (selectedPackage === 'BUNDLING') {
@@ -608,8 +623,7 @@ export default function Home() {
       }
     } catch (err) {
       console.error('Gagal membuat PDF:', err);
-    } finally {}
-    setIsExporting(false);
+    }
   };
 
   const handleFreeDownload = () => {
@@ -1603,6 +1617,8 @@ export default function Home() {
                           <div className="h-16 flex items-center justify-center">
                             {signatureFirstParty ? (
                               <img src={signatureFirstParty} alt="Tanda Tangan Pihak Pertama" className="max-h-16 mx-auto object-contain" />
+                            ) : isExporting ? (
+                              <div className="h-16 w-full" />
                             ) : (
                               <div className="w-28 h-10 border border-dashed border-slate-300/80 rounded-lg flex items-center justify-center text-[10px] text-slate-400">
                                 [Tanda Tangan]
@@ -1621,6 +1637,8 @@ export default function Home() {
                           <div className="h-16 flex items-center justify-center">
                             {signatureSecondParty ? (
                               <img src={signatureSecondParty} alt="Tanda Tangan Pihak Kedua" className="max-h-16 mx-auto object-contain" />
+                            ) : isExporting ? (
+                              <div className="h-16 w-full" />
                             ) : (
                               <div className="w-28 h-10 border border-dashed border-slate-300/80 rounded-lg flex items-center justify-center text-[10px] text-slate-400">
                                 [Tanda Tangan]
@@ -1630,6 +1648,18 @@ export default function Home() {
                           <p className="font-bold underline text-slate-900 text-xs">
                             {signerSecondParty || clientName || 'Pihak Kedua'}
                           </p>
+                        </div>
+                      </div>
+
+                      {/* 7. Footer Paraf & Document Identifier */}
+                      <div className="pt-6 border-t border-slate-200/80 flex items-center justify-between text-[11px] text-slate-500 font-mono">
+                        <div>
+                          <span>Paraf Pihak I: [ ______ ]</span>
+                          <span className="mx-3">|</span>
+                          <span>Paraf Pihak II: [ ______ ]</span>
+                        </div>
+                        <div>
+                          <span>SPKInstan Legal Document</span>
                         </div>
                       </div>
 
@@ -1901,7 +1931,7 @@ export default function Home() {
                   </span>
                 </div>
 
-                {/* Indikator Status & Notifikasi Sedang Diproses */}
+                {/* Indikator Status & Notifikasi Sedang Dipproses */}
                 {isProcessingSuccess ? (
                   <div className="bg-emerald-600 text-white p-4 rounded-2xl shadow-lg animate-pulse text-center space-y-1">
                     <div className="flex items-center justify-center gap-2 font-black text-sm">
