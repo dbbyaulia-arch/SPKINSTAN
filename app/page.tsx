@@ -1,4 +1,3 @@
-// app/page.tsx
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -71,12 +70,11 @@ export default function Home() {
   const [mayarPaymentId, setMayarPaymentId] = useState<string | null>(null);
   const [timeLeft, setTimeLeft] = useState(899);
 
-  // Mayar API, QRIS & Polling States
-  const [qrCodeData, setQrCodeData] = useState<string | null>(null);
+  // Mayar API & Polling States
+  const [, setQrCodeData] = useState<string | null>(null);
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
   const [isLoadingQris, setIsLoadingQris] = useState(false);
   const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
-  const [useIframePayment, setUseIframePayment] = useState(true);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
   // Form State
@@ -376,7 +374,7 @@ export default function Home() {
     } catch (err) {
       console.error('Network error during Mayar payment generation:', err);
     } finally {}
-      setIsLoadingQris(false);
+    setIsLoadingQris(false);
   };
 
   const formatRupiah = (val: string) => (val ? parseInt(val, 10).toLocaleString('id-ID') : '0');
@@ -453,7 +451,7 @@ export default function Home() {
     }
   };
 
-  // Generator PDF Berbasis Blob Stream & Force Clean DOM
+  // Generator PDF Berbasis Blob Stream & Force Clean DOM (Format Dinamis Cegah Terpotong)
   const captureDocumentToPdf = async (docType: 'SPK' | 'NDA' | 'BAST') => {
     setActiveDocTab(docType);
     setMobileViewMode('preview');
@@ -491,17 +489,20 @@ export default function Home() {
       }
 
       const imgData = canvas.toDataURL('image/jpeg', 0.98);
+
+      // --- PERBAIKAN DOKUMEN CROP: PERHITUNGAN TINGGI DINAMIS ---
+      const pdfWidth = 8.27; // Lebar standar A4 dalam Inci
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width; // Tinggi PDF dinamis mengikuti kanvas
+      const fileSuffix = isPaidDoc ? 'CLEAN' : 'WATERMARKED_DRAFT';
+
       const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'in',
-        format: 'a4',
+        format: [pdfWidth, pdfHeight],
       });
 
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      const fileSuffix = isPaidDoc ? 'CLEAN' : 'WATERMARKED_DRAFT';
-
       pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+      // ---------------------------------------------------------
 
       // Unduh menggunakan Blob Object URL untuk menembus Pop-up Blocker
       const pdfBlob = pdf.output('blob');
@@ -1215,7 +1216,7 @@ export default function Home() {
                             onTouchEnd={stopDraw}
                             className="w-full h-28 bg-white rounded-xl border border-slate-200 cursor-crosshair touch-none mx-auto"
                           />
-                          <div className="flex items-center justify-between text-xs">
+                          <div className="flex items-center justify-between text-xs pt-1">
                             <button
                               type="button"
                               onClick={clearSignature}
@@ -1223,9 +1224,26 @@ export default function Home() {
                             >
                               <RotateCcw className="w-3 h-3" /> Hapus Coretan
                             </button>
-                            <span className="text-[11px] text-slate-400 italic">
-                              Goreskan TTD dengan jari / mouse
-                            </span>
+
+                            {/* Opsi Upload Gambar TTD */}
+                            <label className="cursor-pointer text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1">
+                              <span>📁 Upload Gambar TTD (PNG/JPG)</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    const reader = new FileReader();
+                                    reader.onload = (event) => {
+                                      setSignatureDataUrl(event.target?.result as string);
+                                    };
+                                    reader.readAsDataURL(file);
+                                  }
+                                }}
+                              />
+                            </label>
                           </div>
                         </div>
                         <p className="text-[11px] text-slate-500 italic mt-2">
@@ -1304,7 +1322,7 @@ export default function Home() {
                     {!paidDocs[activeDocTab] && (
                       <div className="watermark-layer absolute inset-0 pointer-events-none z-20 flex items-center justify-center overflow-hidden">
                         <span className="text-5xl sm:text-7xl font-black tracking-[0.25em] text-slate-300/25 uppercase select-none font-sans -rotate-12 transform">
-                          DRAF SPKINSTAN
+                          SPKINSTAN
                         </span>
                       </div>
                     )}
@@ -1701,7 +1719,7 @@ export default function Home() {
               </div>
             )}
 
-            {/* STEP 2: Payment Process View */}
+            {/* STEP 2: Payment Process View (Satu Tampilan Iframe Ringkas) */}
             {modalStep === 'qris' && (
               <div className="space-y-4 text-center">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -1723,62 +1741,24 @@ export default function Home() {
                   </p>
                 </div>
 
-                {/* Switch Modus Tampilan Pembayaran */}
-                {paymentUrl && (
-                  <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-bold">
-                    <button
-                      type="button"
-                      onClick={() => setUseIframePayment(true)}
-                      className={`flex-1 py-1.5 rounded-lg transition-all ${
-                        useIframePayment ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
-                      }`}
-                    >
-                      Portal Langsung Modal
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setUseIframePayment(false)}
-                      className={`flex-1 py-1.5 rounded-lg transition-all ${
-                        !useIframePayment ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
-                      }`}
-                    >
-                      Scan Barcode QRIS
-                    </button>
-                  </div>
-                )}
-
-                {/* Container QRIS / Embedded Iframe */}
+                {/* Container Direct Embedded Portal Mayar (Satu Tampilan) */}
                 <div className="bg-slate-50 p-2 sm:p-4 rounded-2xl border border-slate-200 overflow-hidden w-full space-y-3">
                   {isLoadingQris ? (
                     <div className="w-full h-64 rounded-xl bg-slate-100 flex items-center justify-center text-xs text-slate-500 animate-pulse font-sans font-bold gap-2">
                       <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
                       <span>Menyiapkan Payment Gateway Mayar...</span>
                     </div>
-                  ) : paymentUrl && useIframePayment ? (
-                    <div className="w-full h-[360px] rounded-xl overflow-hidden border border-slate-200 bg-white relative">
+                  ) : paymentUrl ? (
+                    <div className="w-full h-[380px] rounded-xl overflow-hidden border border-slate-200 bg-white relative">
                       <iframe
                         src={paymentUrl}
                         className="w-full h-full border-0"
                         title="Mayar Payment Gateway"
                       />
                     </div>
-                  ) : qrCodeData ? (
-                    <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-sm space-y-3">
-                      <span className="block text-xs font-extrabold text-slate-800 uppercase tracking-wider">
-                        Scan Kode QRIS Di Bawah Ini
-                      </span>
-                      <img
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(qrCodeData)}`}
-                        alt="QRIS Barcode Mayar"
-                        className="w-52 h-52 mx-auto rounded-lg shadow-md border border-slate-100"
-                      />
-                      <span className="block text-[11px] font-medium text-slate-500">
-                        Dapat discan menggunakan GoPay, OVO, Dana, ShopeePay, BCA, Mandiri, dll.
-                      </span>
-                    </div>
                   ) : (
                     <div className="w-full h-32 rounded-xl bg-red-50 text-red-500 flex items-center justify-center text-xs p-4 text-center font-sans font-medium">
-                      Gagal memuat metode pembayaran. Silakan coba kembali beberapa saat.
+                      Gagal memuat metode pembayaran. Silakan klik tombol di bawah untuk membuka tab baru.
                     </div>
                   )}
 
