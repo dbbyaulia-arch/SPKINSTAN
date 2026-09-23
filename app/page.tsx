@@ -1,7 +1,6 @@
 // app/page.tsx
 'use client';
 
-import clausesData from '@/config/clauses.json';
 import React, { useState, useEffect, useRef } from 'react';
 import {
   ShieldCheck,
@@ -31,8 +30,7 @@ import {
   Plus,
   Trash2,
   Loader2,
-  ExternalLink,
-  Check
+  ExternalLink
 } from 'lucide-react';
 
 declare global {
@@ -67,7 +65,7 @@ export default function Home() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [modalStep, setModalStep] = useState<'download_choice' | 'qris'>('download_choice');
   const [mobileViewMode, setMobileViewMode] = useState<'form' | 'preview'>('form');
-  const [isExporting, setIsExporting] = useState(false);
+  const [, setIsExporting] = useState(false);
 
   const [sessionId, setSessionId] = useState('');
   const [mayarPaymentId, setMayarPaymentId] = useState<string | null>(null);
@@ -87,6 +85,10 @@ export default function Home() {
   const [freelancerWa, setFreelancerWa] = useState('');
   const [clientName, setClientName] = useState('');
   const [clientWa, setClientWa] = useState('');
+
+  // Signatory Customization Fields (Step 4)
+  const [signerFirstParty, setSignerFirstParty] = useState('');
+  const [signerSecondParty, setSignerSecondParty] = useState('');
 
   // SPK Fields
   const [projectTitle, setProjectTitle] = useState('');
@@ -119,7 +121,7 @@ export default function Home() {
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
 
   // Testimonials
-  const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviews] = useState<Review[]>([]);
 
   const generateNewSessionId = () => {
     return 'SPK-' + Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -249,7 +251,7 @@ export default function Home() {
   };
 
   // Polling Real-time Ketat ke Server Redis
-  const startPollingStatus = (currentSession: string, mayarId?: string) => {
+  const startPollingStatus = (currentSession: string, _mayarId?: string) => {
     stopPolling();
     pollingRef.current = setInterval(async () => {
       try {
@@ -298,7 +300,7 @@ export default function Home() {
 
   // Dynamic Custom Clauses Handlers
   const handleAddCustomClause = () => {
-    setCustomClauses((prev) => [...prev, '']);
+    setCustomClauses((prev: string[]) => [...prev, '']);
   };
 
   const handleCustomClauseChange = (index: number, value: string) => {
@@ -308,7 +310,7 @@ export default function Home() {
   };
 
   const handleRemoveCustomClause = (index: number) => {
-    setCustomClauses((prev) => prev.filter((_, i) => i !== index));
+    setCustomClauses((prev: string[]) => prev.filter((_, i) => i !== index));
   };
 
   // Request Pembayaran Mayar
@@ -373,9 +375,8 @@ export default function Home() {
       }
     } catch (err) {
       console.error('Network error during Mayar payment generation:', err);
-    } finally {
+    } finally {}
       setIsLoadingQris(false);
-    }
   };
 
   const formatRupiah = (val: string) => (val ? parseInt(val, 10).toLocaleString('id-ID') : '0');
@@ -1151,41 +1152,86 @@ export default function Home() {
                     </div>
                   )}
 
-                  {/* STEP 4 */}
+                  {/* STEP 4: Legalisasi & Tanda Tangan */}
                   {currentWizardStep === 4 && (
                     <div className="space-y-4">
-                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">
-                        Bubuhkan Tanda Tangan Digital (Opsional)
-                      </label>
-                      <div className="bg-slate-50 border border-dashed border-slate-300 rounded-2xl p-3 text-center space-y-2">
-                        <canvas
-                          ref={canvasRef}
-                          width={300}
-                          height={120}
-                          onMouseDown={startDraw}
-                          onMouseMove={draw}
-                          onMouseUp={stopDraw}
-                          onTouchStart={startDraw}
-                          onTouchMove={draw}
-                          onTouchEnd={stopDraw}
-                          className="w-full h-28 bg-white rounded-xl border border-slate-200 cursor-crosshair touch-none mx-auto"
-                        />
-                        <div className="flex items-center justify-between text-xs">
-                          <button
-                            type="button"
-                            onClick={clearSignature}
-                            className="text-slate-500 hover:text-red-600 flex items-center gap-1 font-semibold"
-                          >
-                            <RotateCcw className="w-3 h-3" /> Hapus Coretan
-                          </button>
-                          <span className="text-[11px] text-slate-400 italic">
-                            Goreskan TTD dengan jari / mouse
-                          </span>
+                      {/* Form Input Penandatangan Pihak Pertama & Kedua */}
+                      <div className="space-y-3">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1">
+                          <User className="w-3.5 h-3.5 text-blue-600" /> Penandatangan Pihak Pertama
+                        </h4>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1">
+                            Nama Penandatangan (Pelaksana / Perwakilan)
+                          </label>
+                          <input
+                            type="text"
+                            value={signerFirstParty}
+                            onChange={(e) => setSignerFirstParty(e.target.value)}
+                            placeholder={freelancerName || 'cth: Debby Aulia'}
+                            className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
+                          />
+                          <p className="text-[10px] text-slate-400 mt-1">
+                            Kosongkan jika sama dengan Pihak Pertama ({freelancerName || 'Pelaksana'}).
+                          </p>
                         </div>
                       </div>
-                      <p className="text-[11px] text-slate-500 italic">
-                        *Jika tidak diisi, kolom tanda tangan akan dibiarkan bersih tanpa teks otomatis saat diunduh.
-                      </p>
+
+                      <div className="space-y-3 pt-2 border-t border-slate-100">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1">
+                          <Building2 className="w-3.5 h-3.5 text-indigo-600" /> Penandatangan Pihak Kedua
+                        </h4>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1">
+                            Nama Penandatangan (Pemberi Kerja / Perwakilan)
+                          </label>
+                          <input
+                            type="text"
+                            value={signerSecondParty}
+                            onChange={(e) => setSignerSecondParty(e.target.value)}
+                            placeholder={clientName || 'cth: Nama Direktur / Klien'}
+                            className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
+                          />
+                          <p className="text-[10px] text-slate-400 mt-1">
+                            Kosongkan jika sama dengan Pihak Kedua ({clientName || 'Klien'}).
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-100">
+                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+                          Bubuhkan Tanda Tangan Digital (Opsional)
+                        </label>
+                        <div className="bg-slate-50 border border-dashed border-slate-300 rounded-2xl p-3 text-center space-y-2">
+                          <canvas
+                            ref={canvasRef}
+                            width={300}
+                            height={120}
+                            onMouseDown={startDraw}
+                            onMouseMove={draw}
+                            onMouseUp={stopDraw}
+                            onTouchStart={startDraw}
+                            onTouchMove={draw}
+                            onTouchEnd={stopDraw}
+                            className="w-full h-28 bg-white rounded-xl border border-slate-200 cursor-crosshair touch-none mx-auto"
+                          />
+                          <div className="flex items-center justify-between text-xs">
+                            <button
+                              type="button"
+                              onClick={clearSignature}
+                              className="text-slate-500 hover:text-red-600 flex items-center gap-1 font-semibold"
+                            >
+                              <RotateCcw className="w-3 h-3" /> Hapus Coretan
+                            </button>
+                            <span className="text-[11px] text-slate-400 italic">
+                              Goreskan TTD dengan jari / mouse
+                            </span>
+                          </div>
+                        </div>
+                        <p className="text-[11px] text-slate-500 italic mt-2">
+                          *Jika tidak diisi, kolom tanda tangan akan dibiarkan bersih tanpa teks otomatis saat diunduh.
+                        </p>
+                      </div>
                     </div>
                   )}
 
@@ -1221,7 +1267,7 @@ export default function Home() {
                 </form>
               </div>
 
-              {/* RIGHT COLUMN: Realtime Modern Sans-Serif Document Preview */}
+              {/* RIGHT COLUMN: SPKInstan Signature Template Exclusive Preview */}
               <div
                 className={`lg:col-span-7 space-y-4 ${
                   mobileViewMode === 'form' ? 'hidden lg:block' : 'block'
@@ -1231,15 +1277,15 @@ export default function Home() {
                 <div className="flex items-center justify-between bg-white px-4 py-2.5 rounded-2xl border border-slate-200 shadow-sm text-xs">
                   <span className="flex items-center gap-1.5 font-bold text-slate-700">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    Live Preview Dokumen (Sans-Serif Modern / Inter / Plus Jakarta Sans)
+                    Live Preview Dokumen (SPKInstan Signature Template)
                   </span>
                   <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full">
                     <Shield className="w-3 h-3 text-blue-600" />
-                    Proteksi Anti-Inspect & Copy Active
+                    Proteksi Anti-Inspect Active
                   </span>
                 </div>
 
-                {/* Printable A4 Paper Container with Modern Design Specifications */}
+                {/* Printable A4 Paper Container - SPKInstan Signature Template */}
                 <div className="relative bg-slate-300/40 p-2 sm:p-6 rounded-3xl overflow-hidden border border-slate-200">
                   <div
                     id="a4-document-preview"
@@ -1247,112 +1293,116 @@ export default function Home() {
                     onCopy={(e) => e.preventDefault()}
                     onCut={(e) => e.preventDefault()}
                     onDragStart={(e) => e.preventDefault()}
-                    className={`w-full min-h-[780px] bg-white text-slate-900 font-sans p-6 sm:p-10 relative overflow-x-auto shadow-xl rounded-xl ${
+                    className={`w-full min-h-[842px] bg-white text-slate-900 font-sans relative overflow-hidden shadow-xl rounded-xl border border-slate-200/80 ${
                       !paidDocs[activeDocTab] ? 'select-none' : ''
                     }`}
                   >
-                    {/* Watermark Overlay Minimalis Tipis di Tengah */}
+                    {/* 1. Header Top Accent Bar */}
+                    <div className="h-2.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 w-full" />
+
+                    {/* Watermark Overlay Minimalis */}
                     {!paidDocs[activeDocTab] && (
                       <div className="watermark-layer absolute inset-0 pointer-events-none z-20 flex items-center justify-center overflow-hidden">
-                        <span className="text-5xl sm:text-7xl font-light tracking-[0.3em] text-slate-400/20 uppercase select-none font-sans -rotate-12 transform">
-                          SPKINSTAN
+                        <span className="text-5xl sm:text-7xl font-black tracking-[0.25em] text-slate-300/25 uppercase select-none font-sans -rotate-12 transform">
+                          DRAF SPKINSTAN
                         </span>
                       </div>
                     )}
 
-                    {/* Content Container dengan Tipografi Modern */}
-                    <div className="relative z-0 space-y-4 text-[12px] sm:text-[13px] leading-relaxed break-words text-left text-slate-700">
+                    {/* Document Inner Wrapper */}
+                    <div className="p-6 sm:p-10 space-y-6 text-[12px] sm:text-[13px] leading-relaxed text-slate-700 relative z-10">
                       
-                      {/* Header Nama Bisnis */}
-                      <div className="pb-3 border-b border-purple-600">
-                        <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-                          {freelancerName || 'Nama Bisnis'}
-                        </h1>
+                      {/* 2. Brand Header & Document Verification Badge */}
+                      <div className="flex items-start justify-between pb-4 border-b border-slate-200/80 gap-4">
+                        <div className="space-y-1">
+                          <span className="text-[10px] font-bold tracking-widest text-blue-600 uppercase">
+                            Penyedia Jasa / Usaha
+                          </span>
+                          <h1 className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight leading-tight">
+                            {freelancerName || 'Nama Usaha / Freelancer'}
+                          </h1>
+                          {freelancerEmail && (
+                            <p className="text-[11px] text-slate-500">{freelancerEmail}</p>
+                          )}
+                        </div>
+
+                        <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3 text-right space-y-1 min-w-[170px]">
+                          <div className="inline-flex items-center gap-1 text-[10px] font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            TERVERIFIKASI SPKINSTAN
+                          </div>
+                          <p className="font-mono text-[11px] font-bold text-slate-800">
+                            #{sessionId ? sessionId : 'SPK-2026-001'}
+                          </p>
+                          <p className="text-[10px] text-slate-500">{getTodayFormattedDate()}</p>
+                        </div>
                       </div>
 
-                      {/* Judul Utama Perjanjian */}
-                      <div className="text-center py-2">
-                        <h2 className="text-base sm:text-lg font-bold tracking-wider text-purple-700 uppercase">
+                      {/* 3. Document Title Block */}
+                      <div className="border-l-4 border-blue-600 pl-4 py-1">
+                        <h2 className="text-base sm:text-lg font-black tracking-wide text-slate-900 uppercase">
                           {activeDocTab === 'SPK' && 'PERJANJIAN KERJA SAMA PEKERJAAN JASA'}
-                          {activeDocTab === 'NDA' && 'PERJANJIAN KERAHASIAAN INFORMASI'}
-                          {activeDocTab === 'BAST' && 'BERITA ACARA SERAH TERIMA PEKERJAAN'}
+                          {activeDocTab === 'NDA' && 'PERJANJIAN KERAHASIAAN INFORMASI (NDA)'}
+                          {activeDocTab === 'BAST' && 'BERITA ACARA SERAH TERIMA PEKERJAAN (BAST)'}
                         </h2>
-                      </div>
-
-                      {/* Meta Information (Nomor & Tanggal) */}
-                      <div className="space-y-1 mb-4 text-[13px]">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-800 w-20">Nomor</span>
-                          <span className="text-slate-600">: SPK/2026/09/{sessionId ? sessionId.split('-')[1] : '001'}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-800 w-20">Tanggal</span>
-                          <span className="text-slate-600">: {getTodayFormattedDate()}</span>
-                        </div>
-                      </div>
-
-                      {/* Paragraf Komparisi */}
-                      <p className="text-slate-600 leading-relaxed mb-4">
-                        Pada hari ini, <strong>{getTodayFormattedDate()}</strong>, yang bertanda tangan di bawah ini:
-                      </p>
-
-                      {/* Identitas Para Pihak */}
-                      <div className="space-y-2 mb-4 pl-1">
-                        <p className="text-slate-600">
-                          1. <strong>{freelancerName || '-'}</strong>, selanjutnya disebut <strong>PIHAK PERTAMA</strong>.
-                        </p>
-                        <p className="text-slate-600">
-                          2. <strong>{clientName || '-'}</strong>, selanjutnya disebut <strong>PIHAK KEDUA</strong>.
+                        <p className="text-[11px] font-medium text-slate-500">
+                          Dokumen Hukum Perikatan Perdata Resmi
                         </p>
                       </div>
 
-                      <p className="text-slate-600 leading-relaxed mb-5">
-                        Kedua belah pihak sepakat untuk mengikatkan diri dalam ketentuan perikatan sebagai berikut:
-                      </p>
+                      {/* 4. Parties Identification Paragraph */}
+                      <div className="bg-slate-50/70 border border-slate-200/80 rounded-2xl p-4 space-y-2">
+                        <p className="text-slate-600">
+                          Pada hari ini, <strong>{getTodayFormattedDate()}</strong>, yang bertanda tangan di bawah ini sepakat mengikatkan diri dalam perikatan hukum:
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                          <div className="bg-white p-2.5 rounded-xl border border-slate-200/60">
+                            <span className="text-[10px] font-bold text-blue-600 uppercase block">PIHAK PERTAMA (Pelaksana)</span>
+                            <span className="font-bold text-slate-900">{freelancerName || '-'}</span>
+                          </div>
+                          <div className="bg-white p-2.5 rounded-xl border border-slate-200/60">
+                            <span className="text-[10px] font-bold text-indigo-600 uppercase block">PIHAK KEDUA (Pemberi Kerja)</span>
+                            <span className="font-bold text-slate-900">{clientName || '-'}</span>
+                          </div>
+                        </div>
+                      </div>
 
-                      {/* Judul & Isi Pasal-Pasal Modern */}
-                      <div className="space-y-4">
+                      {/* 5. Document Clauses (Accent Cards) */}
+                      <div className="space-y-3.5">
                         {activeDocTab === 'SPK' && (
                           <>
-                            <div className="mb-4">
-                              <h3 className="text-sm font-semibold text-slate-800 mb-1">
-                                Pasal 1 - Definisi & Scope Pekerjaan
+                            <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-1">
+                              <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-blue-600" />
+                                Pasal 1 — Ruang Lingkup Pekerjaan
                               </h3>
-                              <p className="text-slate-600 leading-relaxed">
-                                PIHAK PERTAMA menyetujui untuk melaksanakan pekerjaan <strong>"{projectTitle || 'Pengembangan Aplikasi Web & API Integration'}"</strong> bagi PIHAK KEDUA sesuai dengan acuan teknis yang disepakati bersama.
+                              <p className="text-slate-600 pl-3.5">
+                                PIHAK PERTAMA melaksanakan pekerjaan <strong>"{projectTitle || 'Pengembangan Aplikasi Web & API Integration'}"</strong> sesuai spesifikasi teknis yang disetujui PIHAK KEDUA.
                               </p>
                             </div>
 
-                            <div className="mb-4">
-                              <h3 className="text-sm font-semibold text-slate-800 mb-1">
-                                Pasal 2 - Nilai Pekerjaan & Ketentuan Pembayaran
+                            <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-1">
+                              <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-blue-600" />
+                                Pasal 2 — Nilai Pekerjaan & Skema Pembayaran
                               </h3>
-                              <p className="text-slate-600 leading-relaxed">
-                                Total nilai imbalan adalah sebesar <strong>Rp {formatRupiah(projectAmount || '7500000')}</strong> dengan Uang Muka (DP) sebesar <strong>{dpPercent || '50'}%</strong>. Pembayaran dilakukan via transfer ke rekening <strong>{bankInfo || 'BCA 1234567890 a.n Debby Aulia'}</strong>.
+                              <p className="text-slate-600 pl-3.5">
+                                Total imbalan sebesar <strong>Rp {formatRupiah(projectAmount || '7500000')}</strong> dengan Uang Muka (DP) <strong>{dpPercent || '50'}%</strong> via transfer ke <strong>{bankInfo || 'BCA 1234567890 a.n Debby Aulia'}</strong>.
                               </p>
                             </div>
 
                             {(clauseRevision || clauseSla || clauseRetention || clauseDp || customClauses.some((c) => c.trim() !== '')) && (
-                              <div className="mb-4">
-                                <h3 className="text-sm font-semibold text-slate-800 mb-1">
-                                  Pasal 3 - Ketentuan Tambahan Proteksi Hukum
+                              <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-1.5">
+                                <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-blue-600" />
+                                  Pasal 3 — Syarat & Ketentuan Khusus
                                 </h3>
-                                <ul className="list-disc pl-5 space-y-1.5 text-slate-600">
-                                  {clauseRevision && (
-                                    <li>Pekerjaan mencakup batas revisi maksimal 2 (dua) kali. Permintaan di luar batas acuan dianggap addendum biaya baru.</li>
-                                  )}
-                                  {clauseSla && (
-                                    <li>PIHAK KEDUA memberikan feedback maksimal 5 (lima) hari kerja. Jika melebihi batas waktu, draf pekerjaan dianggap disetujui (auto-approved).</li>
-                                  )}
-                                  {clauseRetention && (
-                                    <li>Hak penggunaan penuh master file (Figma/Source Code) diberikan setelah pembayaran lunas 100%.</li>
-                                  )}
-                                  {clauseDp && (
-                                    <li>Uang Muka (DP) tidak dapat ditarik kembali (non-refundable) sesuai Pasal 1464 KUHPerdata jika pembatalan terjadi sepihak dari PIHAK KEDUA.</li>
-                                  )}
-                                  {customClauses.map((c, i) =>
-                                    c.trim() !== '' ? <li key={i}>{c}</li> : null
-                                  )}
+                                <ul className="list-disc pl-8 space-y-1 text-slate-600">
+                                  {clauseRevision && <li>Revisi dibatasi maksimal 2 (dua) kali. Permintaan tambahan dianggap addendum terpisah.</li>}
+                                  {clauseSla && <li>Evaluasi feedback dari PIHAK KEDUA maksimal 5 hari kerja. Lebih dari itu dianggap disetujui otomatis.</li>}
+                                  {clauseRetention && <li>Master file/Source code diserahkan penuh setelah pembayaran lunas 100%.</li>}
+                                  {clauseDp && <li>DP tidak dapat dikembalikan (non-refundable) jika pembatalan berasal dari PIHAK KEDUA (Pasal 1464 KUHPerdata).</li>}
+                                  {customClauses.map((c, idx) => c.trim() !== '' ? <li key={idx}>{c}</li> : null)}
                                 </ul>
                               </div>
                             )}
@@ -1361,21 +1411,23 @@ export default function Home() {
 
                         {activeDocTab === 'NDA' && (
                           <>
-                            <div className="mb-4">
-                              <h3 className="text-sm font-semibold text-slate-800 mb-1">
-                                Pasal 1 - Definisi Informasi Rahasia
+                            <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 space-y-1">
+                              <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-indigo-600" />
+                                Pasal 1 — Cakupan Kerahasiaan
                               </h3>
-                              <p className="text-slate-600 leading-relaxed">
-                                Informasi Rahasia adalah seluruh data, dokumen, atau keterangan baik lisan maupun tertulis yang diungkapkan oleh salah satu pihak kepada pihak lainnya sehubungan dengan kerja sama ini, termasuk namun tidak terbatas pada <strong>"{ndaScope || 'Source Code, Skema Database, Aset Desain, & Strategi Bisnis'}"</strong>.
+                              <p className="text-slate-600 pl-3.5">
+                                Mencakup seluruh aset, rahasia dagang, serta informasi <strong>"{ndaScope || 'Source Code, Skema Database, Aset Desain Figma'}"</strong>.
                               </p>
                             </div>
 
-                            <div className="mb-4">
-                              <h3 className="text-sm font-semibold text-slate-800 mb-1">
-                                Pasal 2 - Jangka Waktu & Denda Pelanggaran
+                            <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 space-y-1">
+                              <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-indigo-600" />
+                                Pasal 2 — Masa Berlaku & Denda Sanksi
                               </h3>
-                              <p className="text-slate-600 leading-relaxed">
-                                Kewajiban menjaga kerahasiaan berlaku selama <strong>{ndaYears || '2'} tahun</strong>. Pelanggaran atas perjanjian ini dikenakan kewajiban ganti rugi sebesar <strong>Rp {formatRupiah(ndaPenalty || '25000000')}</strong> sesuai dengan ketentuan hukum yang berlaku.
+                              <p className="text-slate-600 pl-3.5">
+                                Kerahasiaan dijaga selama <strong>{ndaYears || '2'} tahun</strong>. Pelanggaran dikenakan ganti rugi sebesar <strong>Rp {formatRupiah(ndaPenalty || '25000000')}</strong>.
                               </p>
                             </div>
                           </>
@@ -1383,51 +1435,61 @@ export default function Home() {
 
                         {activeDocTab === 'BAST' && (
                           <>
-                            <div className="mb-4">
-                              <h3 className="text-sm font-semibold text-slate-800 mb-1">
-                                Pasal 1 - Serah Terima Pekerjaan
+                            <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 space-y-1">
+                              <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-purple-600" />
+                                Pasal 1 — Serah Terima Pekerjaan
                               </h3>
-                              <p className="text-slate-600 leading-relaxed">
-                                PIHAK PERTAMA menyerahkan hasil pekerjaan berdasarkan SPK Referensi <strong>"{bastRef || 'SPK/2026/DEV/009'}"</strong> kepada PIHAK KEDUA secara lengkap pada tanggal <strong>{bastDate || '23 September 2026'}</strong>.
+                              <p className="text-slate-600 pl-3.5">
+                                PIHAK PERTAMA menyerahkan pekerjaan berdasarkan acuan SPK Referensi <strong>"{bastRef || 'SPK/2026/DEV/009'}"</strong> secara penuh pada <strong>{bastDate || '23 September 2026'}</strong>.
                               </p>
                             </div>
 
-                            <div className="mb-4">
-                              <h3 className="text-sm font-semibold text-slate-800 mb-1">
-                                Pasal 2 - Garansi & Pembebasan
+                            <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 space-y-1">
+                              <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-purple-600" />
+                                Pasal 2 — Masa Garansi Perbaikan
                               </h3>
-                              <p className="text-slate-600 leading-relaxed">
-                                PIHAK KEDUA menyatakan telah memeriksa hasil pekerjaan dan menerimanya dengan baik. PIHAK PERTAMA memberikan masa garansi perbaikan bug selama <strong>{bastWarranty || '14'} hari kerja</strong> sejak serah terima.
+                              <p className="text-slate-600 pl-3.5">
+                                PIHAK PERTAMA memberikan garansi perbaikan bug selama <strong>{bastWarranty || '14'} hari kerja</strong> terhitung sejak tanggal penandatanganan ini.
                               </p>
                             </div>
                           </>
                         )}
                       </div>
 
-                      {/* Area Tanda Tangan Tanpa Teks Placeholder Terang saat Kosong */}
-                      <div className="pt-8 grid grid-cols-2 gap-8 text-center font-sans border-t border-slate-200 mt-8">
-                        <div className="space-y-12">
-                          <p className="font-bold text-slate-800 text-xs">PIHAK PERTAMA</p>
+                      {/* 6. Signature Enclosure Boxes (Real-time Live Sync) */}
+                      <div className="pt-6 grid grid-cols-2 gap-4 text-center font-sans">
+                        <div className="bg-slate-50/80 border border-slate-200/80 rounded-2xl p-4 space-y-3">
+                          <span className="text-[10px] font-extrabold text-blue-600 uppercase tracking-wider block">
+                            PIHAK PERTAMA (Pelaksana)
+                          </span>
                           <div className="h-16 flex items-center justify-center">
                             {signatureDataUrl ? (
                               <img src={signatureDataUrl} alt="Tanda Tangan Digital" className="max-h-16 mx-auto object-contain" />
                             ) : (
-                              <div className="w-36 h-12"></div>
+                              <div className="w-28 h-10 border border-dashed border-slate-300/80 rounded-lg flex items-center justify-center text-[10px] text-slate-400">
+                                [Tanda Tangan]
+                              </div>
                             )}
                           </div>
-                          {freelancerName && (
-                            <p className="font-bold underline text-slate-900 text-xs">{freelancerName}</p>
-                          )}
+                          <p className="font-bold underline text-slate-900 text-xs">
+                            {signerFirstParty || freelancerName || 'Nama Penyedia Jasa'}
+                          </p>
                         </div>
 
-                        <div className="space-y-12">
-                          <p className="font-bold text-slate-800 text-xs">PIHAK KEDUA</p>
+                        <div className="bg-slate-50/80 border border-slate-200/80 rounded-2xl p-4 space-y-3">
+                          <span className="text-[10px] font-extrabold text-indigo-600 uppercase tracking-wider block">
+                            PIHAK KEDUA (Pemberi Kerja)
+                          </span>
                           <div className="h-16 flex items-center justify-center">
-                            <div className="w-36 h-12"></div>
+                            <div className="w-28 h-10 border border-dashed border-slate-300/80 rounded-lg flex items-center justify-center text-[10px] text-slate-400">
+                              [Tanda Tangan]
+                            </div>
                           </div>
-                          {clientName && (
-                            <p className="font-bold underline text-slate-900 text-xs">{clientName}</p>
-                          )}
+                          <p className="font-bold underline text-slate-900 text-xs">
+                            {signerSecondParty || clientName || 'Nama Klien'}
+                          </p>
                         </div>
                       </div>
 
@@ -1639,7 +1701,7 @@ export default function Home() {
               </div>
             )}
 
-            {/* STEP 2: Payment Process View (Direct Verifier Only - Strict Verification) */}
+            {/* STEP 2: Payment Process View */}
             {modalStep === 'qris' && (
               <div className="space-y-4 text-center">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -1742,7 +1804,7 @@ export default function Home() {
                   <span>Sistem memverifikasi pelunasan secara real-time...</span>
                 </div>
 
-                {/* Tombol Verifikasi Ketat Server Redis (Tanpa Bypass) */}
+                {/* Tombol Verifikasi Server Redis */}
                 <div className="space-y-2 pt-1">
                   <button
                     type="button"
