@@ -87,8 +87,19 @@ export default function Home() {
   const [clientName, setClientName] = useState('');
   const [clientWa, setClientWa] = useState('');
 
-  // Dynamic Document Serial Number State
-  const [docNumber, setDocNumber] = useState('001/SPK/IX/2026');
+  // PERBAIKAN 1: State Nomor Dokumen Terpisah per Jenis Dokumen
+  const [docNumbers, setDocNumbers] = useState({
+    SPK: '001/SPK/IX/2026',
+    NDA: '001/NDA/IX/2026',
+    BAST: '001/BAST/IX/2026',
+  });
+
+  const handleDocNumberChange = (value: string) => {
+    setDocNumbers((prev) => ({
+      ...prev,
+      [activeDocTab]: value,
+    }));
+  };
 
   // Signatory Customization Fields (Step 4)
   const [signerFirstParty, setSignerFirstParty] = useState('');
@@ -889,16 +900,16 @@ export default function Home() {
                   {/* STEP 1: Identitas Para Pihak */}
                   {currentWizardStep === 1 && (
                     <div className="space-y-4">
-                      {/* Input Nomor Surat / Dokumen Custom */}
+                      {/* PERBAIKAN 2: Input Nomor Surat / Dokumen Custom dengan Multi-State */}
                       <div>
                         <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
-                          <Hash className="w-3.5 h-3.5 text-blue-600" /> Nomor Dokumen / Surat
+                          <Hash className="w-3.5 h-3.5 text-blue-600" /> Nomor Dokumen / Surat ({activeDocTab})
                         </label>
                         <input
                           type="text"
-                          value={docNumber}
-                          onChange={(e) => setDocNumber(e.target.value)}
-                          placeholder="cth: 001/SPK/IX/2026"
+                          value={docNumbers[activeDocTab]}
+                          onChange={(e) => handleDocNumberChange(e.target.value)}
+                          placeholder={`cth: 001/${activeDocTab}/IX/2026`}
                           className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-mono font-medium"
                         />
                         <p className="text-[10px] text-slate-400 mt-1">
@@ -1432,21 +1443,23 @@ export default function Home() {
                   </p>
                 </div>
 
-                {/* Printable A4 Paper Container - Responsif Tanpa Terpotong */}
-                <div className="relative bg-slate-300/40 p-2 sm:p-6 rounded-3xl border border-slate-200 overflow-x-auto w-full flex flex-col items-center">
+                {/* Outer Wrapper untuk Scroll / Scaling Responsif di UI */}
+                <div className="w-full overflow-x-auto pb-4 flex justify-center bg-slate-300/40 p-2 sm:p-6 rounded-3xl border border-slate-200">
                   <div
                     id="a4-document-preview"
                     onContextMenu={(e) => e.preventDefault()}
                     onCopy={(e) => e.preventDefault()}
                     onCut={(e) => e.preventDefault()}
                     onDragStart={(e) => e.preventDefault()}
-                    className={`flex flex-col gap-8 items-center w-full max-w-[794px] mx-auto ${
+                    className={`flex flex-col gap-8 items-center ${
                       !paidDocs[activeDocTab] ? 'select-none' : ''
                     }`}
                   >
-                    {/* === HALAMAN 1 (A4 Container) === */}
-                    <div className="a4-page w-full max-w-[794px] min-h-[1123px] bg-white text-slate-900 font-sans p-6 sm:p-10 relative flex flex-col justify-between shadow-xl rounded-xl border border-slate-200 overflow-hidden shrink-0">
-                      
+                    {/* === HALAMAN 1 (A4 Container dengan Aspect Ratio Mutlak Presisi) === */}
+                    <div
+                      className="a4-page w-[794px] h-[1123px] min-w-[794px] min-h-[1123px] bg-white text-slate-900 font-sans p-10 relative flex flex-col justify-between shadow-xl rounded-xl border border-slate-200 overflow-hidden shrink-0 aspect-[1/1.414]"
+                      style={{ width: '794px', height: '1123px' }}
+                    >
                       {/* Watermark Overlay Minimalis Halaman 1 */}
                       {!paidDocs[activeDocTab] && (
                         <div className="watermark-layer absolute inset-0 pointer-events-none z-20 flex items-center justify-center overflow-hidden">
@@ -1478,8 +1491,9 @@ export default function Home() {
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                               Nomor Dokumen
                             </p>
+                            {/* PERBAIKAN 3: Render Nomor Dokumen Sesuai Multi-State */}
                             <p className="font-mono text-[11px] font-extrabold text-slate-900">
-                              {docNumber || '001/SPK/IX/2026'}
+                              {docNumbers[activeDocTab] || `001/${activeDocTab}/IX/2026`}
                             </p>
                             <p className="text-[10px] text-slate-500 pt-0.5">{getTodayFormattedDate()}</p>
                           </div>
@@ -1692,10 +1706,12 @@ export default function Home() {
                       </div>
                     </div>
 
-                    {/* === HALAMAN 2 (A4 Container - Dibuat Dinamis Hanya Jika Perlu) === */}
+                    {/* === HALAMAN 2 (A4 Container dengan Aspect Ratio Mutlak Presisi) === */}
                     {needsPage2 && (
-                      <div className="a4-page w-full max-w-[794px] min-h-[1123px] bg-white text-slate-900 font-sans p-6 sm:p-10 relative flex flex-col justify-between shadow-xl rounded-xl border border-slate-200 overflow-hidden shrink-0">
-                        
+                      <div
+                        className="a4-page w-[794px] h-[1123px] min-w-[794px] min-h-[1123px] bg-white text-slate-900 font-sans p-10 relative flex flex-col justify-between shadow-xl rounded-xl border border-slate-200 overflow-hidden shrink-0 aspect-[1/1.414]"
+                        style={{ width: '794px', height: '1123px' }}
+                      >
                         {/* Watermark Overlay Minimalis Halaman 2 */}
                         {!paidDocs[activeDocTab] && (
                           <div className="watermark-layer absolute inset-0 pointer-events-none z-20 flex items-center justify-center overflow-hidden">
@@ -2050,7 +2066,7 @@ export default function Home() {
                   </span>
                 </div>
 
-                {/* Indikator Status & Notifikasi Sedang Diproses */}
+                {/* Indikator Status & Notifikasi Sedang Dipproses */}
                 {isProcessingSuccess ? (
                   <div className="bg-emerald-600 text-white p-4 rounded-2xl shadow-lg animate-pulse text-center space-y-1">
                     <div className="flex items-center justify-center gap-2 font-black text-sm">
