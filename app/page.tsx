@@ -30,7 +30,8 @@ import {
   Trash2,
   Loader2,
   ExternalLink,
-  Hash
+  Hash,
+  AlertTriangle
 } from 'lucide-react';
 
 declare global {
@@ -76,6 +77,7 @@ export default function Home() {
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
   const [isLoadingQris, setIsLoadingQris] = useState(false);
   const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
+  const [isProcessingSuccess, setIsProcessingSuccess] = useState(false);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
   // Form State - Identitas Para Pihak
@@ -182,9 +184,12 @@ export default function Home() {
     }
   }, [showCheckoutModal]);
 
-  // Eksekusi Kelunasan & Pencabutan Watermark
+  // Eksekusi Kelunasan, Notifikasi "Sedang Diproses", & Pencabutan Watermark
   const handlePaymentSuccess = () => {
     stopPolling();
+
+    // Tampilkan notifikasi "Pembayaran Terdeteksi! Sedang diproses..."
+    setIsProcessingSuccess(true);
 
     if (selectedPackage === 'BUNDLING') {
       setPaidDocs({ SPK: true, NDA: true, BAST: true });
@@ -192,11 +197,15 @@ export default function Home() {
       setPaidDocs((prev) => ({ ...prev, [paidDocTarget]: true }));
     }
 
-    setMobileViewMode('preview');
-    setShowCheckoutModal(false);
-    setShowSuccessModal(true);
-    setShouldAutoDownload(true);
-    setAutoDownloadStatus('Memproses pencabutan watermark & menyiapkan PDF...');
+    // Beri jeda 2 detik agar pengguna melihat pesan "sedang diproses" sebelum pindah modal
+    setTimeout(() => {
+      setIsProcessingSuccess(false);
+      setMobileViewMode('preview');
+      setShowCheckoutModal(false);
+      setShowSuccessModal(true);
+      setShouldAutoDownload(true);
+      setAutoDownloadStatus('Memproses pencabutan watermark & menyiapkan PDF...');
+    }, 2000);
 
     if (typeof window !== 'undefined' && window.fbq) {
       window.fbq('track', 'Purchase', {
@@ -248,8 +257,9 @@ export default function Home() {
     } catch (err) {
       console.error('Verifikasi pembayaran gagal:', err);
       alert('Gagal terhubung ke server verifikasi. Silakan periksa koneksi internet Anda.');
-    } finally {}
-    setIsVerifyingPayment(false);
+    } finally {
+      setIsVerifyingPayment(false);
+    }
   };
 
   // Polling Real-time Ketat ke Server Redis
@@ -598,9 +608,8 @@ export default function Home() {
       }
     } catch (err) {
       console.error('Gagal membuat PDF:', err);
-    } finally {
-      setIsExporting(false);
-    }
+    } finally {}
+    setIsExporting(false);
   };
 
   const handleFreeDownload = () => {
@@ -1422,7 +1431,7 @@ export default function Home() {
                       !paidDocs[activeDocTab] ? 'select-none' : ''
                     }`}
                   >
-                    {/* 1. Header Top Accent Floating Bar (Solusi 1 - Mencegah Crop/Ketidakrapian) */}
+                    {/* 1. Header Top Accent Floating Bar */}
                     <div className="pt-5 px-6 sm:px-10">
                       <div className="h-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 w-full rounded-full shadow-xs" />
                     </div>
@@ -1439,7 +1448,7 @@ export default function Home() {
                     {/* Document Inner Wrapper */}
                     <div className="p-6 sm:p-10 pt-4 space-y-6 text-[12px] sm:text-[13px] leading-relaxed text-slate-700 relative z-10">
                       
-                      {/* 2. Brand Header & Document Information Box (Bersih Tanpa Badge & Prefix #) */}
+                      {/* 2. Brand Header & Document Information Box */}
                       <div className="flex items-start justify-between pb-4 border-b border-slate-200/80 gap-4">
                         <div className="space-y-1">
                           <span className="text-[10px] font-bold tracking-widest text-blue-600 uppercase">
@@ -1477,7 +1486,7 @@ export default function Home() {
                         </p>
                       </div>
 
-                      {/* 4. Parties Identification Paragraph (Nomenklatur Bersih) */}
+                      {/* 4. Parties Identification Paragraph */}
                       <div className="bg-slate-50/70 border border-slate-200/80 rounded-2xl p-4 space-y-2">
                         <p className="text-slate-600">
                           Pada hari ini, <strong>{getTodayFormattedDate()}</strong>, yang bertanda tangan di bawah ini sepakat mengikatkan diri dalam perikatan hukum:
@@ -1494,7 +1503,7 @@ export default function Home() {
                         </div>
                       </div>
 
-                      {/* 5. Document Clauses (Accent Cards) */}
+                      {/* 5. Document Clauses */}
                       <div className="space-y-3.5">
                         {activeDocTab === 'SPK' && (
                           <>
@@ -1585,7 +1594,7 @@ export default function Home() {
                         )}
                       </div>
 
-                      {/* 6. Signature Enclosure Boxes (Rendering Independen Pihak Pertama & Kedua) */}
+                      {/* 6. Signature Enclosure Boxes */}
                       <div className="pt-6 grid grid-cols-2 gap-4 text-center font-sans">
                         <div className="bg-slate-50/80 border border-slate-200/80 rounded-2xl p-4 space-y-3">
                           <span className="text-[10px] font-extrabold text-blue-600 uppercase tracking-wider block">
@@ -1832,7 +1841,7 @@ export default function Home() {
               </div>
             )}
 
-            {/* STEP 2: Payment Process View (Satu Tampilan Iframe Ringkas) */}
+            {/* STEP 2: Payment Process View (Embedded Mayar Portal) */}
             {modalStep === 'qris' && (
               <div className="space-y-4 text-center">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -1854,7 +1863,7 @@ export default function Home() {
                   </p>
                 </div>
 
-                {/* Container Direct Embedded Portal Mayar (Satu Tampilan) */}
+                {/* Container Direct Embedded Portal Mayar */}
                 <div className="bg-slate-50 p-2 sm:p-4 rounded-2xl border border-slate-200 overflow-hidden w-full space-y-3">
                   {isLoadingQris ? (
                     <div className="w-full h-64 rounded-xl bg-slate-100 flex items-center justify-center text-xs text-slate-500 animate-pulse font-sans font-bold gap-2">
@@ -1892,16 +1901,29 @@ export default function Home() {
                   </span>
                 </div>
 
-                <div className="text-[11px] text-emerald-600 font-semibold flex items-center justify-center gap-2 bg-emerald-50 p-2.5 rounded-xl border border-emerald-200">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-                  <span>Sistem memverifikasi pelunasan secara real-time...</span>
-                </div>
+                {/* Indikator Status & Notifikasi Sedang Diproses */}
+                {isProcessingSuccess ? (
+                  <div className="bg-emerald-600 text-white p-4 rounded-2xl shadow-lg animate-pulse text-center space-y-1">
+                    <div className="flex items-center justify-center gap-2 font-black text-sm">
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <span>Pembayaran Terdeteksi!</span>
+                    </div>
+                    <p className="text-xs text-emerald-100 font-medium">
+                      Sedang memproses verifikasi & menyiapkan dokumen, mohon tunggu sebentar ya...
+                    </p>
+                  </div>
+                ) : (
+                  <div className="text-[11px] text-emerald-600 font-semibold flex items-center justify-center gap-2 bg-emerald-50 p-2.5 rounded-xl border border-emerald-200">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                    <span>Sistem memverifikasi pelunasan secara real-time...</span>
+                  </div>
+                )}
 
                 {/* Tombol Verifikasi Server Redis */}
                 <div className="space-y-2 pt-1">
                   <button
                     type="button"
-                    disabled={isVerifyingPayment}
+                    disabled={isVerifyingPayment || isProcessingSuccess}
                     onClick={handleManualCheckPayment}
                     className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white font-black text-xs rounded-xl shadow-md flex items-center justify-center gap-2 transition"
                   >
@@ -1935,7 +1957,9 @@ export default function Home() {
       {/* Success & Download Receipt Modal */}
       {showSuccessModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white max-w-md w-full rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-5 text-center">
+          <div className="bg-white max-w-md w-full rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-4 text-center my-8 max-h-[90vh] overflow-y-auto">
+
+            {/* Icon & Header Status */}
             <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
               <CheckCircle className="w-7 h-7" />
             </div>
@@ -1943,7 +1967,7 @@ export default function Home() {
             <div>
               <h3 className="font-extrabold text-slate-900 text-lg">Pembayaran Terverifikasi Lunas!</h3>
               <p className="text-xs text-slate-500 mt-1">
-                Watermark SPKINSTAN telah resmi dicabut. Dokumen PDF Clean (Tanpa Watermark) Anda siap diunduh.
+                Watermark SPKINSTAN telah resmi dicabut. Dokumen PDF Clean Anda siap diunduh.
               </p>
             </div>
 
@@ -1955,8 +1979,20 @@ export default function Home() {
               </div>
             )}
 
+            {/* BOX PERINGATAN ZERO DATABASE & HAK AKSES ADMIN */}
+            <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-3.5 text-left space-y-1">
+              <div className="flex items-center gap-1.5 font-extrabold text-amber-900 text-xs">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>PENTING: Segera Unduh & Simpan Dokumen!</span>
+              </div>
+              <p className="text-[11px] text-amber-800 leading-relaxed font-medium">
+                Platform ini berjalan <strong>tanpa database & tanpa login</strong>. Jika modal ini ditutup, Anda <strong>tidak bisa mengunduh ulang</strong> dan Admin juga tidak menyimpan/memiliki riwayat file Anda.
+              </p>
+            </div>
+
+            {/* Tombol Unduh / Kirim WA */}
             {selectedPackage === 'BUNDLING' ? (
-              <div className="space-y-3 pt-2 text-left">
+              <div className="space-y-3 pt-1 text-left">
                 <span className="text-xs font-bold text-slate-700 block text-center uppercase tracking-wider">
                   Paket Bundling 3 Dokumen (Lunas)
                 </span>
@@ -2004,7 +2040,7 @@ export default function Home() {
                 </button>
               </div>
             ) : (
-              <div className="space-y-2.5">
+              <div className="space-y-2.5 pt-1">
                 <button
                   type="button"
                   onClick={() => handleDownloadPDF(paidDocTarget)}
@@ -2024,8 +2060,9 @@ export default function Home() {
               </div>
             )}
 
-            <div className="pt-4 border-t border-slate-100">
-              <div className="bg-emerald-50/80 border border-emerald-200/80 rounded-2xl p-4 text-center space-y-2.5">
+            {/* Bagian Ulasan WA */}
+            <div className="pt-3 border-t border-slate-100">
+              <div className="bg-emerald-50/80 border border-emerald-200/80 rounded-2xl p-3.5 text-center space-y-2">
                 <div className="text-xs font-extrabold text-slate-900 flex items-center justify-center gap-1.5">
                   <MessageSquarePlus className="w-4 h-4 text-emerald-600" />
                   <span>Berikan Ulasan & Kritik via WhatsApp</span>
@@ -2037,7 +2074,7 @@ export default function Home() {
                   href="https://wa.me/6281234567890?text=Halo%20Admin%20SPKInstan,%20saya%20baru%20saja%20membuat%20dokumen%20dan%20ingin%20memberikan%20ulasan/kritik:"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2 transition"
+                  className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2 transition"
                 >
                   <MessageCircle className="w-4 h-4" />
                   <span>Chat WA Admin Business</span>
@@ -2048,7 +2085,7 @@ export default function Home() {
             <button
               type="button"
               onClick={() => setShowSuccessModal(false)}
-              className="text-xs text-slate-400 hover:text-slate-600 pt-2"
+              className="text-xs text-slate-400 hover:text-slate-600 pt-1 block mx-auto font-medium"
             >
               Tutup Modal
             </button>
