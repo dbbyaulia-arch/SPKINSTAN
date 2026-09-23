@@ -1871,7 +1871,7 @@ export default function Home() {
                         <div>
                           <div className="flex items-center gap-1.5">
                             <span className="font-bold">Paket Bundling Proteksi 3-in-1</span>
-                            <span className="bg-amber-500 text-white text-[9px] px-1 py-0.2 rounded font-black uppercase">
+                            <span className="bg-amber-500 text-white text-[9px] px-1 py-0.5 rounded font-black uppercase">
                               -60%
                             </span>
                           </div>
@@ -1963,7 +1963,7 @@ export default function Home() {
                   </span>
                 </div>
 
-                {/* Indikator Status & Notifikasi Sedang Dipproses */}
+                {/* Indikator Status & Notifikasi Sedang Diproses */}
                 {isProcessingSuccess ? (
                   <div className="bg-emerald-600 text-white p-4 rounded-2xl shadow-lg animate-pulse text-center space-y-1">
                     <div className="flex items-center justify-center gap-2 font-black text-sm">
