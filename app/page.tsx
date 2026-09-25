@@ -31,7 +31,9 @@ import {
   Loader2,
   ExternalLink,
   Hash,
-  AlertTriangle
+  AlertTriangle,
+  Check,
+  Sliders
 } from 'lucide-react';
 
 declare global {
@@ -45,6 +47,15 @@ interface Review {
   name: string;
   text: string;
   stars: number;
+}
+
+interface Clause {
+  id: string;
+  docType: 'SPK' | 'NDA' | 'BAST';
+  title: string;
+  content: string;
+  isEnabled: boolean;
+  isCustom?: boolean;
 }
 
 const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
@@ -123,14 +134,269 @@ export default function Home() {
   const [bastWarranty, setBastWarranty] = useState('');
   const [bastDate, setBastDate] = useState('');
 
-  // Clause Checkboxes
-  const [clauseRevision, setClauseRevision] = useState(true);
-  const [clauseSla, setClauseSla] = useState(true);
-  const [clauseRetention, setClauseRetention] = useState(true);
-  const [clauseDp, setClauseDp] = useState(true);
+  // ==========================================
+  // ARRAY-BASED CLAUSE MANAGER STATE & LOGIC
+  // ==========================================
+  const [clauses, setClauses] = useState<Clause[]>([
+    // SPK Clauses Bawaan
+    {
+      id: 'spk-1',
+      docType: 'SPK',
+      title: 'Ruang Lingkup Pekerjaan',
+      content: 'PIHAK PERTAMA berkewajiban melaksanakan pengerjaan proyek sesuai dengan acuan spesifikasi teknis dan deliverables yang telah disepakati bersama PIHAK KEDUA.',
+      isEnabled: true,
+    },
+    {
+      id: 'spk-2',
+      docType: 'SPK',
+      title: 'Jangka Waktu & Timeline Pekerjaan',
+      content: 'Pelaksanaan pekerjaan dimulai sejak Uang Muka (DP) diterima oleh PIHAK PERTAMA. Timeline pekerjaan, milestone penyerahan, dan tanggal penyelesaian proyek wajib dipatuhi oleh Para Pihak.',
+      isEnabled: true,
+    },
+    {
+      id: 'spk-3',
+      docType: 'SPK',
+      title: 'Imbalan Jasa & Skema Pembayaran',
+      content: 'Total imbalan jasa yang disepakati wajib dibayarkan dengan Uang Muka (DP) sebelum pengerjaan dimulai melalui transfer bank resmi PIHAK PERTAMA.',
+      isEnabled: true,
+    },
+    {
+      id: 'spk-4',
+      docType: 'SPK',
+      title: 'Ketentuan Revisi & SLA Feedback',
+      content: 'Revisi pekerjaan dibatasi maksimal 2 (dua) kali sesuai cakupan kesepakatan awal. Evaluasi atau feedback dari PIHAK KEDUA wajib diberikan maksimal 5 (lima) hari kerja; jika melebihi batas waktu tersebut, pekerjaan dianggap disetujui secara otomatis (auto-approved).',
+      isEnabled: true,
+    },
+    {
+      id: 'spk-5',
+      docType: 'SPK',
+      title: 'Retensi Hak Milik & Master File',
+      content: 'Seluruh file master, aset Figma, serta Source Code aplikasi tetap menjadi hak milik PIHAK PERTAMA dan baru akan diserahkan secara penuh kepada PIHAK KEDUA setelah sisa pembayaran dilunasi 100%.',
+      isEnabled: true,
+    },
+    {
+      id: 'spk-6',
+      docType: 'SPK',
+      title: 'Pembatalan & DP Non-Refundable',
+      content: 'Sesuai ketentuan Pasal 1464 KUHPerdata, apabila pembatalan perjanjian dilakukan secara sepihak oleh PIHAK KEDUA, maka Uang Muka (DP) yang telah dibayarkan dianggap hangus dan tidak dapat ditarik kembali (non-refundable).',
+      isEnabled: true,
+    },
+    {
+      id: 'spk-7',
+      docType: 'SPK',
+      title: 'Keadaan Memaksa (Force Majeure)',
+      content: 'Segala keterlambatan atau kegagalan pelaksanaan kewajiban akibat peristiwa di luar kendali wajar Para Pihak (seperti bencana alam, perang, pandemi, atau regulasi resmi pemerintah) dibebaskan dari tuntutan ganti rugi.',
+      isEnabled: true,
+    },
+    {
+      id: 'spk-8',
+      docType: 'SPK',
+      title: 'Akses Server & Layanan Pihak Ketiga',
+      content: 'PIHAK KEDUA wajib menyediakan akses kredensial server/hosting/API yang diperlukan. Seluruh biaya lisensi layanan pihak ketiga berbayar (seperti domain, hosting, API premium, atau plugin) berada di luar nilai imbalan SPK dan ditanggung penuh oleh PIHAK KEDUA.',
+      isEnabled: true,
+    },
+    {
+      id: 'spk-9',
+      docType: 'SPK',
+      title: 'Hak Cipta Portofolio & Penyelesaian Sengketa',
+      content: 'PIHAK PERTAMA berhak menampilkan hasil karya visual/desain sebagai portofolio profesional selama tidak melanggar kerahasiaan NDA. Setiap sengketa akan diselesaikan secara musyawarah, dan apabila tidak tercapai kesepakatan, diselesaikan melalui domisili Pengadilan Negeri yang berwenang.',
+      isEnabled: true,
+    },
 
-  // Custom Dynamic Clauses Array
-  const [customClauses, setCustomClauses] = useState<string[]>(['']);
+    // NDA Clauses Bawaan
+    {
+      id: 'nda-1',
+      docType: 'NDA',
+      title: 'Definisi Informasi Rahasia',
+      content: 'Sesuai UU No. 30 Tahun 2000 tentang Rahasia Dagang, Informasi Rahasia mencakup seluruh data teknis, kode sumber, skema database, aset desain, strategi pemasaran, serta data finansial yang diberikan oleh Pemilik Informasi.',
+      isEnabled: true,
+    },
+    {
+      id: 'nda-2',
+      docType: 'NDA',
+      title: 'Kewajiban & Pembatasan Kerahasiaan',
+      content: 'Penerima Informasi dilarang keras mengungkapkan, menggandakan, menyebarluaskan, atau memanfaatkan Informasi Rahasia kepada pihak ketiga mana pun tanpa persetujuan tertulis terlebih dahulu dari Pemilik Informasi.',
+      isEnabled: true,
+    },
+    {
+      id: 'nda-3',
+      docType: 'NDA',
+      title: 'Pengecualian Kerahasiaan',
+      content: 'Kewajiban kerahasiaan tidak berlaku atas informasi yang: (a) telah menjadi milik umum (public domain) tanpa pelanggaran NDA; (b) telah diketahui sebelumnya secara sah; atau (c) wajib dibuka berdasarkan perintah hukum / keputusan Pengadilan.',
+      isEnabled: true,
+    },
+    {
+      id: 'nda-4',
+      docType: 'NDA',
+      title: 'Jangka Waktu Kerahasiaan',
+      content: 'Kewajiban menjaga kerahasiaan ini berlaku efektif sejak tanggal penandatanganan dan tetap mengikat Para Pihak selama masa waktu yang telah disepakati setelah hubungan kerja sama berakhir.',
+      isEnabled: true,
+    },
+    {
+      id: 'nda-5',
+      docType: 'NDA',
+      title: 'Pengembalian & Pemusnahan Aset Data',
+      content: 'Setelah pengerjaan proyek selesai atau atas permintaan tertulis Pemilik Informasi, Penerima Informasi wajib mengembalikan seluruh fisik dokumen dan memusnahkan/menghapus file digital yang mengandung Informasi Rahasia.',
+      isEnabled: true,
+    },
+    {
+      id: 'nda-6',
+      docType: 'NDA',
+      title: 'Sanksi Pelanggaran & Denda Finansial',
+      content: 'Setiap bentuk kebocoran atau pelanggaran kerahasiaan dikenakan denda penalti finansial serta hak untuk menuntut ganti rugi materiil/immateriil sesuai ketentuan hukum perdata.',
+      isEnabled: true,
+    },
+    {
+      id: 'nda-7',
+      docType: 'NDA',
+      title: 'Penyelesaian Sengketa',
+      content: 'Setiap perselisihan yang timbul dari pelaksanaan NDA ini diselesaikan melalui musyawarah untuk mufakat, dan apabila gagal, diselesaikan di forum hukum Pengadilan Negeri setempat.',
+      isEnabled: true,
+    },
+
+    // BAST Clauses Bawaan
+    {
+      id: 'bast-1',
+      docType: 'BAST',
+      title: 'Identitas & Referensi Kontrak Utama',
+      content: 'Berita Acara ini diterbitkan sebagai bukti administratif sah yang merujuk pada kesepakatan Perjanjian Kerja Sama (SPK) Utama yang telah disepakati Para Pihak.',
+      isEnabled: true,
+    },
+    {
+      id: 'bast-2',
+      docType: 'BAST',
+      title: 'Pernyataan Serah Terima Pekerjaan',
+      content: 'PIHAK PERTAMA menyatakan telah menyerahkan seluruh hasil pengerjaan proyek, dan PIHAK KEDUA menyatakan telah menerima pengerjaan tersebut secara resmi.',
+      isEnabled: true,
+    },
+    {
+      id: 'bast-3',
+      docType: 'BAST',
+      title: 'Hasil Pemeriksaan & Quality Check',
+      content: 'PIHAK KEDUA telah melakukan pemeriksaan komprehensif terhadap seluruh fitur, desain, dan deliverables, serta mengonfirmasi bahwa hasil pekerjaan telah sesuai dengan standar spesifikasi teknis SPK.',
+      isEnabled: true,
+    },
+    {
+      id: 'bast-4',
+      docType: 'BAST',
+      title: 'Masa Garansi & Pemeliharaan Bug',
+      content: 'PIHAK PERTAMA memberikan garansi pemeliharaan perbaikan kendala teknis / bug secara gratis selama masa garansi yang disepakati terhitung sejak penandatanganan BAST ini.',
+      isEnabled: true,
+    },
+    {
+      id: 'bast-5',
+      docType: 'BAST',
+      title: 'Pengesahan Hak Pelunasan Pembayaran',
+      content: 'Dengan ditandatanganinya BAST ini, kewajiban pengerjaan PIHAK PERTAMA dinyatakan selesai sempurna, dan PIHAK PERTAMA berhak penuh atas pencairan pelunasan 100% dari PIHAK KEDUA.',
+      isEnabled: true,
+    },
+  ]);
+
+  // Sinkronisasi otomatis input form spesifik ke dalam Teks Pasal State
+  useEffect(() => {
+    setClauses((prev) =>
+      prev.map((c) => {
+        if (c.id === 'spk-1') {
+          return {
+            ...c,
+            content: `PIHAK PERTAMA berkewajiban melaksanakan pekerjaan "${projectTitle || 'Pengembangan Aplikasi Web & API Integration'}" sesuai dengan acuan spesifikasi teknis dan deliverables yang telah disepakati bersama PIHAK KEDUA.`,
+          };
+        }
+        if (c.id === 'spk-3') {
+          return {
+            ...c,
+            content: `Total imbalan jasa yang disepakati sebesar Rp ${formatRupiah(projectAmount || '7500000')}, dengan Uang Muka (DP) sebesar ${dpPercent || '50'}% wajib dibayarkan sebelum pengerjaan dimulai melalui transfer ke ${bankInfo || 'BCA 1234567890 a.n budi'}.`,
+          };
+        }
+        if (c.id === 'nda-1') {
+          return {
+            ...c,
+            content: `Sesuai UU No. 30 Tahun 2000 tentang Rahasia Dagang, Informasi Rahasia mencakup seluruh data teknis, "${ndaScope || 'Source Code, Skema Database, Aset Desain Figma, & Strategi Bisnis'}", kode sumber, strategi pemasaran, serta data finansial yang diberikan oleh Pemilik Informasi.`,
+          };
+        }
+        if (c.id === 'nda-4') {
+          return {
+            ...c,
+            content: `Kewajiban menjaga kerahasiaan ini berlaku efektif sejak tanggal penandatanganan dan tetap mengikat Para Pihak selama ${ndaYears || '2'} (dua) tahun setelah hubungan kerja sama berakhir.`,
+          };
+        }
+        if (c.id === 'nda-6') {
+          return {
+            ...c,
+            content: `Setiap bentuk kebocoran atau pelanggaran kerahasiaan dikenakan denda penalti finansial sebesar Rp ${formatRupiah(ndaPenalty || '25000000')} serta hak untuk menuntut ganti rugi materiil/immateriil sesuai ketentuan hukum perdata.`,
+          };
+        }
+        if (c.id === 'bast-1') {
+          return {
+            ...c,
+            content: `Berita Acara ini diterbitkan sebagai bukti administratif sah yang merujuk pada kesepakatan Perjanjian Kerja Sama (SPK) Utama dengan Nomor Referensi: "${bastRef || '001/SPK/IX/2026'}".`,
+          };
+        }
+        if (c.id === 'bast-2') {
+          return {
+            ...c,
+            content: `PIHAK PERTAMA menyatakan telah menyerahkan seluruh hasil pengerjaan proyek, dan PIHAK KEDUA menyatakan telah menerima pengerjaan tersebut secara resmi pada tanggal ${bastDate || '25 September 2026'}.`,
+          };
+        }
+        if (c.id === 'bast-4') {
+          return {
+            ...c,
+            content: `PIHAK PERTAMA memberikan garansi pemeliharaan perbaikan kendala teknis / bug secara gratis selama ${bastWarranty || '14'} (empat belas) hari kerja terhitung sejak penandatanganan BAST ini.`,
+          };
+        }
+        return c;
+      })
+    );
+  }, [projectTitle, projectAmount, dpPercent, bankInfo, ndaScope, ndaYears, ndaPenalty, bastRef, bastDate, bastWarranty]);
+
+  // Handler Manajemen Pasal State
+  const handleToggleClause = (id: string) => {
+    setClauses((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, isEnabled: !c.isEnabled } : c))
+    );
+  };
+
+  const handleUpdateClauseTitle = (id: string, title: string) => {
+    setClauses((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, title } : c))
+    );
+  };
+
+  const handleUpdateClauseContent = (id: string, content: string) => {
+    setClauses((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, content } : c))
+    );
+  };
+
+  const handleAddCustomClause = () => {
+    const newClause: Clause = {
+      id: `custom-${Date.now()}`,
+      docType: activeDocTab,
+      title: 'Ketentuan Khusus Tambahan',
+      content: '',
+      isEnabled: true,
+      isCustom: true,
+    };
+    setClauses((prev) => [...prev, newClause]);
+  };
+
+  const handleRemoveClause = (id: string) => {
+    setClauses((prev) => prev.filter((c) => c.id !== id));
+  };
+
+  const handleApplyPreset = (presetType: 'web' | 'design' | 'all') => {
+    if (presetType === 'web') {
+      setClauses((prev) =>
+        prev.map((c) => (c.docType === 'SPK' && c.id === 'spk-8' ? { ...c, isEnabled: true } : c))
+      );
+    } else if (presetType === 'design') {
+      setClauses((prev) =>
+        prev.map((c) => (c.docType === 'SPK' && c.id === 'spk-8' ? { ...c, isEnabled: false } : c))
+      );
+    } else if (presetType === 'all') {
+      setClauses((prev) => prev.map((c) => ({ ...c, isEnabled: true })));
+    }
+  };
 
   // Signature Pad Canvas - PIHAK PERTAMA
   const canvasRef1 = useRef<HTMLCanvasElement | null>(null);
@@ -145,7 +411,7 @@ export default function Home() {
   // Testimonials
   const [reviews] = useState<Review[]>([]);
 
-  // === METODE 1: DOM HEIGHT MEASUREMENT (Deteksi Tinggi Piksel Nyata) ===
+  // === DETEKSI TINGGI PIKSEL & PEMISAHAN HALAMAN A4 ===
   const [needsPage2, setNeedsPage2] = useState(false);
   const page1ContentRef = useRef<HTMLDivElement | null>(null);
   const page1MainContentRef = useRef<HTMLDivElement | null>(null);
@@ -176,11 +442,7 @@ export default function Home() {
   }, [
     needsPage2,
     activeDocTab,
-    customClauses,
-    clauseRevision,
-    clauseSla,
-    clauseRetention,
-    clauseDp,
+    clauses,
     projectTitle,
     projectAmount,
     dpPercent,
@@ -376,21 +638,6 @@ export default function Home() {
     return () => window.removeEventListener('message', handleMayarMessage);
   }, [paidDocTarget, selectedPackage, mayarPaymentId, sessionId]);
 
-  // Dynamic Custom Clauses Handlers
-  const handleAddCustomClause = () => {
-    setCustomClauses((prev: string[]) => [...prev, '']);
-  };
-
-  const handleCustomClauseChange = (index: number, value: string) => {
-    const updated = [...customClauses];
-    updated[index] = value;
-    setCustomClauses(updated);
-  };
-
-  const handleRemoveCustomClause = (index: number) => {
-    setCustomClauses((prev: string[]) => prev.filter((_, i) => i !== index));
-  };
-
   // Request Pembayaran Mayar
   const handleRequestQris = async () => {
     if (isLoadingQris) return;
@@ -580,7 +827,9 @@ export default function Home() {
     }
   };
 
-  // Generator PDF Dinamis: Menjaga Live Preview Tetap Presisi & Bebas Teks Gepeng/Ke-pressed
+  // =========================================================
+  // GENERATOR PDF DINAMIS (PENGATURAN SKALA UTUH ANTI-GEPENG)
+  // =========================================================
   const captureDocumentToPdf = async (docType: 'SPK' | 'NDA' | 'BAST') => {
     setActiveDocTab(docType);
     setMobileViewMode('preview');
@@ -653,15 +902,25 @@ export default function Home() {
 
         const imgData = canvas.toDataURL('image/jpeg', 0.98);
 
-        // Hitung proporsi tinggi gambar agar tidak gepeng di canvas PDF A4 (210mm x 297mm)
+        // Hitung proporsi tinggi gambar di canvas PDF A4 (210mm x 297mm)
         const imgWidth = 210;
         const pageHeight = 297;
         const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
         if (i > 0) pdf.addPage();
 
-        // Cetak dengan skala presisi tinggi
-        pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, Math.min(imgHeight, pageHeight));
+        // SOLUSI FIX GEPENG: Jaga aspect ratio (rasio proporsional)
+        if (imgHeight > pageHeight) {
+          // Jika tinggi konten melebihi batas A4, kecilkan skala gambar secara keseluruhan (lebar & tinggi)
+          const ratio = pageHeight / imgHeight;
+          const scaledWidth = imgWidth * ratio;
+          const xCenterOffset = (imgWidth - scaledWidth) / 2; // Agar posisinya tetap di tengah kertas
+
+          pdf.addImage(imgData, 'JPEG', xCenterOffset, 0, scaledWidth, pageHeight);
+        } else {
+          // Jika konten muat, cetak dengan rasio normal
+          pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
+        }
       }
 
       const isPaidDoc = paidDocs[docType] || paidDocs[activeDocTab];
@@ -738,14 +997,14 @@ export default function Home() {
   const wizardTitles = [
     'Identitas Para Pihak',
     'Detail Spesifik Dokumen',
-    'Klausul Proteksi Hukum',
+    'Manajer Pasal Dinamis',
     'Legalisasi & Tanda Tangan'
   ];
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col justify-between font-sans antialiased selection:bg-blue-100 selection:text-blue-700 pb-20 md:pb-0">
       
-      {/* CSS Import Font Calibri / Carlito / Standard System Legal Font Stack & PDF Rules */}
+      {/* CSS Import Font Calibri & Rules */}
       <style>{`
         #a4-document-preview, .a4-page {
           font-family: 'Calibri', 'Carlito', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
@@ -765,7 +1024,6 @@ export default function Home() {
         }
         ` : ''}
 
-        /* Menjaga spasi teks tetap lega & dinamis saat ekspor PDF */
         .a4-page.export-pdf-mode {
           display: flex !important;
           flex-direction: column !important;
@@ -1092,7 +1350,7 @@ export default function Home() {
                     </div>
                   )}
 
-                  {/* STEP 2 */}
+                  {/* STEP 2: Detail Spesifik Dokumen */}
                   {currentWizardStep === 2 && (
                     <div className="space-y-4">
                       {activeDocTab === 'SPK' && (
@@ -1237,102 +1495,113 @@ export default function Home() {
                     </div>
                   )}
 
-                  {/* STEP 3 */}
+                  {/* STEP 3: MANAJER PASAL DINAMIS (ARRAY-BASED CLAUSE MANAGER) */}
                   {currentWizardStep === 3 && (
-                    <div className="space-y-3">
-                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">
-                        Pilih Klausul Proteksi Hukum Perdata
-                      </label>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">
+                          3. Pengaturan & Modifikasi Pasal ({activeDocTab})
+                        </label>
+                      </div>
 
-                      <label className="flex items-start gap-2.5 p-3 rounded-2xl bg-slate-50 border border-slate-200 cursor-pointer hover:bg-slate-100/80 transition-all">
-                        <input
-                          type="checkbox"
-                          checked={clauseRevision}
-                          onChange={(e) => setClauseRevision(e.target.checked)}
-                          className="mt-0.5 rounded text-blue-600 focus:ring-blue-500"
-                        />
-                        <div className="text-xs">
-                          <span className="font-bold text-slate-900 block">Pembatasan Scope & Revisi (Maks 2x)</span>
-                          <span className="text-slate-500">Permintaan di luar acuan dianggap addendum biaya baru.</span>
-                        </div>
-                      </label>
-
-                      <label className="flex items-start gap-2.5 p-3 rounded-2xl bg-slate-50 border border-slate-200 cursor-pointer hover:bg-slate-100/80 transition-all">
-                        <input
-                          type="checkbox"
-                          checked={clauseSla}
-                          onChange={(e) => setClauseSla(e.target.checked)}
-                          className="mt-0.5 rounded text-blue-600 focus:ring-blue-500"
-                        />
-                        <div className="text-xs">
-                          <span className="font-bold text-slate-900 block">SLA Evaluasi Feedback (5 Hari)</span>
-                          <span className="text-slate-500">Jika 5 hari tidak ada feedback, dianggap auto-approved.</span>
-                        </div>
-                      </label>
-
-                      <label className="flex items-start gap-2.5 p-3 rounded-2xl bg-slate-50 border border-slate-200 cursor-pointer hover:bg-slate-100/80 transition-all">
-                        <input
-                          type="checkbox"
-                          checked={clauseRetention}
-                          onChange={(e) => setClauseRetention(e.target.checked)}
-                          className="mt-0.5 rounded text-blue-600 focus:ring-blue-500"
-                        />
-                        <div className="text-xs">
-                          <span className="font-bold text-slate-900 block">Retensi Hak Master File Pasca-Pelunasan</span>
-                          <span className="text-slate-500">File Figma/Source Code dikirim hanya setelah lunas 100%.</span>
-                        </div>
-                      </label>
-
-                      <label className="flex items-start gap-2.5 p-3 rounded-2xl bg-slate-50 border border-slate-200 cursor-pointer hover:bg-slate-100/80 transition-all">
-                        <input
-                          type="checkbox"
-                          checked={clauseDp}
-                          onChange={(e) => setClauseDp(e.target.checked)}
-                          className="mt-0.5 rounded text-blue-600 focus:ring-blue-500"
-                        />
-                        <div className="text-xs">
-                          <span className="font-bold text-slate-900 block">DP Non-Refundable (Pasal 1464 KUHPerdata)</span>
-                          <span className="text-slate-500">Uang muka hangus jika pembatalan terjadi sepihak dari Pihak Kedua.</span>
-                        </div>
-                      </label>
-
-                      {/* Dynamic Multiple Custom Clauses Section */}
-                      <div className="pt-3 border-t border-slate-100 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <label className="block text-xs font-bold text-slate-700">
-                            + Tambah Klausul Khusus Mandiri
-                          </label>
+                      {/* Preset Accelerator Pills */}
+                      <div className="p-2 bg-slate-100 rounded-2xl border border-slate-200/80 space-y-1.5">
+                        <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider block px-1 flex items-center gap-1">
+                          <Sliders className="w-3 h-3 text-blue-600" /> Preset Akselerator Cepat:
+                        </span>
+                        <div className="grid grid-cols-3 gap-1">
                           <button
                             type="button"
-                            onClick={handleAddCustomClause}
-                            className="text-xs text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1 bg-blue-50 px-2 py-1 rounded-lg border border-blue-200 transition-all"
+                            onClick={() => handleApplyPreset('web')}
+                            className="py-1.5 px-2 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-[10px] font-bold border border-slate-200 transition-all shadow-2xs"
                           >
-                            <Plus className="w-3.5 h-3.5" /> Tambah Klausul
+                            Preset Web/App
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleApplyPreset('design')}
+                            className="py-1.5 px-2 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-[10px] font-bold border border-slate-200 transition-all shadow-2xs"
+                          >
+                            Preset Desain
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleApplyPreset('all')}
+                            className="py-1.5 px-2 bg-white hover:bg-slate-50 text-blue-600 rounded-xl text-[10px] font-bold border border-blue-200 transition-all shadow-2xs"
+                          >
+                            Aktifkan Semua
                           </button>
                         </div>
-
-                        {customClauses.map((clause, idx) => (
-                          <div key={idx} className="flex items-center gap-2">
-                            <textarea
-                              rows={2}
-                              value={clause}
-                              onChange={(e) => handleCustomClauseChange(idx, e.target.value)}
-                              placeholder={`cth: Pihak Kedua wajib memberikan materi konten maksimal H+3 sejak SPK ditandatangani.`}
-                              className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all"
-                            />
-                            {customClauses.length > 1 && (
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveCustomClause(idx)}
-                                className="text-red-500 hover:text-red-700 p-2 hover:bg-red-50 rounded-lg transition-all"
-                                title="Hapus Klausul Ini"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            )}
-                          </div>
-                        ))}
                       </div>
+
+                      {/* Daftar Pasal Dinamis dengan Inline Edit & Enable/Disable Switch */}
+                      <div className="space-y-3 max-h-[360px] overflow-y-auto pr-1">
+                        {clauses
+                          .filter((c) => c.docType === activeDocTab)
+                          .map((clause) => (
+                            <div
+                              key={clause.id}
+                              className={`p-3 rounded-2xl border transition-all space-y-2 ${
+                                clause.isEnabled
+                                  ? 'bg-white border-slate-200 shadow-xs'
+                                  : 'bg-slate-50/70 border-slate-200/60 opacity-60'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={clause.isEnabled}
+                                    onChange={() => handleToggleClause(clause.id)}
+                                    className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4"
+                                  />
+                                  <span className="text-xs font-bold text-slate-900">
+                                    {clause.isEnabled ? 'Aktif' : 'Nonaktif'}
+                                  </span>
+                                </label>
+
+                                <div className="flex items-center gap-1">
+                                  {clause.isCustom && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveClause(clause.id)}
+                                      className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded-lg transition-all"
+                                      title="Hapus Pasal Ini"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+
+                              <input
+                                type="text"
+                                value={clause.title}
+                                onChange={(e) => handleUpdateClauseTitle(clause.id, e.target.value)}
+                                placeholder="Judul Pasal"
+                                className="w-full px-2.5 py-1.5 text-xs font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              />
+
+                              <textarea
+                                rows={2}
+                                value={clause.content}
+                                onChange={(e) => handleUpdateClauseContent(clause.id, e.target.value)}
+                                placeholder="Isi kalimat pasal..."
+                                className="w-full px-2.5 py-1.5 text-[11px] text-slate-600 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 leading-relaxed"
+                              />
+                            </div>
+                          ))}
+                      </div>
+
+                      {/* Tombol Tambah Pasal Khusus */}
+                      <button
+                        type="button"
+                        onClick={handleAddCustomClause}
+                        className="w-full py-2.5 bg-blue-50 hover:bg-blue-100/80 text-blue-600 font-bold text-xs rounded-xl border border-blue-200 transition-all flex items-center justify-center gap-1.5"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>+ Tambah Pasal Khusus ({activeDocTab})</span>
+                      </button>
                     </div>
                   )}
 
@@ -1618,247 +1887,34 @@ export default function Home() {
                           </div>
                         </div>
 
-                        {/* Document Clauses Standard Structure */}
+                        {/* PENOMORAN PASAL OTOMATIS BERDASARKAN ARRAY STATE (AUTO-NUMBERING) */}
                         <div className="space-y-2 sm:space-y-2.5">
-                          {/* === SPK PASAL STANDAR === */}
-                          {activeDocTab === 'SPK' && (
-                            <>
-                              <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
+                          {clauses
+                            .filter((c) => c.docType === activeDocTab && c.isEnabled)
+                            .map((clause, index) => (
+                              <div key={clause.id} className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
                                 <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
-                                  <span className="w-2 h-2 rounded-full bg-blue-600" />
-                                  Pasal 1 — Ruang Lingkup Pekerjaan
+                                  <span
+                                    className={`w-2 h-2 rounded-full ${
+                                      activeDocTab === 'SPK'
+                                        ? 'bg-blue-600'
+                                        : activeDocTab === 'NDA'
+                                        ? 'bg-indigo-600'
+                                        : 'bg-purple-600'
+                                    }`}
+                                  />
+                                  {activeDocTab === 'BAST'
+                                    ? `Poin ${index + 1} — ${clause.title}`
+                                    : `Pasal ${index + 1} — ${clause.title}`}
                                 </h3>
                                 <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
-                                  PIHAK PERTAMA berkewajiban melaksanakan pekerjaan <strong>"{projectTitle || 'Pengembangan Aplikasi Web & API Integration'}"</strong> sesuai dengan acuan spesifikasi teknis dan deliverables yang telah disepakati bersama PIHAK KEDUA.
+                                  {clause.content}
                                 </p>
                               </div>
-
-                              <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
-                                <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
-                                  <span className="w-2 h-2 rounded-full bg-blue-600" />
-                                  Pasal 2 — Jangka Waktu & Timeline Pekerjaan
-                                </h3>
-                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
-                                  Pelaksanaan pekerjaan dimulai sejak Uang Muka (DP) diterima oleh PIHAK PERTAMA. Timeline pekerjaan, milestone penyerahan, dan tanggal penyelesaian proyek wajib dipatuhi oleh Para Pihak.
-                                </p>
-                              </div>
-
-                              <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
-                                <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
-                                  <span className="w-2 h-2 rounded-full bg-blue-600" />
-                                  Pasal 3 — Imbalan Jasa & Skema Pembayaran
-                                </h3>
-                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
-                                  Total imbalan jasa yang disepakati sebesar <strong>Rp {formatRupiah(projectAmount || '7500000')}</strong>, dengan Uang Muka (DP) sebesar <strong>{dpPercent || '50'}%</strong> wajib dibayarkan sebelum pengerjaan dimulai melalui transfer ke <strong>{bankInfo || 'BCA 1234567890 a.n budi'}</strong>.
-                                </p>
-                              </div>
-
-                              <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
-                                <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
-                                  <span className="w-2 h-2 rounded-full bg-blue-600" />
-                                  Pasal 4 — Ketentuan Revisi & SLA Feedback
-                                </h3>
-                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
-                                  Revisi pekerjaan dibatasi maksimal 2 (dua) kali sesuai cakupan kesepakatan awal. Evaluasi atau feedback dari PIHAK KEDUA wajib diberikan maksimal 5 (lima) hari kerja; jika melebihi batas waktu tersebut, pekerjaan dianggap disetujui secara otomatis (auto-approved).
-                                </p>
-                              </div>
-
-                              <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
-                                <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
-                                  <span className="w-2 h-2 rounded-full bg-blue-600" />
-                                  Pasal 5 — Retensi Hak Milik & Master File
-                                </h3>
-                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
-                                  Seluruh file master, aset Figma, serta Source Code aplikasi tetap menjadi hak milik PIHAK PERTAMA dan baru akan diserahkan secara penuh kepada PIHAK KEDUA setelah sisa pembayaran dilunasi 100%.
-                                </p>
-                              </div>
-
-                              <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
-                                <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
-                                  <span className="w-2 h-2 rounded-full bg-blue-600" />
-                                  Pasal 6 — Pembatalan & DP Non-Refundable
-                                </h3>
-                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
-                                  Sesuai ketentuan Pasal 1464 KUHPerdata, apabila pembatalan perjanjian dilakukan secara sepihak oleh PIHAK KEDUA, maka Uang Muka (DP) yang telah dibayarkan dianggap hangus dan tidak dapat ditarik kembali (non-refundable).
-                                </p>
-                              </div>
-
-                              <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
-                                <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
-                                  <span className="w-2 h-2 rounded-full bg-blue-600" />
-                                  Pasal 7 — Keadaan Memaksa (Force Majeure)
-                                </h3>
-                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
-                                  Segala keterlambatan atau kegagalan pelaksanaan kewajiban akibat peristiwa di luar kendali wajar Para Pihak (seperti bencana alam, perang, pandemi, atau regulasi resmi pemerintah) dibebaskan dari tuntutan ganti rugi.
-                                </p>
-                              </div>
-
-                              <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
-                                <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
-                                  <span className="w-2 h-2 rounded-full bg-blue-600" />
-                                  Pasal 8 — Akses Server & Layanan Pihak Ketiga
-                                </h3>
-                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
-                                  PIHAK KEDUA wajib menyediakan akses kredensial server/hosting/API yang diperlukan. Seluruh biaya lisensi layanan pihak ketiga berbayar (seperti domain, hosting, API premium, atau plugin) berada di luar nilai imbalan SPK dan ditanggung penuh oleh PIHAK KEDUA.
-                                </p>
-                              </div>
-
-                              <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
-                                <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
-                                  <span className="w-2 h-2 rounded-full bg-blue-600" />
-                                  Pasal 9 — Hak Cipta Portofolio & Penyelesaian Sengketa
-                                </h3>
-                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
-                                  PIHAK PERTAMA berhak menampilkan hasil karya visual/desain sebagai portofolio profesional selama tidak melanggar kerahasiaan NDA. Setiap sengketa akan diselesaikan secara musyawarah, dan apabila tidak tercapai kesepakatan, diselesaikan melalui domisili Pengadilan Negeri yang berwenang.
-                                </p>
-                              </div>
-
-                              {customClauses.some((c) => c.trim() !== '') && (
-                                <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
-                                  <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
-                                    <span className="w-2 h-2 rounded-full bg-blue-600" />
-                                    Pasal 10 — Ketentuan Khusus Tambahan
-                                  </h3>
-                                  <ul className="list-disc pl-6 sm:pl-7 space-y-1 text-slate-700 text-[12px] sm:text-[13px] font-normal">
-                                    {customClauses.map((c, idx) => c.trim() !== '' ? <li key={idx}>{c}</li> : null)}
-                                  </ul>
-                                </div>
-                              )}
-                            </>
-                          )}
-
-                          {/* === NDA PASAL STANDAR === */}
-                          {activeDocTab === 'NDA' && (
-                            <>
-                              <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
-                                <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
-                                  <span className="w-2 h-2 rounded-full bg-indigo-600" />
-                                  Pasal 1 — Definisi Informasi Rahasia
-                                </h3>
-                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
-                                  Sesuai UU No. 30 Tahun 2000 tentang Rahasia Dagang, Informasi Rahasia mencakup seluruh data teknis, <strong>"{ndaScope || 'Source Code, Skema Database, Aset Desain Figma, & Strategi Bisnis'}"</strong>, kode sumber, strategi pemasaran, serta data finansial yang diberikan oleh Pemilik Informasi.
-                                </p>
-                              </div>
-
-                              <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
-                                <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
-                                  <span className="w-2 h-2 rounded-full bg-indigo-600" />
-                                  Pasal 2 — Kewajiban & Pembatasan Kerahasiaan
-                                </h3>
-                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
-                                  Penerima Informasi dilarang keras mengungkapkan, menggandakan, menyebarluaskan, atau memanfaatkan Informasi Rahasia kepada pihak ketiga mana pun tanpa persetujuan tertulis terlebih dahulu dari Pemilik Informasi.
-                                </p>
-                              </div>
-
-                              <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
-                                <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
-                                  <span className="w-2 h-2 rounded-full bg-indigo-600" />
-                                  Pasal 3 — Pengecualian Kerahasiaan
-                                </h3>
-                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
-                                  Kewajiban kerahasiaan tidak berlaku atas informasi yang: (a) telah menjadi milik umum (public domain) tanpa pelanggaran NDA; (b) telah diketahui sebelumnya secara sah; atau (c) wajib dibuka berdasarkan perintah hukum / keputusan Pengadilan.
-                                </p>
-                              </div>
-
-                              <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
-                                <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
-                                  <span className="w-2 h-2 rounded-full bg-indigo-600" />
-                                  Pasal 4 — Jangka Waktu Kerahasiaan
-                                </h3>
-                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
-                                  Kewajiban menjaga kerahasiaan ini berlaku efektif sejak tanggal penandatanganan dan tetap mengikat Para Pihak selama <strong>{ndaYears || '2'} (dua) tahun</strong> setelah hubungan kerja sama berakhir.
-                                </p>
-                              </div>
-
-                              <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
-                                <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
-                                  <span className="w-2 h-2 rounded-full bg-indigo-600" />
-                                  Pasal 5 — Pengembalian & Pemusnahan Aset Data
-                                </h3>
-                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
-                                  Setelah pengerjaan proyek selesai atau atas permintaan tertulis Pemilik Informasi, Penerima Informasi wajib mengembalikan seluruh fisik dokumen dan memusnahkan/menghapus file digital yang mengandung Informasi Rahasia.
-                                </p>
-                              </div>
-
-                              <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
-                                <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
-                                  <span className="w-2 h-2 rounded-full bg-indigo-600" />
-                                  Pasal 6 — Sanksi Pelanggaran & Denda Finansial
-                                </h3>
-                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
-                                  Setiap bentuk kebocoran atau pelanggaran kerahasiaan dikenakan denda penalti finansial sebesar <strong>Rp {formatRupiah(ndaPenalty || '25000000')}</strong> serta hak untuk menuntut ganti rugi materiil/immateriil sesuai ketentuan hukum perdata.
-                                </p>
-                              </div>
-
-                              <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
-                                <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
-                                  <span className="w-2 h-2 rounded-full bg-indigo-600" />
-                                  Pasal 7 — Penyelesaian Sengketa
-                                </h3>
-                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
-                                  Setiap perselisihan yang timbul dari pelaksanaan NDA ini diselesaikan melalui musyawarah untuk mufakat, dan apabila gagal, diselesaikan di forum hukum Pengadilan Negeri setempat.
-                                </p>
-                              </div>
-                            </>
-                          )}
-
-                          {/* === BAST PASAL STANDAR === */}
-                          {activeDocTab === 'BAST' && (
-                            <>
-                              <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
-                                <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
-                                  <span className="w-2 h-2 rounded-full bg-purple-600" />
-                                  Poin 1 — Identitas & Referensi Kontrak Utama
-                                </h3>
-                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
-                                  Berita Acara ini diterbitkan sebagai bukti administratif sah yang merujuk pada kesepakatan Perjanjian Kerja Sama (SPK) Utama dengan Nomor Referensi: <strong>"{bastRef || '001/SPK/IX/2026'}"</strong>.
-                                </p>
-                              </div>
-
-                              <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
-                                <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
-                                  <span className="w-2 h-2 rounded-full bg-purple-600" />
-                                  Poin 2 — Pernyataan Serah Terima Pekerjaan
-                                </h3>
-                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
-                                  PIHAK PERTAMA menyatakan telah menyerahkan seluruh hasil pengerjaan proyek, dan PIHAK KEDUA menyatakan telah menerima pengerjaan tersebut secara resmi pada tanggal <strong>{bastDate || '25 September 2026'}</strong>.
-                                </p>
-                              </div>
-
-                              <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
-                                <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
-                                  <span className="w-2 h-2 rounded-full bg-purple-600" />
-                                  Poin 3 — Hasil Pemeriksaan & Quality Check
-                                </h3>
-                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
-                                  PIHAK KEDUA telah melakukan pemeriksaan komprehensif terhadap seluruh fitur, desain, dan deliverables, serta mengonfirmasi bahwa hasil pekerjaan telah sesuai dengan standar spesifikasi teknis SPK.
-                                </p>
-                              </div>
-
-                              <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
-                                <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
-                                  <span className="w-2 h-2 rounded-full bg-purple-600" />
-                                  Poin 4 — Masa Garansi & Pemeliharaan Bug
-                                </h3>
-                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
-                                  PIHAK PERTAMA memberikan garansi pemeliharaan perbaikan kendala teknis / bug secara gratis selama <strong>{bastWarranty || '14'} (empat belas) hari kerja</strong> terhitung sejak penandatanganan BAST ini.
-                                </p>
-                              </div>
-
-                              <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
-                                <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
-                                  <span className="w-2 h-2 rounded-full bg-purple-600" />
-                                  Poin 5 — Pengesahan Hak Pelunasan Pembayaran
-                                </h3>
-                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
-                                  Dengan ditandatanganinya BAST ini, kewajiban pengerjaan PIHAK PERTAMA dinyatakan selesai sempurna, dan PIHAK PERTAMA berhak penuh atas pencairan pelunasan 100% dari PIHAK KEDUA.
-                                </p>
-                              </div>
-                            </>
-                          )}
+                            ))}
                         </div>
 
-                        {/* Kolom Tanda Tangan Utama di Halaman 1 (Hanya Jika Konten Muat 1 Halaman) */}
+                        {/* Kolom Tanda Tangan Utama di Halaman 1 (Jika Konten Muat 1 Halaman) */}
                         {!needsPage2 && (
                           <div className="pt-2 sm:pt-3 grid grid-cols-2 gap-3 sm:gap-4 text-center">
                             <div className="bg-slate-50/80 border border-slate-200/80 rounded-xl p-2.5 sm:p-3 space-y-1.5">
@@ -2232,7 +2288,7 @@ export default function Home() {
                   </p>
                 </div>
 
-                {/* BANNER PERINGATAN KUNING / AMBER UNTUK PROSES PEMBAYARAN */}
+                {/* BANNER PERINGATAN KUNING / AMBER TEGAS */}
                 <div className="bg-amber-50 border-2 border-amber-300 text-amber-900 p-3.5 rounded-2xl text-[11px] text-left leading-relaxed font-medium space-y-1 shadow-xs">
                   <div className="flex items-center gap-1.5 font-bold text-amber-900">
                     <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
