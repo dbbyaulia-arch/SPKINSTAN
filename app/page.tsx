@@ -1347,7 +1347,7 @@ export default function Home() {
                             type="email"
                             value={freelancerEmail}
                             onChange={(e) => setFreelancerEmail(e.target.value)}
-                            placeholder="cth: debby@gmail.com"
+                            placeholder="cth: budi@gmail.com"
                             className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                           />
                         </div>
@@ -2140,7 +2140,7 @@ export default function Home() {
                             Paraf II: [ {signatureSecondParty ? <img src={signatureSecondParty} alt="Paraf II" className="h-3 sm:h-4 inline-block object-contain" /> : '___'} ]
                           </span>
                           <span className="font-mono">Hal 2 dari 2</span>
-                          <span className="hidden sm:inline font-mono">SPKInstan Legal Document</span>
+
                         </div>
                       </div>
                     )}
