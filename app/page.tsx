@@ -679,7 +679,7 @@ export default function Home() {
     'Legalisasi & Tanda Tangan'
   ];
 
-  // Penentuan Halaman 2 Dinamis (Solusi 2: Menghitung akumulasi total seluruh klausul aktif)
+  // Penentuan Halaman 2 Dinamis (Pecah Halaman HANYA jika klausul aktif > 6)
   const activeCustomClausesCount = customClauses.filter((c) => c.trim() !== '').length;
   const totalActiveClauses = 
     (clauseRevision ? 1 : 0) + 
@@ -688,7 +688,7 @@ export default function Home() {
     (clauseDp ? 1 : 0) + 
     activeCustomClausesCount;
 
-  const needsPage2 = activeDocTab === 'SPK' ? totalActiveClauses > 3 : false;
+  const needsPage2 = activeDocTab === 'SPK' ? totalActiveClauses > 6 : false;
   const totalPages = needsPage2 ? 2 : 1;
 
   return (
@@ -1501,7 +1501,7 @@ export default function Home() {
                       !paidDocs[activeDocTab] ? 'select-none' : ''
                     }`}
                   >
-                    {/* === HALAMAN 1 (Solusi 1: Menerapkan min-h-[1123px] h-auto tanpa overflow-hidden) === */}
+                    {/* === HALAMAN 1 (Single Page First Layout) === */}
                     <div
                       className="a4-page w-full max-w-[794px] min-h-[1123px] h-auto bg-white text-slate-900 font-sans p-6 sm:p-10 relative flex flex-col justify-between shadow-xl rounded-xl border border-slate-200 shrink-0"
                     >
@@ -1514,7 +1514,6 @@ export default function Home() {
                         </div>
                       )}
 
-                      {/* Solusi 3: Mengoptimalkan spacing vertikal (space-y-2.5 sm:space-y-3.5) */}
                       <div className="space-y-2.5 sm:space-y-3.5 text-[12px] sm:text-[13px] leading-relaxed text-slate-700 relative z-10">
                         {/* Header Top Accent Floating Bar */}
                         <div className="h-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 w-full rounded-full shadow-xs mb-3" />
@@ -1573,7 +1572,7 @@ export default function Home() {
                           </div>
                         </div>
 
-                        {/* Document Clauses - Page 1 (Solusi 3: Padding kartu p-2 sm:p-2.5) */}
+                        {/* Document Clauses */}
                         <div className="space-y-2.5 sm:space-y-3">
                           {activeDocTab === 'SPK' && (
                             <>
@@ -1648,7 +1647,7 @@ export default function Home() {
                           )}
                         </div>
 
-                        {/* Jika Tidak Membutuhkan Halaman 2, Satukan Pasal 3 & TTD Langsung di Halaman 1 */}
+                        {/* Jika Tidak Membutuhkan Halaman 2 (klausul <= 6), Seluruh Isi Tampil di Halaman 1 */}
                         {!needsPage2 && (
                           <>
                             {activeDocTab === 'SPK' && (
@@ -1693,7 +1692,7 @@ export default function Home() {
                               </div>
                             )}
 
-                            {/* Solusi 3: Kolom Tanda Tangan Utama Ringkas (h-8 sm:h-12) */}
+                            {/* Kolom Tanda Tangan Utama di Halaman 1 */}
                             <div className="pt-2 sm:pt-4 grid grid-cols-2 gap-3 sm:gap-4 text-center font-sans">
                               <div className="bg-slate-50/80 border border-slate-200/80 rounded-2xl p-2.5 sm:p-3 space-y-1.5 sm:space-y-2">
                                 <span className="text-[9px] sm:text-[10px] font-extrabold text-blue-600 uppercase tracking-wider block">
@@ -1751,7 +1750,7 @@ export default function Home() {
                       </div>
                     </div>
 
-                    {/* === HALAMAN 2 (Solusi 1: min-h-[1123px] h-auto tanpa overflow-hidden) === */}
+                    {/* === HALAMAN 2 (Hanya Aktif Jika Total Klausul > 6) === */}
                     {needsPage2 && (
                       <div
                         className="a4-page w-full max-w-[794px] min-h-[1123px] h-auto bg-white text-slate-900 font-sans p-6 sm:p-10 relative flex flex-col justify-between shadow-xl rounded-xl border border-slate-200 shrink-0"
@@ -2110,7 +2109,7 @@ export default function Home() {
                   </span>
                 </div>
 
-                {/* Indikator Status & Notifikasi Sedang Dipproses */}
+                {/* Indikator Status & Notifikasi Sedang Diproses */}
                 {isProcessingSuccess ? (
                   <div className="bg-emerald-600 text-white p-4 rounded-2xl shadow-lg animate-pulse text-center space-y-1">
                     <div className="flex items-center justify-center gap-2 font-black text-sm">
