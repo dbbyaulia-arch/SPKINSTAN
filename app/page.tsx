@@ -679,9 +679,16 @@ export default function Home() {
     'Legalisasi & Tanda Tangan'
   ];
 
-  // Penentuan Halaman 2 Dinamis:
+  // Penentuan Halaman 2 Dinamis (Solusi 2: Menghitung akumulasi total seluruh klausul aktif)
   const activeCustomClausesCount = customClauses.filter((c) => c.trim() !== '').length;
-  const needsPage2 = activeDocTab === 'SPK' ? activeCustomClausesCount > 2 : false;
+  const totalActiveClauses = 
+    (clauseRevision ? 1 : 0) + 
+    (clauseSla ? 1 : 0) + 
+    (clauseRetention ? 1 : 0) + 
+    (clauseDp ? 1 : 0) + 
+    activeCustomClausesCount;
+
+  const needsPage2 = activeDocTab === 'SPK' ? totalActiveClauses > 3 : false;
   const totalPages = needsPage2 ? 2 : 1;
 
   return (
@@ -1483,7 +1490,7 @@ export default function Home() {
                 </div>
 
                 {/* Wrapper Responsif UI + Presisi Mutlak saat PDF Canvas */}
-                <div className="w-full bg-slate-300/40 p-2 sm:p-6 rounded-3xl border border-slate-200 flex justify-center items-center overflow-x-auto">
+                <div className="w-full bg-slate-300/40 p-2 sm:p-6 rounded-3xl border border-slate-200 flex justify-center items-center overflow-x-auto pb-4">
                   <div
                     id="a4-document-preview"
                     onContextMenu={(e) => e.preventDefault()}
@@ -1494,9 +1501,9 @@ export default function Home() {
                       !paidDocs[activeDocTab] ? 'select-none' : ''
                     }`}
                   >
-                    {/* === HALAMAN 1 (A4 Responsif di Layar, Presisi Mutlak di PDF) === */}
+                    {/* === HALAMAN 1 (Solusi 1: Menerapkan min-h-[1123px] h-auto tanpa overflow-hidden) === */}
                     <div
-                      className="a4-page w-full max-w-[794px] aspect-[1/1.414] bg-white text-slate-900 font-sans p-6 sm:p-10 relative flex flex-col justify-between shadow-xl rounded-xl border border-slate-200 overflow-hidden shrink-0"
+                      className="a4-page w-full max-w-[794px] min-h-[1123px] h-auto bg-white text-slate-900 font-sans p-6 sm:p-10 relative flex flex-col justify-between shadow-xl rounded-xl border border-slate-200 shrink-0"
                     >
                       {/* Watermark Overlay Minimalis Halaman 1 */}
                       {!paidDocs[activeDocTab] && (
@@ -1507,7 +1514,8 @@ export default function Home() {
                         </div>
                       )}
 
-                      <div className="space-y-4 sm:space-y-5 text-[12px] sm:text-[13px] leading-relaxed text-slate-700 relative z-10">
+                      {/* Solusi 3: Mengoptimalkan spacing vertikal (space-y-2.5 sm:space-y-3.5) */}
+                      <div className="space-y-2.5 sm:space-y-3.5 text-[12px] sm:text-[13px] leading-relaxed text-slate-700 relative z-10">
                         {/* Header Top Accent Floating Bar */}
                         <div className="h-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 w-full rounded-full shadow-xs mb-3" />
 
@@ -1565,11 +1573,11 @@ export default function Home() {
                           </div>
                         </div>
 
-                        {/* Document Clauses - Page 1 */}
+                        {/* Document Clauses - Page 1 (Solusi 3: Padding kartu p-2 sm:p-2.5) */}
                         <div className="space-y-2.5 sm:space-y-3">
                           {activeDocTab === 'SPK' && (
                             <>
-                              <div className="bg-white p-2.5 sm:p-3 rounded-2xl border border-slate-200/80 space-y-1">
+                              <div className="bg-white p-2 sm:p-2.5 rounded-2xl border border-slate-200/80 space-y-1">
                                 <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                                   <span className="w-2 h-2 rounded-full bg-blue-600" />
                                   Pasal 1 — Ruang Lingkup Pekerjaan
@@ -1579,7 +1587,7 @@ export default function Home() {
                                 </p>
                               </div>
 
-                              <div className="bg-white p-2.5 sm:p-3 rounded-2xl border border-slate-200/80 space-y-1">
+                              <div className="bg-white p-2 sm:p-2.5 rounded-2xl border border-slate-200/80 space-y-1">
                                 <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                                   <span className="w-2 h-2 rounded-full bg-blue-600" />
                                   Pasal 2 — Nilai Pekerjaan & Skema Pembayaran
@@ -1593,7 +1601,7 @@ export default function Home() {
 
                           {activeDocTab === 'NDA' && (
                             <>
-                              <div className="bg-white p-2.5 sm:p-3 rounded-2xl border border-slate-200/80 space-y-1">
+                              <div className="bg-white p-2 sm:p-2.5 rounded-2xl border border-slate-200/80 space-y-1">
                                 <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                                   <span className="w-2 h-2 rounded-full bg-indigo-600" />
                                   Pasal 1 — Cakupan Kerahasiaan
@@ -1603,7 +1611,7 @@ export default function Home() {
                                 </p>
                               </div>
 
-                              <div className="bg-white p-2.5 sm:p-3 rounded-2xl border border-slate-200/80 space-y-1">
+                              <div className="bg-white p-2 sm:p-2.5 rounded-2xl border border-slate-200/80 space-y-1">
                                 <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                                   <span className="w-2 h-2 rounded-full bg-indigo-600" />
                                   Pasal 2 — Masa Berlaku & Denda Sanksi
@@ -1617,7 +1625,7 @@ export default function Home() {
 
                           {activeDocTab === 'BAST' && (
                             <>
-                              <div className="bg-white p-2.5 sm:p-3 rounded-2xl border border-slate-200/80 space-y-1">
+                              <div className="bg-white p-2 sm:p-2.5 rounded-2xl border border-slate-200/80 space-y-1">
                                 <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                                   <span className="w-2 h-2 rounded-full bg-purple-600" />
                                   Pasal 1 — Serah Terima Pekerjaan
@@ -1627,7 +1635,7 @@ export default function Home() {
                                 </p>
                               </div>
 
-                              <div className="bg-white p-2.5 sm:p-3 rounded-2xl border border-slate-200/80 space-y-1">
+                              <div className="bg-white p-2 sm:p-2.5 rounded-2xl border border-slate-200/80 space-y-1">
                                 <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                                   <span className="w-2 h-2 rounded-full bg-purple-600" />
                                   Pasal 2 — Masa Garansi Perbaikan
@@ -1645,7 +1653,7 @@ export default function Home() {
                           <>
                             {activeDocTab === 'SPK' && (
                               (clauseRevision || clauseSla || clauseRetention || clauseDp || customClauses.some((c) => c.trim() !== '')) && (
-                                <div className="bg-white p-2.5 sm:p-3 rounded-2xl border border-slate-200/80 space-y-1">
+                                <div className="bg-white p-2 sm:p-2.5 rounded-2xl border border-slate-200/80 space-y-1">
                                   <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                                     <span className="w-2 h-2 rounded-full bg-blue-600" />
                                     Pasal 3 — Syarat & Ketentuan Khusus
@@ -1662,7 +1670,7 @@ export default function Home() {
                             )}
 
                             {activeDocTab === 'NDA' && (
-                              <div className="bg-white p-2.5 sm:p-3 rounded-2xl border border-slate-200/80 space-y-1">
+                              <div className="bg-white p-2 sm:p-2.5 rounded-2xl border border-slate-200/80 space-y-1">
                                 <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                                   <span className="w-2 h-2 rounded-full bg-indigo-600" />
                                   Pasal 3 — Ketentuan Kerahasiaan Tambahan
@@ -1674,7 +1682,7 @@ export default function Home() {
                             )}
 
                             {activeDocTab === 'BAST' && (
-                              <div className="bg-white p-2.5 sm:p-3 rounded-2xl border border-slate-200/80 space-y-1">
+                              <div className="bg-white p-2 sm:p-2.5 rounded-2xl border border-slate-200/80 space-y-1">
                                 <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                                   <span className="w-2 h-2 rounded-full bg-purple-600" />
                                   Pasal 3 — Pengesahan & Retensi Hak
@@ -1685,19 +1693,19 @@ export default function Home() {
                               </div>
                             )}
 
-                            {/* Kolom Tanda Tangan Utama */}
+                            {/* Solusi 3: Kolom Tanda Tangan Utama Ringkas (h-8 sm:h-12) */}
                             <div className="pt-2 sm:pt-4 grid grid-cols-2 gap-3 sm:gap-4 text-center font-sans">
                               <div className="bg-slate-50/80 border border-slate-200/80 rounded-2xl p-2.5 sm:p-3 space-y-1.5 sm:space-y-2">
                                 <span className="text-[9px] sm:text-[10px] font-extrabold text-blue-600 uppercase tracking-wider block">
                                   PIHAK PERTAMA
                                 </span>
-                                <div className="h-10 sm:h-14 flex items-center justify-center">
+                                <div className="h-8 sm:h-12 flex items-center justify-center">
                                   {signatureFirstParty ? (
-                                    <img src={signatureFirstParty} alt="Tanda Tangan Pihak Pertama" className="max-h-10 sm:max-h-14 mx-auto object-contain" />
+                                    <img src={signatureFirstParty} alt="Tanda Tangan Pihak Pertama" className="max-h-8 sm:max-h-12 mx-auto object-contain" />
                                   ) : isExporting ? (
-                                    <div className="h-10 sm:h-14 w-full" />
+                                    <div className="h-8 sm:h-12 w-full" />
                                   ) : (
-                                    <div className="w-20 sm:w-28 h-7 sm:h-9 border border-dashed border-slate-300/80 rounded-lg flex items-center justify-center text-[9px] sm:text-[10px] text-slate-400">
+                                    <div className="w-20 sm:w-28 h-6 sm:h-8 border border-dashed border-slate-300/80 rounded-lg flex items-center justify-center text-[9px] sm:text-[10px] text-slate-400">
                                       [Tanda Tangan]
                                     </div>
                                   )}
@@ -1711,13 +1719,13 @@ export default function Home() {
                                 <span className="text-[9px] sm:text-[10px] font-extrabold text-indigo-600 uppercase tracking-wider block">
                                   PIHAK KEDUA
                                 </span>
-                                <div className="h-10 sm:h-14 flex items-center justify-center">
+                                <div className="h-8 sm:h-12 flex items-center justify-center">
                                   {signatureSecondParty ? (
-                                    <img src={signatureSecondParty} alt="Tanda Tangan Pihak Kedua" className="max-h-10 sm:max-h-14 mx-auto object-contain" />
+                                    <img src={signatureSecondParty} alt="Tanda Tangan Pihak Kedua" className="max-h-8 sm:max-h-12 mx-auto object-contain" />
                                   ) : isExporting ? (
-                                    <div className="h-10 sm:h-14 w-full" />
+                                    <div className="h-8 sm:h-12 w-full" />
                                   ) : (
-                                    <div className="w-20 sm:w-28 h-7 sm:h-9 border border-dashed border-slate-300/80 rounded-lg flex items-center justify-center text-[9px] sm:text-[10px] text-slate-400">
+                                    <div className="w-20 sm:w-28 h-6 sm:h-8 border border-dashed border-slate-300/80 rounded-lg flex items-center justify-center text-[9px] sm:text-[10px] text-slate-400">
                                       [Tanda Tangan]
                                     </div>
                                   )}
@@ -1743,10 +1751,10 @@ export default function Home() {
                       </div>
                     </div>
 
-                    {/* === HALAMAN 2 (A4 Responsif di Layar, Presisi Mutlak di PDF) === */}
+                    {/* === HALAMAN 2 (Solusi 1: min-h-[1123px] h-auto tanpa overflow-hidden) === */}
                     {needsPage2 && (
                       <div
-                        className="a4-page w-full max-w-[794px] aspect-[1/1.414] bg-white text-slate-900 font-sans p-6 sm:p-10 relative flex flex-col justify-between shadow-xl rounded-xl border border-slate-200 overflow-hidden shrink-0"
+                        className="a4-page w-full max-w-[794px] min-h-[1123px] h-auto bg-white text-slate-900 font-sans p-6 sm:p-10 relative flex flex-col justify-between shadow-xl rounded-xl border border-slate-200 shrink-0"
                       >
                         {/* Watermark Overlay Minimalis Halaman 2 */}
                         {!paidDocs[activeDocTab] && (
@@ -1757,13 +1765,13 @@ export default function Home() {
                           </div>
                         )}
 
-                        <div className="space-y-4 sm:space-y-6 text-[12px] sm:text-[13px] leading-relaxed text-slate-700 relative z-10">
+                        <div className="space-y-2.5 sm:space-y-3.5 text-[12px] sm:text-[13px] leading-relaxed text-slate-700 relative z-10">
                           {/* Header Top Accent Floating Bar */}
                           <div className="h-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 w-full rounded-full shadow-xs mb-4" />
 
                           {/* Document Clauses - Page 2 */}
                           {activeDocTab === 'SPK' && (
-                            <div className="bg-white p-3 sm:p-3.5 rounded-2xl border border-slate-200/80 space-y-1.5">
+                            <div className="bg-white p-2.5 sm:p-3 rounded-2xl border border-slate-200/80 space-y-1.5">
                               <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                                 <span className="w-2 h-2 rounded-full bg-blue-600" />
                                 Pasal 3 — Syarat & Ketentuan Khusus (Lanjutan)
@@ -1778,19 +1786,19 @@ export default function Home() {
                             </div>
                           )}
 
-                          {/* Signature Enclosure Boxes */}
+                          {/* Signature Enclosure Boxes Halaman 2 */}
                           <div className="pt-4 sm:pt-6 grid grid-cols-2 gap-3 sm:gap-4 text-center font-sans">
                             <div className="bg-slate-50/80 border border-slate-200/80 rounded-2xl p-3 sm:p-4 space-y-2 sm:space-y-3">
                               <span className="text-[9px] sm:text-[10px] font-extrabold text-blue-600 uppercase tracking-wider block">
                                 PIHAK PERTAMA
                               </span>
-                              <div className="h-12 sm:h-16 flex items-center justify-center">
+                              <div className="h-10 sm:h-14 flex items-center justify-center">
                                 {signatureFirstParty ? (
-                                  <img src={signatureFirstParty} alt="Tanda Tangan Pihak Pertama" className="max-h-12 sm:max-h-16 mx-auto object-contain" />
+                                  <img src={signatureFirstParty} alt="Tanda Tangan Pihak Pertama" className="max-h-10 sm:max-h-14 mx-auto object-contain" />
                                 ) : isExporting ? (
-                                  <div className="h-12 sm:h-16 w-full" />
+                                  <div className="h-10 sm:h-14 w-full" />
                                 ) : (
-                                  <div className="w-20 sm:w-28 h-8 sm:h-10 border border-dashed border-slate-300/80 rounded-lg flex items-center justify-center text-[9px] sm:text-[10px] text-slate-400">
+                                  <div className="w-20 sm:w-28 h-7 sm:h-9 border border-dashed border-slate-300/80 rounded-lg flex items-center justify-center text-[9px] sm:text-[10px] text-slate-400">
                                     [Tanda Tangan]
                                   </div>
                                 )}
@@ -1804,13 +1812,13 @@ export default function Home() {
                               <span className="text-[9px] sm:text-[10px] font-extrabold text-indigo-600 uppercase tracking-wider block">
                                 PIHAK KEDUA
                               </span>
-                              <div className="h-12 sm:h-16 flex items-center justify-center">
+                              <div className="h-10 sm:h-14 flex items-center justify-center">
                                 {signatureSecondParty ? (
-                                  <img src={signatureSecondParty} alt="Tanda Tangan Pihak Kedua" className="max-h-12 sm:max-h-16 mx-auto object-contain" />
+                                  <img src={signatureSecondParty} alt="Tanda Tangan Pihak Kedua" className="max-h-10 sm:max-h-14 mx-auto object-contain" />
                                 ) : isExporting ? (
-                                  <div className="h-12 sm:h-16 w-full" />
+                                  <div className="h-10 sm:h-14 w-full" />
                                 ) : (
-                                  <div className="w-20 sm:w-28 h-8 sm:h-10 border border-dashed border-slate-300/80 rounded-lg flex items-center justify-center text-[9px] sm:text-[10px] text-slate-400">
+                                  <div className="w-20 sm:w-28 h-7 sm:h-9 border border-dashed border-slate-300/80 rounded-lg flex items-center justify-center text-[9px] sm:text-[10px] text-slate-400">
                                     [Tanda Tangan]
                                   </div>
                                 )}
