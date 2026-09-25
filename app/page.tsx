@@ -155,12 +155,7 @@ export default function Home() {
     if (isExporting) return;
 
     // Batas tinggi maksimal area isi teks Halaman 1 sebelum butuh Halaman 2 (dalam piksel)
-    const MAX_PAGE_CONTENT_HEIGHT = 870;
-
-    if (activeDocTab !== 'SPK') {
-      if (needsPage2) setNeedsPage2(false);
-      return;
-    }
+    const MAX_PAGE_CONTENT_HEIGHT = 960;
 
     if (!needsPage2) {
       if (page1ContentRef.current) {
@@ -190,6 +185,12 @@ export default function Home() {
     projectAmount,
     dpPercent,
     bankInfo,
+    ndaScope,
+    ndaYears,
+    ndaPenalty,
+    bastRef,
+    bastWarranty,
+    bastDate,
     signerFirstParty,
     signerSecondParty,
     signatureFirstParty,
@@ -1622,7 +1623,7 @@ export default function Home() {
                           </div>
                         </div>
 
-                        {/* Document Clauses */}
+                        {/* Document Clauses - Tetap Berada di Halaman 1 */}
                         <div className="space-y-2.5 sm:space-y-3">
                           {activeDocTab === 'SPK' && (
                             <>
@@ -1645,6 +1646,22 @@ export default function Home() {
                                   Total imbalan sebesar <strong>Rp {formatRupiah(projectAmount || '7500000')}</strong> dengan Uang Muka (DP) <strong>{dpPercent || '50'}%</strong> via transfer ke <strong>{bankInfo || 'BCA 1234567890 a.n Debby Aulia'}</strong>.
                                 </p>
                               </div>
+
+                              {(clauseRevision || clauseSla || clauseRetention || clauseDp || customClauses.some((c) => c.trim() !== '')) && (
+                                <div className="bg-white p-2 sm:p-2.5 rounded-2xl border border-slate-200/80 space-y-1">
+                                  <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                                    <span className="w-2 h-2 rounded-full bg-blue-600" />
+                                    Pasal 3 — Syarat & Ketentuan Khusus
+                                  </h3>
+                                  <ul className="list-disc pl-6 sm:pl-7 space-y-0.5 text-slate-600 text-[10px] sm:text-[11px]">
+                                    {clauseRevision && <li>Revisi dibatasi maksimal 2 (dua) kali. Permintaan tambahan dianggap addendum terpisah.</li>}
+                                    {clauseSla && <li>Evaluasi feedback dari PIHAK KEDUA maksimal 5 hari kerja. Lebih dari itu dianggap disetujui otomatis.</li>}
+                                    {clauseRetention && <li>Master file/Source code diserahkan penuh setelah pembayaran lunas 100%.</li>}
+                                    {clauseDp && <li>DP tidak dapat dikembalikan (non-refundable) jika pembatalan berasal dari PIHAK KEDUA (Pasal 1464 KUHPerdata).</li>}
+                                    {customClauses.map((c, idx) => c.trim() !== '' ? <li key={idx}>{c}</li> : null)}
+                                  </ul>
+                                </div>
+                              )}
                             </>
                           )}
 
@@ -1667,6 +1684,16 @@ export default function Home() {
                                 </h3>
                                 <p className="text-slate-600 pl-3.5 text-[11px] sm:text-[12px]">
                                   Kerahasiaan dijaga selama <strong>{ndaYears || '2'} tahun</strong>. Pelanggaran dikenakan ganti rugi sebesar <strong>Rp {formatRupiah(ndaPenalty || '25000000')}</strong>.
+                                </p>
+                              </div>
+
+                              <div className="bg-white p-2 sm:p-2.5 rounded-2xl border border-slate-200/80 space-y-1">
+                                <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-indigo-600" />
+                                  Pasal 3 — Ketentuan Kerahasiaan Tambahan
+                                </h3>
+                                <p className="text-slate-600 pl-3.5 text-[10px] sm:text-[11px]">
+                                  Segala bentuk penggandaan, pembocoran, atau pemanfaatan informasi rahasia tanpa persetujuan tertulis dari PIHAK KEDUA akan ditindaklanjuti secara hukum sesuai regulasi KUHPerdata dan UU Rahasia Dagang yang berlaku di Indonesia.
                                 </p>
                               </div>
                             </>
@@ -1693,44 +1720,7 @@ export default function Home() {
                                   PIHAK PERTAMA memberikan garansi perbaikan bug selama <strong>{bastWarranty || '14'} hari kerja</strong> terhitung sejak tanggal penandatanganan ini.
                                 </p>
                               </div>
-                            </>
-                          )}
-                        </div>
 
-                        {/* Jika Konten Pas Muat dalam 1 Halaman (needsPage2 === false) */}
-                        {!needsPage2 && (
-                          <>
-                            {activeDocTab === 'SPK' && (
-                              (clauseRevision || clauseSla || clauseRetention || clauseDp || customClauses.some((c) => c.trim() !== '')) && (
-                                <div className="bg-white p-2 sm:p-2.5 rounded-2xl border border-slate-200/80 space-y-1">
-                                  <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                                    <span className="w-2 h-2 rounded-full bg-blue-600" />
-                                    Pasal 3 — Syarat & Ketentuan Khusus
-                                  </h3>
-                                  <ul className="list-disc pl-6 sm:pl-7 space-y-0.5 text-slate-600 text-[10px] sm:text-[11px]">
-                                    {clauseRevision && <li>Revisi dibatasi maksimal 2 (dua) kali. Permintaan tambahan dianggap addendum terpisah.</li>}
-                                    {clauseSla && <li>Evaluasi feedback dari PIHAK KEDUA maksimal 5 hari kerja. Lebih dari itu dianggap disetujui otomatis.</li>}
-                                    {clauseRetention && <li>Master file/Source code diserahkan penuh setelah pembayaran lunas 100%.</li>}
-                                    {clauseDp && <li>DP tidak dapat dikembalikan (non-refundable) jika pembatalan berasal dari PIHAK KEDUA (Pasal 1464 KUHPerdata).</li>}
-                                    {customClauses.map((c, idx) => c.trim() !== '' ? <li key={idx}>{c}</li> : null)}
-                                  </ul>
-                                </div>
-                              )
-                            )}
-
-                            {activeDocTab === 'NDA' && (
-                              <div className="bg-white p-2 sm:p-2.5 rounded-2xl border border-slate-200/80 space-y-1">
-                                <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                                  <span className="w-2 h-2 rounded-full bg-indigo-600" />
-                                  Pasal 3 — Ketentuan Kerahasiaan Tambahan
-                                </h3>
-                                <p className="text-slate-600 pl-3.5 text-[10px] sm:text-[11px]">
-                                  Segala bentuk penggandaan, pembocoran, atau pemanfaatan informasi rahasia tanpa persetujuan tertulis dari PIHAK KEDUA akan ditindaklanjuti secara hukum sesuai regulasi KUHPerdata dan UU Rahasia Dagang yang berlaku di Indonesia.
-                                </p>
-                              </div>
-                            )}
-
-                            {activeDocTab === 'BAST' && (
                               <div className="bg-white p-2 sm:p-2.5 rounded-2xl border border-slate-200/80 space-y-1">
                                 <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                                   <span className="w-2 h-2 rounded-full bg-purple-600" />
@@ -1740,51 +1730,53 @@ export default function Home() {
                                   Dengan ditandatanganinya Berita Acara ini, PIHAK KEDUA menyatakan telah menerima seluruh hasil pekerjaan dengan baik dan PIHAK PERTAMA berhak penuh atas pelunasan sisa tagihan sesuai perjanjian awal.
                                 </p>
                               </div>
-                            )}
+                            </>
+                          )}
+                        </div>
 
-                            {/* Kolom Tanda Tangan Utama di Halaman 1 */}
-                            <div className="pt-2 sm:pt-4 grid grid-cols-2 gap-3 sm:gap-4 text-center font-sans">
-                              <div className="bg-slate-50/80 border border-slate-200/80 rounded-2xl p-2.5 sm:p-3 space-y-1.5 sm:space-y-2">
-                                <span className="text-[9px] sm:text-[10px] font-extrabold text-blue-600 uppercase tracking-wider block">
-                                  PIHAK PERTAMA
-                                </span>
-                                <div className="h-8 sm:h-12 flex items-center justify-center">
-                                  {signatureFirstParty ? (
-                                    <img src={signatureFirstParty} alt="Tanda Tangan Pihak Pertama" className="max-h-8 sm:max-h-12 mx-auto object-contain" />
-                                  ) : isExporting ? (
-                                    <div className="h-8 sm:h-12 w-full" />
-                                  ) : (
-                                    <div className="w-20 sm:w-28 h-6 sm:h-8 border border-dashed border-slate-300/80 rounded-lg flex items-center justify-center text-[9px] sm:text-[10px] text-slate-400">
-                                      [Tanda Tangan]
-                                    </div>
-                                  )}
-                                </div>
-                                <p className="font-bold underline text-slate-900 text-[11px] sm:text-xs">
-                                  {signerFirstParty || freelancerName || 'Pihak Pertama'}
-                                </p>
+                        {/* Kolom Tanda Tangan Utama di Halaman 1 (Hanya Jika Konten Muat 1 Halaman) */}
+                        {!needsPage2 && (
+                          <div className="pt-2 sm:pt-4 grid grid-cols-2 gap-3 sm:gap-4 text-center font-sans">
+                            <div className="bg-slate-50/80 border border-slate-200/80 rounded-2xl p-2.5 sm:p-3 space-y-1.5 sm:space-y-2">
+                              <span className="text-[9px] sm:text-[10px] font-extrabold text-blue-600 uppercase tracking-wider block">
+                                PIHAK PERTAMA
+                              </span>
+                              <div className="h-8 sm:h-12 flex items-center justify-center">
+                                {signatureFirstParty ? (
+                                  <img src={signatureFirstParty} alt="Tanda Tangan Pihak Pertama" className="max-h-8 sm:max-h-12 mx-auto object-contain" />
+                                ) : isExporting ? (
+                                  <div className="h-8 sm:h-12 w-full" />
+                                ) : (
+                                  <div className="w-20 sm:w-28 h-6 sm:h-8 border border-dashed border-slate-300/80 rounded-lg flex items-center justify-center text-[9px] sm:text-[10px] text-slate-400">
+                                    [Tanda Tangan]
+                                  </div>
+                                )}
                               </div>
-
-                              <div className="bg-slate-50/80 border border-slate-200/80 rounded-2xl p-2.5 sm:p-3 space-y-1.5 sm:space-y-2">
-                                <span className="text-[9px] sm:text-[10px] font-extrabold text-indigo-600 uppercase tracking-wider block">
-                                  PIHAK KEDUA
-                                </span>
-                                <div className="h-8 sm:h-12 flex items-center justify-center">
-                                  {signatureSecondParty ? (
-                                    <img src={signatureSecondParty} alt="Tanda Tangan Pihak Kedua" className="max-h-8 sm:max-h-12 mx-auto object-contain" />
-                                  ) : isExporting ? (
-                                    <div className="h-8 sm:h-12 w-full" />
-                                  ) : (
-                                    <div className="w-20 sm:w-28 h-6 sm:h-8 border border-dashed border-slate-300/80 rounded-lg flex items-center justify-center text-[9px] sm:text-[10px] text-slate-400">
-                                      [Tanda Tangan]
-                                    </div>
-                                  )}
-                                </div>
-                                <p className="font-bold underline text-slate-900 text-[11px] sm:text-xs">
-                                  {signerSecondParty || clientName || 'Pihak Kedua'}
-                                </p>
-                              </div>
+                              <p className="font-bold underline text-slate-900 text-[11px] sm:text-xs">
+                                {signerFirstParty || freelancerName || 'Pihak Pertama'}
+                              </p>
                             </div>
-                          </>
+
+                            <div className="bg-slate-50/80 border border-slate-200/80 rounded-2xl p-2.5 sm:p-3 space-y-1.5 sm:space-y-2">
+                              <span className="text-[9px] sm:text-[10px] font-extrabold text-indigo-600 uppercase tracking-wider block">
+                                PIHAK KEDUA
+                              </span>
+                              <div className="h-8 sm:h-12 flex items-center justify-center">
+                                {signatureSecondParty ? (
+                                  <img src={signatureSecondParty} alt="Tanda Tangan Pihak Kedua" className="max-h-8 sm:max-h-12 mx-auto object-contain" />
+                                ) : isExporting ? (
+                                  <div className="h-8 sm:h-12 w-full" />
+                                ) : (
+                                  <div className="w-20 sm:w-28 h-6 sm:h-8 border border-dashed border-slate-300/80 rounded-lg flex items-center justify-center text-[9px] sm:text-[10px] text-slate-400">
+                                    [Tanda Tangan]
+                                  </div>
+                                )}
+                              </div>
+                              <p className="font-bold underline text-slate-900 text-[11px] sm:text-xs">
+                                {signerSecondParty || clientName || 'Pihak Kedua'}
+                              </p>
+                            </div>
+                          </div>
                         )}
                       </div>
 
@@ -1800,7 +1792,7 @@ export default function Home() {
                       </div>
                     </div>
 
-                    {/* === HALAMAN 2 (Hanya Otomatis Aktif Jika Konten Terdeteksi Overflow secara Real-time) === */}
+                    {/* === HALAMAN 2 (Hanya Otomatis Aktif Jika Konten Terdeteksi Overflow) === */}
                     {needsPage2 && (
                       <div
                         className="a4-page w-full max-w-[794px] min-h-[1123px] h-auto bg-white text-slate-900 font-sans p-6 sm:p-10 relative flex flex-col justify-between shadow-xl rounded-xl border border-slate-200 shrink-0"
@@ -1821,22 +1813,15 @@ export default function Home() {
                           {/* Header Top Accent Floating Bar */}
                           <div className="h-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 w-full rounded-full shadow-xs mb-4" />
 
-                          {/* Document Clauses - Page 2 */}
-                          {activeDocTab === 'SPK' && (
-                            <div className="bg-white p-2.5 sm:p-3 rounded-2xl border border-slate-200/80 space-y-1.5">
-                              <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                                <span className="w-2 h-2 rounded-full bg-blue-600" />
-                                Pasal 3 — Syarat & Ketentuan Khusus (Lanjutan)
-                              </h3>
-                              <ul className="list-disc pl-6 sm:pl-8 space-y-1 text-slate-600 text-[10px] sm:text-[12px]">
-                                {clauseRevision && <li>Revisi dibatasi maksimal 2 (dua) kali. Permintaan tambahan dianggap addendum terpisah.</li>}
-                                {clauseSla && <li>Evaluasi feedback dari PIHAK KEDUA maksimal 5 hari kerja. Lebih dari itu dianggap disetujui otomatis.</li>}
-                                {clauseRetention && <li>Master file/Source code diserahkan penuh setelah pembayaran lunas 100%.</li>}
-                                {clauseDp && <li>DP tidak dapat dikembalikan (non-refundable) jika pembatalan berasal dari PIHAK KEDUA (Pasal 1464 KUHPerdata).</li>}
-                                {customClauses.map((c, idx) => c.trim() !== '' ? <li key={idx}>{c}</li> : null)}
-                              </ul>
-                            </div>
-                          )}
+                          {/* Lembar Pengesahan Header */}
+                          <div className="bg-slate-50/80 p-3 sm:p-4 rounded-2xl border border-slate-200/80 space-y-1">
+                            <h3 className="text-xs sm:text-sm font-extrabold text-slate-900 uppercase tracking-wide">
+                              LEMBAR PENGESAHAN & PENANDATANGANAN
+                            </h3>
+                            <p className="text-slate-600 text-[11px] sm:text-[12px]">
+                              Demikian Perjanjian ini dibuat dan disepakati oleh Para Pihak dalam keadaan sadar tanpa paksaan dari pihak manapun untuk dipergunakan sebagaimana mestinya.
+                            </p>
+                          </div>
 
                           {/* Signature Enclosure Boxes Halaman 2 */}
                           <div className="pt-4 sm:pt-6 grid grid-cols-2 gap-3 sm:gap-4 text-center font-sans">
@@ -2348,7 +2333,7 @@ export default function Home() {
               onClick={() => setShowSuccessModal(false)}
               className="text-xs text-slate-400 hover:text-slate-600 pt-1 block mx-auto font-medium"
             >
-              Tutup Modal
+              selesai
             </button>
           </div>
         </div>
