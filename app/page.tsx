@@ -727,9 +727,9 @@ export default function Home() {
     let text = '';
 
     if (selectedPackage === 'BUNDLING' && !specificDoc) {
-      text = `Halo ${clientName || 'Pihak Kedua'},\n\nBerikut dikirimkan draf resmi *Paket Perjanjian Kerja Sama (SPK, NDA, & BAST)* untuk proyek "${projectTitle || 'Pekerjaan Jasa'}" yang telah diterbitkan secara legal.\n\n*Pihak Pertama:* ${freelancerName || 'Debby Aulia'}\n*Status Dokumen:* Sah (Terverifikasi Pelunasan PRO)\n\nMohon diperiksa dan ditandatangani kembali. Terima kasih!`;
+      text = `Halo ${clientName || 'Pihak Kedua'},\n\nBerikut dikirimkan draf resmi *Paket Perjanjian Kerja Sama (SPK, NDA, & BAST)* untuk proyek "${projectTitle || 'Pekerjaan Jasa'}" yang telah diterbitkan secara legal.\n\n*Pihak Pertama:* ${freelancerName || 'budi'}\n*Status Dokumen:* Sah (Terverifikasi Pelunasan PRO)\n\nMohon diperiksa dan ditandatangani kembali. Terima kasih!`;
     } else {
-      text = `Halo ${clientName || 'Pihak Kedua'},\n\nBerikut dikirimkan draf resmi *${targetDoc} Perjanjian Kerja Sama* untuk proyek "${projectTitle || 'Pekerjaan Jasa'}" yang telah diterbitkan secara legal.\n\n*Pihak Pertama:* ${freelancerName || 'Debby Aulia'}\n*Status Dokumen:* Sah (Terverifikasi Pelunasan)\n\nMohon diperiksa dan ditandatangani kembali. Terima kasih!`;
+      text = `Halo ${clientName || 'Pihak Kedua'},\n\nBerikut dikirimkan draf resmi *${targetDoc} Perjanjian Kerja Sama* untuk proyek "${projectTitle || 'Pekerjaan Jasa'}" yang telah diterbitkan secara legal.\n\n*Pihak Pertama:* ${freelancerName || 'budi'}\n*Status Dokumen:* Sah (Terverifikasi Pelunasan)\n\nMohon diperiksa dan ditandatangani kembali. Terima kasih!`;
     }
 
     window.open(`https://wa.me/${clientWa}?text=${encodeURIComponent(text)}`, '_blank');
@@ -1030,7 +1030,7 @@ export default function Home() {
                             type="text"
                             value={freelancerName}
                             onChange={(e) => setFreelancerName(e.target.value)}
-                            placeholder="cth: Debby Aulia"
+                            placeholder="cth: budi"
                             className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                           />
                         </div>
@@ -1143,7 +1143,8 @@ export default function Home() {
                               type="text"
                               value={bankInfo}
                               onChange={(e) => setBankInfo(e.target.value)}
-                              placeholder="cth: BCA 1234567890 a.n Debby Aulia"
+                              placeholder="cth: BCA 1234567890 a.n budi
+                              "
                               className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                             />
                           </div>
@@ -1352,7 +1353,7 @@ export default function Home() {
                             type="text"
                             value={signerFirstParty}
                             onChange={(e) => setSignerFirstParty(e.target.value)}
-                            placeholder={freelancerName || 'cth: Debby Aulia'}
+                            placeholder={freelancerName || 'cth: budi'}
                             className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                           />
                           <p className="text-[10px] text-slate-400 mt-1">
@@ -1638,7 +1639,7 @@ export default function Home() {
                                   Pasal 2 — Nilai Pekerjaan & Skema Pembayaran
                                 </h3>
                                 <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-relaxed font-normal">
-                                  Total imbalan sebesar <strong>Rp {formatRupiah(projectAmount || '7500000')}</strong> dengan Uang Muka (DP) <strong>{dpPercent || '50'}%</strong> via transfer ke <strong>{bankInfo || 'BCA 1234567890 a.n Debby Aulia'}</strong>.
+                                  Total imbalan sebesar <strong>Rp {formatRupiah(projectAmount || '7500000')}</strong> dengan Uang Muka (DP) <strong>{dpPercent || '50'}%</strong> via transfer ke <strong>{bankInfo || 'BCA 1234567890 a.n budi'}</strong>.
                                 </p>
                               </div>
 
