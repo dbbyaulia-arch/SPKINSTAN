@@ -839,7 +839,7 @@ export default function Home() {
               </h1>
 
               <p className="text-slate-500 text-xs sm:text-sm md:text-base font-medium leading-relaxed max-w-xl mx-auto">
-                Hasilkan SPK, NDA, & BAST sah dalam 2 menit. Bebas ghosting, kepastian pembayaran, dan revisi terstruktur langsung dari HP.
+                SPKInstan adalah platform LegalTech berbasis web yang membantu freelancer, creator, dan agensi mikro membuat dokumen perjanjian kerja sama (SPK, NDA, dan BAST) berstandar hukum perdata Indonesia secara instan, tanpa perlu login atau registrasi.
               </p>
 
               {/* Package Selector Pills */}
