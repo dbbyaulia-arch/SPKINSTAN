@@ -1143,8 +1143,7 @@ export default function Home() {
                               type="text"
                               value={bankInfo}
                               onChange={(e) => setBankInfo(e.target.value)}
-                              placeholder="cth: BCA 1234567890 a.n budi
-                              "
+                              placeholder="cth: BCA 1234567890 a.n budi"
                               className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                             />
                           </div>
@@ -1560,7 +1559,7 @@ export default function Home() {
                       {/* Konten Halaman 1 dengan Ref Pengukuran DOM */}
                       <div
                         ref={needsPage2 ? page1MainContentRef : page1ContentRef}
-                        className="space-y-3 sm:space-y-3.5 text-[12px] sm:text-[13px] leading-relaxed text-slate-700 relative z-10"
+                        className="space-y-3 sm:space-y-3.5 text-[12px] sm:text-[13px] leading-[1.5] text-slate-700 relative z-10"
                       >
                         {/* Header Top Accent Floating Bar */}
                         <div className="h-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 w-full rounded-full shadow-xs mb-3" />
@@ -1592,20 +1591,20 @@ export default function Home() {
 
                         {/* Document Title Block */}
                         <div className="border-l-4 border-blue-600 pl-3 sm:pl-4 py-0.5">
-                          <h2 className="text-[18px] sm:text-[20px] font-extrabold tracking-wide text-slate-900 uppercase">
+                          <h2 className="text-[18px] sm:text-[20px] font-extrabold tracking-wide text-slate-900 uppercase leading-[1.2]">
                             {activeDocTab === 'SPK' && 'PERJANJIAN KERJA SAMA PEKERJAAN JASA'}
                             {activeDocTab === 'NDA' && 'PERJANJIAN KERAHASIAAN INFORMASI (NDA)'}
                             {activeDocTab === 'BAST' && 'BERITA ACARA SERAH TERIMA PEKERJAAN (BAST)'}
                           </h2>
                           <p className="text-[11px] font-semibold text-slate-500">
-                            Dokumen Hukum Perikatan Perdata Resmi
+                            Dokumen Hukum Perikatan Perdata Resmi (KUHPerdata & UU Terkait)
                           </p>
                         </div>
 
                         {/* Parties Identification Paragraph */}
                         <div className="bg-slate-50/70 border border-slate-200/80 rounded-xl p-2.5 sm:p-3 space-y-1.5">
-                          <p className="text-slate-700 text-[12px] sm:text-[13px] leading-relaxed">
-                            Pada hari ini, <strong>{getTodayFormattedDate()}</strong>, yang bertanda tangan di bawah ini sepakat mengikatkan diri dalam perikatan hukum:
+                          <p className="text-slate-700 text-[12px] sm:text-[13px] leading-[1.5]">
+                            Pada hari ini, <strong>{getTodayFormattedDate()}</strong>, kami yang bertanda tangan di bawah ini secara sadar dan tanpa paksaan sepakat mengikatkan diri dalam perikatan hukum perdata:
                           </p>
                           <div className="grid grid-cols-2 gap-2 pt-0.5">
                             <div className="bg-white p-2 rounded-lg border border-slate-200/60">
@@ -1619,8 +1618,9 @@ export default function Home() {
                           </div>
                         </div>
 
-                        {/* Document Clauses - Tetap Berada di Halaman 1 */}
+                        {/* Document Clauses Standard Structure */}
                         <div className="space-y-2 sm:space-y-2.5">
+                          {/* === SPK PASAL STANDAR === */}
                           {activeDocTab === 'SPK' && (
                             <>
                               <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
@@ -1628,32 +1628,98 @@ export default function Home() {
                                   <span className="w-2 h-2 rounded-full bg-blue-600" />
                                   Pasal 1 — Ruang Lingkup Pekerjaan
                                 </h3>
-                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-relaxed font-normal">
-                                  PIHAK PERTAMA melaksanakan pekerjaan <strong>"{projectTitle || 'Pengembangan Aplikasi Web & API Integration'}"</strong> sesuai spesifikasi teknis yang disetujui PIHAK KEDUA.
+                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
+                                  PIHAK PERTAMA berkewajiban melaksanakan pekerjaan <strong>"{projectTitle || 'Pengembangan Aplikasi Web & API Integration'}"</strong> sesuai dengan acuan spesifikasi teknis dan deliverables yang telah disepakati bersama PIHAK KEDUA.
                                 </p>
                               </div>
 
                               <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
                                 <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
                                   <span className="w-2 h-2 rounded-full bg-blue-600" />
-                                  Pasal 2 — Nilai Pekerjaan & Skema Pembayaran
+                                  Pasal 2 — Jangka Waktu & Timeline Pekerjaan
                                 </h3>
-                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-relaxed font-normal">
-                                  Total imbalan sebesar <strong>Rp {formatRupiah(projectAmount || '7500000')}</strong> dengan Uang Muka (DP) <strong>{dpPercent || '50'}%</strong> via transfer ke <strong>{bankInfo || 'BCA 1234567890 a.n budi'}</strong>.
+                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
+                                  Pelaksanaan pekerjaan dimulai sejak Uang Muka (DP) diterima oleh PIHAK PERTAMA. Timeline pekerjaan, milestone penyerahan, dan tanggal penyelesaian proyek wajib dipatuhi oleh Para Pihak.
                                 </p>
                               </div>
 
-                              {(clauseRevision || clauseSla || clauseRetention || clauseDp || customClauses.some((c) => c.trim() !== '')) && (
+                              <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
+                                <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-blue-600" />
+                                  Pasal 3 — Imbalan Jasa & Skema Pembayaran
+                                </h3>
+                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
+                                  Total imbalan jasa yang disepakati sebesar <strong>Rp {formatRupiah(projectAmount || '7500000')}</strong>, dengan Uang Muka (DP) sebesar <strong>{dpPercent || '50'}%</strong> wajib dibayarkan sebelum pengerjaan dimulai melalui transfer ke <strong>{bankInfo || 'BCA 1234567890 a.n budi'}</strong>.
+                                </p>
+                              </div>
+
+                              <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
+                                <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-blue-600" />
+                                  Pasal 4 — Ketentuan Revisi & SLA Feedback
+                                </h3>
+                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
+                                  Revisi pekerjaan dibatasi maksimal 2 (dua) kali sesuai cakupan kesepakatan awal. Evaluasi atau feedback dari PIHAK KEDUA wajib diberikan maksimal 5 (lima) hari kerja; jika melebihi batas waktu tersebut, pekerjaan dianggap disetujui secara otomatis (auto-approved).
+                                </p>
+                              </div>
+
+                              <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
+                                <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-blue-600" />
+                                  Pasal 5 — Retensi Hak Milik & Master File
+                                </h3>
+                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
+                                  Seluruh file master, aset Figma, serta Source Code aplikasi tetap menjadi hak milik PIHAK PERTAMA dan baru akan diserahkan secara penuh kepada PIHAK KEDUA setelah sisa pembayaran dilunasi 100%.
+                                </p>
+                              </div>
+
+                              <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
+                                <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-blue-600" />
+                                  Pasal 6 — Pembatalan & DP Non-Refundable
+                                </h3>
+                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
+                                  Sesuai ketentuan Pasal 1464 KUHPerdata, apabila pembatalan perjanjian dilakukan secara sepihak oleh PIHAK KEDUA, maka Uang Muka (DP) yang telah dibayarkan dianggap hangus dan tidak dapat ditarik kembali (non-refundable).
+                                </p>
+                              </div>
+
+                              <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
+                                <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-blue-600" />
+                                  Pasal 7 — Keadaan Memaksa (Force Majeure)
+                                </h3>
+                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
+                                  Segala keterlambatan atau kegagalan pelaksanaan kewajiban akibat peristiwa di luar kendali wajar Para Pihak (seperti bencana alam, perang, pandemi, atau regulasi resmi pemerintah) dibebaskan dari tuntutan ganti rugi.
+                                </p>
+                              </div>
+
+                              <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
+                                <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-blue-600" />
+                                  Pasal 8 — Akses Server & Layanan Pihak Ketiga
+                                </h3>
+                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
+                                  PIHAK KEDUA wajib menyediakan akses kredensial server/hosting/API yang diperlukan. Seluruh biaya lisensi layanan pihak ketiga berbayar (seperti domain, hosting, API premium, atau plugin) berada di luar nilai imbalan SPK dan ditanggung penuh oleh PIHAK KEDUA.
+                                </p>
+                              </div>
+
+                              <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
+                                <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-blue-600" />
+                                  Pasal 9 — Hak Cipta Portofolio & Penyelesaian Sengketa
+                                </h3>
+                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
+                                  PIHAK PERTAMA berhak menampilkan hasil karya visual/desain sebagai portofolio profesional selama tidak melanggar kerahasiaan NDA. Setiap sengketa akan diselesaikan secara musyawarah, dan apabila tidak tercapai kesepakatan, diselesaikan melalui domisili Pengadilan Negeri yang berwenang.
+                                </p>
+                              </div>
+
+                              {customClauses.some((c) => c.trim() !== '') && (
                                 <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
                                   <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
                                     <span className="w-2 h-2 rounded-full bg-blue-600" />
-                                    Pasal 3 — Syarat & Ketentuan Khusus
+                                    Pasal 10 — Ketentuan Khusus Tambahan
                                   </h3>
                                   <ul className="list-disc pl-6 sm:pl-7 space-y-1 text-slate-700 text-[12px] sm:text-[13px] font-normal">
-                                    {clauseRevision && <li>Revisi dibatasi maksimal 2 (dua) kali. Permintaan tambahan dianggap addendum terpisah.</li>}
-                                    {clauseSla && <li>Evaluasi feedback dari PIHAK KEDUA maksimal 5 hari kerja. Lebih dari itu dianggap disetujui otomatis.</li>}
-                                    {clauseRetention && <li>Master file/Source code diserahkan penuh setelah pembayaran lunas 100%.</li>}
-                                    {clauseDp && <li>DP tidak dapat dikembalikan (non-refundable) jika pembatalan berasal dari PIHAK KEDUA (Pasal 1464 KUHPerdata).</li>}
                                     {customClauses.map((c, idx) => c.trim() !== '' ? <li key={idx}>{c}</li> : null)}
                                   </ul>
                                 </div>
@@ -1661,69 +1727,131 @@ export default function Home() {
                             </>
                           )}
 
+                          {/* === NDA PASAL STANDAR === */}
                           {activeDocTab === 'NDA' && (
                             <>
                               <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
                                 <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
                                   <span className="w-2 h-2 rounded-full bg-indigo-600" />
-                                  Pasal 1 — Cakupan Kerahasiaan
+                                  Pasal 1 — Definisi Informasi Rahasia
                                 </h3>
-                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-relaxed font-normal">
-                                  Mencakup seluruh aset, rahasia dagang, serta informasi <strong>"{ndaScope || 'Source Code, Skema Database, Aset Desain Figma'}"</strong>.
+                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
+                                  Sesuai UU No. 30 Tahun 2000 tentang Rahasia Dagang, Informasi Rahasia mencakup seluruh data teknis, <strong>"{ndaScope || 'Source Code, Skema Database, Aset Desain Figma, & Strategi Bisnis'}"</strong>, kode sumber, strategi pemasaran, serta data finansial yang diberikan oleh Pemilik Informasi.
                                 </p>
                               </div>
 
                               <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
                                 <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
                                   <span className="w-2 h-2 rounded-full bg-indigo-600" />
-                                  Pasal 2 — Masa Berlaku & Denda Sanksi
+                                  Pasal 2 — Kewajiban & Pembatasan Kerahasiaan
                                 </h3>
-                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-relaxed font-normal">
-                                  Kerahasiaan dijaga selama <strong>{ndaYears || '2'} tahun</strong>. Pelanggaran dikenakan ganti rugi sebesar <strong>Rp {formatRupiah(ndaPenalty || '25000000')}</strong>.
+                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
+                                  Penerima Informasi dilarang keras mengungkapkan, menggandakan, menyebarluaskan, atau memanfaatkan Informasi Rahasia kepada pihak ketiga mana pun tanpa persetujuan tertulis terlebih dahulu dari Pemilik Informasi.
                                 </p>
                               </div>
 
                               <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
                                 <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
                                   <span className="w-2 h-2 rounded-full bg-indigo-600" />
-                                  Pasal 3 — Ketentuan Kerahasiaan Tambahan
+                                  Pasal 3 — Pengecualian Kerahasiaan
                                 </h3>
-                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-relaxed font-normal">
-                                  Segala bentuk penggandaan, pembocoran, atau pemanfaatan informasi rahasia tanpa persetujuan tertulis dari PIHAK KEDUA akan ditindaklanjuti secara hukum sesuai regulasi KUHPerdata dan UU Rahasia Dagang yang berlaku di Indonesia.
+                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
+                                  Kewajiban kerahasiaan tidak berlaku atas informasi yang: (a) telah menjadi milik umum (public domain) tanpa pelanggaran NDA; (b) telah diketahui sebelumnya secara sah; atau (c) wajib dibuka berdasarkan perintah hukum / keputusan Pengadilan.
+                                </p>
+                              </div>
+
+                              <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
+                                <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-indigo-600" />
+                                  Pasal 4 — Jangka Waktu Kerahasiaan
+                                </h3>
+                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
+                                  Kewajiban menjaga kerahasiaan ini berlaku efektif sejak tanggal penandatanganan dan tetap mengikat Para Pihak selama <strong>{ndaYears || '2'} (dua) tahun</strong> setelah hubungan kerja sama berakhir.
+                                </p>
+                              </div>
+
+                              <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
+                                <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-indigo-600" />
+                                  Pasal 5 — Pengembalian & Pemusnahan Aset Data
+                                </h3>
+                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
+                                  Setelah pengerjaan proyek selesai atau atas permintaan tertulis Pemilik Informasi, Penerima Informasi wajib mengembalikan seluruh fisik dokumen dan memusnahkan/menghapus file digital yang mengandung Informasi Rahasia.
+                                </p>
+                              </div>
+
+                              <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
+                                <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-indigo-600" />
+                                  Pasal 6 — Sanksi Pelanggaran & Denda Finansial
+                                </h3>
+                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
+                                  Setiap bentuk kebocoran atau pelanggaran kerahasiaan dikenakan denda penalti finansial sebesar <strong>Rp {formatRupiah(ndaPenalty || '25000000')}</strong> serta hak untuk menuntut ganti rugi materiil/immateriil sesuai ketentuan hukum perdata.
+                                </p>
+                              </div>
+
+                              <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
+                                <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-indigo-600" />
+                                  Pasal 7 — Penyelesaian Sengketa
+                                </h3>
+                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
+                                  Setiap perselisihan yang timbul dari pelaksanaan NDA ini diselesaikan melalui musyawarah untuk mufakat, dan apabila gagal, diselesaikan di forum hukum Pengadilan Negeri setempat.
                                 </p>
                               </div>
                             </>
                           )}
 
+                          {/* === BAST PASAL STANDAR === */}
                           {activeDocTab === 'BAST' && (
                             <>
                               <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
                                 <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
                                   <span className="w-2 h-2 rounded-full bg-purple-600" />
-                                  Pasal 1 — Serah Terima Pekerjaan
+                                  Poin 1 — Identitas & Referensi Kontrak Utama
                                 </h3>
-                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-relaxed font-normal">
-                                  PIHAK PERTAMA menyerahkan pekerjaan berdasarkan acuan SPK Referensi <strong>"{bastRef || '001/SPK/IX/2026'}"</strong> secara penuh pada <strong>{bastDate || '25 September 2026'}</strong>.
+                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
+                                  Berita Acara ini diterbitkan sebagai bukti administratif sah yang merujuk pada kesepakatan Perjanjian Kerja Sama (SPK) Utama dengan Nomor Referensi: <strong>"{bastRef || '001/SPK/IX/2026'}"</strong>.
                                 </p>
                               </div>
 
                               <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
                                 <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
                                   <span className="w-2 h-2 rounded-full bg-purple-600" />
-                                  Pasal 2 — Masa Garansi Perbaikan
+                                  Poin 2 — Pernyataan Serah Terima Pekerjaan
                                 </h3>
-                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-relaxed font-normal">
-                                  PIHAK PERTAMA memberikan garansi perbaikan bug selama <strong>{bastWarranty || '14'} hari kerja</strong> terhitung sejak tanggal penandatanganan ini.
+                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
+                                  PIHAK PERTAMA menyatakan telah menyerahkan seluruh hasil pengerjaan proyek, dan PIHAK KEDUA menyatakan telah menerima pengerjaan tersebut secara resmi pada tanggal <strong>{bastDate || '25 September 2026'}</strong>.
                                 </p>
                               </div>
 
                               <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
                                 <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
                                   <span className="w-2 h-2 rounded-full bg-purple-600" />
-                                  Pasal 3 — Pengesahan & Retensi Hak
+                                  Poin 3 — Hasil Pemeriksaan & Quality Check
                                 </h3>
-                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-relaxed font-normal">
-                                  Dengan ditandatanganinya Berita Acara ini, PIHAK KEDUA menyatakan telah menerima seluruh hasil pekerjaan dengan baik dan PIHAK PERTAMA berhak penuh atas pelunasan sisa tagihan sesuai perjanjian awal.
+                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
+                                  PIHAK KEDUA telah melakukan pemeriksaan komprehensif terhadap seluruh fitur, desain, dan deliverables, serta mengonfirmasi bahwa hasil pekerjaan telah sesuai dengan standar spesifikasi teknis SPK.
+                                </p>
+                              </div>
+
+                              <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
+                                <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-purple-600" />
+                                  Poin 4 — Masa Garansi & Pemeliharaan Bug
+                                </h3>
+                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
+                                  PIHAK PERTAMA memberikan garansi pemeliharaan perbaikan kendala teknis / bug secara gratis selama <strong>{bastWarranty || '14'} (empat belas) hari kerja</strong> terhitung sejak penandatanganan BAST ini.
+                                </p>
+                              </div>
+
+                              <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
+                                <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-purple-600" />
+                                  Poin 5 — Pengesahan Hak Pelunasan Pembayaran
+                                </h3>
+                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
+                                  Dengan ditandatanganinya BAST ini, kewajiban pengerjaan PIHAK PERTAMA dinyatakan selesai sempurna, dan PIHAK PERTAMA berhak penuh atas pencairan pelunasan 100% dari PIHAK KEDUA.
                                 </p>
                               </div>
                             </>
@@ -1803,7 +1931,7 @@ export default function Home() {
 
                         <div
                           ref={page2ContentRef}
-                          className="space-y-3 sm:space-y-3.5 text-[12px] sm:text-[13px] leading-relaxed text-slate-700 relative z-10"
+                          className="space-y-3 sm:space-y-3.5 text-[12px] sm:text-[13px] leading-[1.5] text-slate-700 relative z-10"
                         >
                           {/* Header Top Accent Floating Bar */}
                           <div className="h-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 w-full rounded-full shadow-xs mb-4" />
@@ -1813,7 +1941,7 @@ export default function Home() {
                             <h3 className="text-[13px] sm:text-[14px] font-bold text-slate-900 uppercase tracking-wide">
                               LEMBAR PENGESAHAN & PENANDATANGANAN
                             </h3>
-                            <p className="text-slate-700 text-[12px] sm:text-[13px] leading-relaxed font-normal">
+                            <p className="text-slate-700 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
                               Demikian Perjanjian ini dibuat dan disepakati oleh Para Pihak dalam keadaan sadar tanpa paksaan dari pihak manapun untuk dipergunakan sebagaimana mestinya.
                             </p>
                           </div>
@@ -2104,14 +2232,14 @@ export default function Home() {
                   </p>
                 </div>
 
-                {/* CATATAN PERINGATAN PENTING PENGGUNA (ZERO DATABASE) */}
-                <div className="bg-amber-50 border border-amber-200 text-amber-900 p-3.5 rounded-2xl text-[11px] text-left leading-relaxed font-medium space-y-1">
+                {/* BANNER PERINGATAN KUNING / AMBER UNTUK PROSES PEMBAYARAN */}
+                <div className="bg-amber-50 border-2 border-amber-300 text-amber-900 p-3.5 rounded-2xl text-[11px] text-left leading-relaxed font-medium space-y-1 shadow-xs">
                   <div className="flex items-center gap-1.5 font-bold text-amber-900">
                     <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                    <span>Penting</span>
+                    <span className="uppercase tracking-wider text-[10px]">Peringatan Penting Pembayaran</span>
                   </div>
                   <p>
-                    Mohon jangan menutup atau me-refresh tab ini setelah melakukan pembayaran. Tunggu beberapa saat hingga sistem memverifikasi transaksi secara otomatis dan menampilkan tombol unduh dokumen Anda di halaman ini.
+                    <strong>Mohon jangan menutup atau me-refresh tab ini setelah melakukan pembayaran.</strong> Tunggu beberapa saat hingga sistem memverifikasi transaksi secara otomatis dan menampilkan tombol unduh dokumen Anda di halaman ini.
                   </p>
                 </div>
 
@@ -2153,15 +2281,15 @@ export default function Home() {
                   </span>
                 </div>
 
-                {/* Indikator Status & Notifikasi Sedang Diproses */}
+                {/* Indikator Status Pelunasan */}
                 {isProcessingSuccess ? (
                   <div className="bg-emerald-600 text-white p-4 rounded-2xl shadow-lg text-center space-y-1">
                     <div className="flex items-center justify-center gap-2 font-black text-sm">
-                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <CheckCircle className="w-5 h-5" />
                       <span>Pembayaran Terdeteksi!</span>
                     </div>
                     <p className="text-xs text-emerald-100 font-medium">
-                      Sedang memproses verifikasi & menyiapkan dokumen, mohon tunggu sebentar ya...
+                      Sedang memproses verifikasi & menyiapkan dokumen, mohon tunggu sebentar...
                     </p>
                   </div>
                 ) : (
@@ -2206,12 +2334,12 @@ export default function Home() {
         </div>
       )}
 
-      {/* Success & Download Receipt Modal (Bersih Tanpa Indikator Berputar) */}
+      {/* Success & Download Receipt Modal (BERSIH DARI INDIKATOR BERPUTAR) */}
       {showSuccessModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white max-w-md w-full rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-4 text-center my-8 max-h-[90vh] overflow-y-auto">
 
-            {/* Icon & Header Status */}
+            {/* Icon & Header Status Bersih */}
             <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
               <CheckCircle className="w-7 h-7" />
             </div>
@@ -2388,8 +2516,8 @@ export default function Home() {
                 <li>Pasal 1320 KUHPerdata (Syarat Sah Perikatan)</li>
                 <li>Pasal 1338 KUHPerdata (Pacta Sunt Servanda)</li>
                 <li>Pasal 1464 KUHPerdata (Ketentuan Uang Muka / DP)</li>
-                <li>Pasal 1365 KUHPerdata & UU Rahasia Dagang</li>
-                <li>Pasal 1812 KUHPerdata & UU Hak Cipta No. 28/2014</li>
+                <li>UU No. 30 Tahun 2000 (Rahasia Dagang)</li>
+                <li>UU No. 28 Tahun 2014 (Hak Cipta)</li>
               </ul>
             </div>
 
