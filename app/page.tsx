@@ -62,7 +62,7 @@ export default function Home() {
   });
   const [paidDocTarget, setPaidDocTarget] = useState<'SPK' | 'NDA' | 'BAST'>('SPK');
   const [shouldAutoDownload, setShouldAutoDownload] = useState(false);
-  const [autoDownloadStatus, setAutoDownloadStatus] = useState<string>('');
+  const [, setAutoDownloadStatus] = useState<string>('');
 
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -2109,6 +2109,17 @@ export default function Home() {
                   </p>
                 </div>
 
+                {/* CATATAN PERINGATAN PENTING PENGGUNA (ZERO DATABASE) */}
+                <div className="bg-amber-50 border border-amber-200 text-amber-900 p-3.5 rounded-2xl text-[11px] text-left leading-relaxed font-medium space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold text-amber-900">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>Penting</span>
+                  </div>
+                  <p>
+                    Mohon jangan menutup atau me-refresh tab ini setelah melakukan pembayaran. Tunggu beberapa saat hingga sistem memverifikasi transaksi secara otomatis dan menampilkan tombol unduh dokumen Anda di halaman ini.
+                  </p>
+                </div>
+
                 {/* Container Direct Embedded Portal Mayar */}
                 <div className="bg-slate-50 p-2 sm:p-4 rounded-2xl border border-slate-200 overflow-hidden w-full space-y-3">
                   {isLoadingQris ? (
@@ -2147,9 +2158,9 @@ export default function Home() {
                   </span>
                 </div>
 
-                {/* Indikator Status & Notifikasi Sedang Dipproses */}
+                {/* Indikator Status & Notifikasi Sedang Diproses */}
                 {isProcessingSuccess ? (
-                  <div className="bg-emerald-600 text-white p-4 rounded-2xl shadow-lg animate-pulse text-center space-y-1">
+                  <div className="bg-emerald-600 text-white p-4 rounded-2xl shadow-lg text-center space-y-1">
                     <div className="flex items-center justify-center gap-2 font-black text-sm">
                       <Loader2 className="w-5 h-5 animate-spin" />
                       <span>Pembayaran Terdeteksi!</span>
@@ -2200,7 +2211,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* Success & Download Receipt Modal */}
+      {/* Success & Download Receipt Modal (Tanpa Indikator Berputar) */}
       {showSuccessModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white max-w-md w-full rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-4 text-center my-8 max-h-[90vh] overflow-y-auto">
@@ -2325,7 +2336,7 @@ export default function Home() {
               onClick={() => setShowSuccessModal(false)}
               className="text-xs text-slate-400 hover:text-slate-600 pt-1 block mx-auto font-medium"
             >
-              selesai
+              Selesai
             </button>
           </div>
         </div>
