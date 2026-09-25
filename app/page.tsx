@@ -32,7 +32,6 @@ import {
   ExternalLink,
   Hash,
   AlertTriangle,
-  Check,
   Sliders
 } from 'lucide-react';
 
@@ -411,8 +410,15 @@ export default function Home() {
   // Testimonials
   const [reviews] = useState<Review[]>([]);
 
-  // === DETEKSI TINGGI PIKSEL & PEMISAHAN HALAMAN A4 ===
-  const [needsPage2, setNeedsPage2] = useState(false);
+  // === DYNAMIC CLAUSE PARTITIONING & HALAMAN A4 ===
+  const activeClauses = clauses.filter((c) => c.docType === activeDocTab && c.isEnabled);
+  const SPLIT_LIMIT = 4;
+  const isClauseSplit = activeClauses.length > SPLIT_LIMIT;
+
+  const page1Clauses = isClauseSplit ? activeClauses.slice(0, SPLIT_LIMIT) : activeClauses;
+  const page2Clauses = isClauseSplit ? activeClauses.slice(SPLIT_LIMIT) : [];
+
+  const [heightNeedsPage2, setHeightNeedsPage2] = useState(false);
   const page1ContentRef = useRef<HTMLDivElement | null>(null);
   const page1MainContentRef = useRef<HTMLDivElement | null>(null);
   const page2ContentRef = useRef<HTMLDivElement | null>(null);
@@ -420,27 +426,26 @@ export default function Home() {
   useIsomorphicLayoutEffect(() => {
     if (isExporting) return;
 
-    // Batas tinggi maksimal area isi teks Halaman 1 sebelum butuh Halaman 2 (dalam piksel)
     const MAX_PAGE_CONTENT_HEIGHT = 960;
 
-    if (!needsPage2) {
+    if (!heightNeedsPage2) {
       if (page1ContentRef.current) {
         const currentContentHeight = page1ContentRef.current.scrollHeight;
         if (currentContentHeight > MAX_PAGE_CONTENT_HEIGHT) {
-          setNeedsPage2(true);
+          setHeightNeedsPage2(true);
         }
       }
     } else {
       if (page1MainContentRef.current && page2ContentRef.current) {
         const totalCombinedHeight =
           page1MainContentRef.current.scrollHeight + page2ContentRef.current.scrollHeight;
-        if (totalCombinedHeight <= MAX_PAGE_CONTENT_HEIGHT) {
-          setNeedsPage2(false);
+        if (totalCombinedHeight <= MAX_PAGE_CONTENT_HEIGHT && activeClauses.length <= SPLIT_LIMIT) {
+          setHeightNeedsPage2(false);
         }
       }
     }
   }, [
-    needsPage2,
+    heightNeedsPage2,
     activeDocTab,
     clauses,
     projectTitle,
@@ -462,6 +467,7 @@ export default function Home() {
     isExporting
   ]);
 
+  const needsPage2 = isClauseSplit || heightNeedsPage2;
   const totalPages = needsPage2 ? 2 : 1;
 
   const generateNewSessionId = () => {
@@ -911,14 +917,12 @@ export default function Home() {
 
         // SOLUSI FIX GEPENG: Jaga aspect ratio (rasio proporsional)
         if (imgHeight > pageHeight) {
-          // Jika tinggi konten melebihi batas A4, kecilkan skala gambar secara keseluruhan (lebar & tinggi)
           const ratio = pageHeight / imgHeight;
           const scaledWidth = imgWidth * ratio;
-          const xCenterOffset = (imgWidth - scaledWidth) / 2; // Agar posisinya tetap di tengah kertas
+          const xCenterOffset = (imgWidth - scaledWidth) / 2;
 
           pdf.addImage(imgData, 'JPEG', xCenterOffset, 0, scaledWidth, pageHeight);
         } else {
-          // Jika konten muat, cetak dengan rasio normal
           pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
         }
       }
@@ -1887,34 +1891,32 @@ export default function Home() {
                           </div>
                         </div>
 
-                        {/* PENOMORAN PASAL OTOMATIS BERDASARKAN ARRAY STATE (AUTO-NUMBERING) */}
+                        {/* RENDER PASAL HALAMAN 1 (AKSES DARI PAGE 1 CLAUSES) */}
                         <div className="space-y-2 sm:space-y-2.5">
-                          {clauses
-                            .filter((c) => c.docType === activeDocTab && c.isEnabled)
-                            .map((clause, index) => (
-                              <div key={clause.id} className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
-                                <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
-                                  <span
-                                    className={`w-2 h-2 rounded-full ${
-                                      activeDocTab === 'SPK'
-                                        ? 'bg-blue-600'
-                                        : activeDocTab === 'NDA'
-                                        ? 'bg-indigo-600'
-                                        : 'bg-purple-600'
-                                    }`}
-                                  />
-                                  {activeDocTab === 'BAST'
-                                    ? `Poin ${index + 1} — ${clause.title}`
-                                    : `Pasal ${index + 1} — ${clause.title}`}
-                                </h3>
-                                <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
-                                  {clause.content}
-                                </p>
-                              </div>
-                            ))}
+                          {page1Clauses.map((clause, index) => (
+                            <div key={clause.id} className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
+                              <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
+                                <span
+                                  className={`w-2 h-2 rounded-full ${
+                                    activeDocTab === 'SPK'
+                                      ? 'bg-blue-600'
+                                      : activeDocTab === 'NDA'
+                                      ? 'bg-indigo-600'
+                                      : 'bg-purple-600'
+                                  }`}
+                                />
+                                {activeDocTab === 'BAST'
+                                  ? `Poin ${index + 1} — ${clause.title}`
+                                  : `Pasal ${index + 1} — ${clause.title}`}
+                              </h3>
+                              <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
+                                {clause.content}
+                              </p>
+                            </div>
+                          ))}
                         </div>
 
-                        {/* Kolom Tanda Tangan Utama di Halaman 1 (Jika Konten Muat 1 Halaman) */}
+                        {/* Kolom Tanda Tangan Utama di Halaman 1 (Hanya Jika Semua Pasal Muat di Halaman 1) */}
                         {!needsPage2 && (
                           <div className="pt-2 sm:pt-3 grid grid-cols-2 gap-3 sm:gap-4 text-center">
                             <div className="bg-slate-50/80 border border-slate-200/80 rounded-xl p-2.5 sm:p-3 space-y-1.5">
@@ -1971,7 +1973,7 @@ export default function Home() {
                       </div>
                     </div>
 
-                    {/* === HALAMAN 2 (Hanya Otomatis Aktif Jika Konten Terdeteksi Overflow) === */}
+                    {/* === HALAMAN 2 (Otomatis Aktif Jika Pasal > 4 atau Konten Overflow) === */}
                     {needsPage2 && (
                       <div
                         className="a4-page w-full max-w-[794px] min-h-[1123px] h-auto bg-white text-slate-900 p-6 sm:p-8 relative flex flex-col justify-between shadow-xl rounded-xl border border-slate-200 shrink-0"
@@ -1991,6 +1993,33 @@ export default function Home() {
                         >
                           {/* Header Top Accent Floating Bar */}
                           <div className="h-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 w-full rounded-full shadow-xs mb-4" />
+
+                          {/* RENDER PASAL SISA DI HALAMAN 2 (JIKA ADA PASAL LIMA DAN SETERUSNYA) */}
+                          {page2Clauses.length > 0 && (
+                            <div className="space-y-2 sm:space-y-2.5 mb-4">
+                              {page2Clauses.map((clause, index) => (
+                                <div key={clause.id} className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
+                                  <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
+                                    <span
+                                      className={`w-2 h-2 rounded-full ${
+                                        activeDocTab === 'SPK'
+                                          ? 'bg-blue-600'
+                                          : activeDocTab === 'NDA'
+                                          ? 'bg-indigo-600'
+                                          : 'bg-purple-600'
+                                      }`}
+                                    />
+                                    {activeDocTab === 'BAST'
+                                      ? `Poin ${index + page1Clauses.length + 1} — ${clause.title}`
+                                      : `Pasal ${index + page1Clauses.length + 1} — ${clause.title}`}
+                                  </h3>
+                                  <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
+                                    {clause.content}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
 
                           {/* Lembar Pengesahan Header */}
                           <div className="bg-slate-50/80 p-3 sm:p-4 rounded-xl border border-slate-200/80 space-y-1">
@@ -2390,12 +2419,12 @@ export default function Home() {
         </div>
       )}
 
-      {/* Success & Download Receipt Modal (BERSIH DARI INDIKATOR BERPUTAR) */}
+      {/* Success & Download Receipt Modal (BERSIH TANPA INDIKATOR BERPUTAR) */}
       {showSuccessModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white max-w-md w-full rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-4 text-center my-8 max-h-[90vh] overflow-y-auto">
 
-            {/* Icon & Header Status Bersih */}
+            {/* Icon & Header Status Bersih Tanpa Animasi Spinner */}
             <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
               <CheckCircle className="w-7 h-7" />
             </div>
