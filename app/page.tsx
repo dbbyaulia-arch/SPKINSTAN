@@ -1531,19 +1531,6 @@ export default function Home() {
                   </span>
                 </div>
 
-                {/* UI Helper Note */}
-                <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-xs text-blue-900 space-y-1 shadow-xs">
-                  <div className="flex items-center gap-1.5 font-bold text-blue-700">
-                    <Info className="w-4 h-4 shrink-0" />
-                    <span>Panduan Hukum Paraf & Tanda Tangan Dokumen</span>
-                  </div>
-                  <p className="text-[11px] leading-relaxed text-blue-800/90 pl-5">
-                    • <strong>Kolom Paraf Footer:</strong> Ditujukan untuk <em>paraf basah/inisial singkat</em> kedua pihak di tiap lembar setelah dokumen dicetak.<br />
-                    • <strong>Tanda Tangan Utama:</strong> Terletak pada halaman akhir dokumen (dapat menggunakan TTD digital gambar atau TTD basah manual).<br />
-                    <span className="italic text-blue-600 mt-1 block">*Catatan panduan ini hanya tampil di layar dan tidak akan ikut tercetak/terdownload dalam file PDF.</span>
-                  </p>
-                </div>
-
                 {/* Wrapper Responsif UI + Presisi Mutlak saat PDF Canvas */}
                 <div className="w-full bg-slate-300/40 p-2 sm:p-6 rounded-3xl border border-slate-200 flex justify-center items-center overflow-x-auto pb-4">
                   <div
