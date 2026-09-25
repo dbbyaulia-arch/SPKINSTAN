@@ -64,6 +64,9 @@ export default function Home() {
   const [selectedPackage, setSelectedPackage] = useState<'SINGLE' | 'BUNDLING'>('SINGLE');
   const [currentWizardStep, setCurrentWizardStep] = useState(1);
 
+  // State untuk melacak Preset Akselerator yang sedang aktif
+  const [activePreset, setActivePreset] = useState<'web' | 'design' | 'all' | null>(null);
+
   // Per-document Payment License state
   const [paidDocs, setPaidDocs] = useState<{ SPK: boolean; NDA: boolean; BAST: boolean }>({
     SPK: false,
@@ -383,18 +386,58 @@ export default function Home() {
     setClauses((prev) => prev.filter((c) => c.id !== id));
   };
 
+  // LOGIKA PERBAIKAN PRESET DUKUNGAN SPK, NDA, & BAST
   const handleApplyPreset = (presetType: 'web' | 'design' | 'all') => {
-    if (presetType === 'web') {
-      setClauses((prev) =>
-        prev.map((c) => (c.docType === 'SPK' && c.id === 'spk-8' ? { ...c, isEnabled: true } : c))
-      );
-    } else if (presetType === 'design') {
-      setClauses((prev) =>
-        prev.map((c) => (c.docType === 'SPK' && c.id === 'spk-8' ? { ...c, isEnabled: false } : c))
-      );
-    } else if (presetType === 'all') {
-      setClauses((prev) => prev.map((c) => ({ ...c, isEnabled: true })));
-    }
+    setActivePreset(presetType);
+
+    setClauses((prev) =>
+      prev.map((c) => {
+        // 1. Jika menekan 'Aktifkan Semua', aktifkan semua pasal
+        if (presetType === 'all') {
+          return { ...c, isEnabled: true };
+        }
+
+        // 2. Hanya ubah pasal yang sesuai dengan TAB DOKUMEN YANG SEDANG AKTIF
+        if (c.docType !== activeDocTab) {
+          return c;
+        }
+
+        // === LOGIKA PRESET SPK ===
+        if (c.docType === 'SPK') {
+          if (presetType === 'web') {
+            return { ...c, isEnabled: true }; // Web/App butuh semua pasal (termasuk Akses Server spk-8)
+          }
+          if (presetType === 'design') {
+            if (c.id === 'spk-8') return { ...c, isEnabled: false }; // Nonaktifkan Akses Server
+            return { ...c, isEnabled: true };
+          }
+        }
+
+        // === LOGIKA PRESET NDA ===
+        if (c.docType === 'NDA') {
+          if (presetType === 'web') {
+            return { ...c, isEnabled: true }; // Web/App butuh Kerahasiaan penuh + Denda Penalti (nda-6)
+          }
+          if (presetType === 'design') {
+            if (c.id === 'nda-6') return { ...c, isEnabled: false }; // Nonaktifkan Denda Penalti untuk Desain
+            return { ...c, isEnabled: true };
+          }
+        }
+
+        // === LOGIKA PRESET BAST ===
+        if (c.docType === 'BAST') {
+          if (presetType === 'web') {
+            return { ...c, isEnabled: true }; // Web/App butuh Garansi Bug (bast-4)
+          }
+          if (presetType === 'design') {
+            if (c.id === 'bast-4') return { ...c, isEnabled: false }; // Desain tidak butuh Garansi Bug Software
+            return { ...c, isEnabled: true };
+          }
+        }
+
+        return c;
+      })
+    );
   };
 
   // Signature Pad Canvas - PIHAK PERTAMA
@@ -881,7 +924,7 @@ export default function Home() {
         const originalMinHeight = pageEl.style.minHeight;
         const originalPosition = pageEl.style.position;
 
-        // 2. Terapkan Dimensi Standar A4 Cetak Dinamis (Mencegah Teks Tertekan/Gepeng)
+        // 2. Terapkan Dimensi Standar A4 Cetak Dinamis
         pageEl.style.width = '794px';
         pageEl.style.minHeight = '1123px';
         pageEl.style.height = 'auto'; // Mengalir alami sesuai tinggi isi teks
@@ -1508,30 +1551,44 @@ export default function Home() {
                         </label>
                       </div>
 
-                      {/* Preset Accelerator Pills */}
+                      {/* Preset Accelerator Pills dengan Respon Warna Aktif */}
                       <div className="p-2 bg-slate-100 rounded-2xl border border-slate-200/80 space-y-1.5">
                         <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider block px-1 flex items-center gap-1">
-                          <Sliders className="w-3 h-3 text-blue-600" /> Preset Akselerator Cepat:
+                          <Sliders className="w-3 h-3 text-blue-600" /> Preset Akselerator Cepat ({activeDocTab}):
                         </span>
                         <div className="grid grid-cols-3 gap-1">
                           <button
                             type="button"
                             onClick={() => handleApplyPreset('web')}
-                            className="py-1.5 px-2 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-[10px] font-bold border border-slate-200 transition-all shadow-2xs"
+                            className={`py-1.5 px-2 rounded-xl text-[10px] font-bold border transition-all shadow-2xs ${
+                              activePreset === 'web'
+                                ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                                : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
+                            }`}
                           >
                             Preset Web/App
                           </button>
+
                           <button
                             type="button"
                             onClick={() => handleApplyPreset('design')}
-                            className="py-1.5 px-2 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-[10px] font-bold border border-slate-200 transition-all shadow-2xs"
+                            className={`py-1.5 px-2 rounded-xl text-[10px] font-bold border transition-all shadow-2xs ${
+                              activePreset === 'design'
+                                ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                                : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
+                            }`}
                           >
                             Preset Desain
                           </button>
+
                           <button
                             type="button"
                             onClick={() => handleApplyPreset('all')}
-                            className="py-1.5 px-2 bg-white hover:bg-slate-50 text-blue-600 rounded-xl text-[10px] font-bold border border-blue-200 transition-all shadow-2xs"
+                            className={`py-1.5 px-2 rounded-xl text-[10px] font-bold border transition-all shadow-2xs ${
+                              activePreset === 'all'
+                                ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                                : 'bg-white hover:bg-slate-50 text-blue-600 border-blue-200'
+                            }`}
                           >
                             Aktifkan Semua
                           </button>
