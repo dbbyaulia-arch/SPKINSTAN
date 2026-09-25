@@ -586,6 +586,11 @@ export default function Home() {
     setMobileViewMode('preview');
     setIsExporting(true);
 
+    // Pastikan seluruh font (termasuk Spartan) selesai di-load browser
+    if (typeof document !== 'undefined' && document.fonts) {
+      await document.fonts.ready;
+    }
+
     await new Promise((resolve) => setTimeout(resolve, 300));
 
     const element = document.getElementById('a4-document-preview');
@@ -741,8 +746,14 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col justify-between font-sans antialiased selection:bg-blue-100 selection:text-blue-700 pb-20 md:pb-0">
       
-      {/* CSS Anti-Print, Selection Locking & Dynamic PDF Export Rules */}
+      {/* CSS Import Font League Spartan, Anti-Print, Selection Locking & Dynamic PDF Export Rules */}
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=League+Spartan:wght@300;400;500;600;700;800;900&display=swap');
+
+        #a4-document-preview, .a4-page {
+          font-family: 'League Spartan', 'Spartan', sans-serif !important;
+        }
+
         @media print {
           body { display: none !important; }
         }
