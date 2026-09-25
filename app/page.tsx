@@ -296,11 +296,6 @@ export default function Home() {
             await captureDocumentToPdf(paidDocTarget);
           }
           setAutoDownloadStatus('Unduhan selesai!');
-
-          // Sembunyikan notifikasi otomatis setelah 2.5 detik
-          setTimeout(() => {
-            setAutoDownloadStatus('');
-          }, 2500);
         } catch (autoErr) {
           console.warn('Browser memblokir auto download:', autoErr);
           setAutoDownloadStatus('Silakan klik tombol unduh hijau di bawah ini.');
@@ -2221,24 +2216,6 @@ export default function Home() {
                 Watermark SPKINSTAN telah resmi dicabut. Dokumen PDF Clean Anda siap diunduh.
               </p>
             </div>
-
-            {/* Indikator Status Auto-Download Dinamis */}
-            {autoDownloadStatus && (
-              <div
-                className={`px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 border transition-all ${
-                  autoDownloadStatus.includes('selesai')
-                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                    : 'bg-blue-50 border-blue-200 text-blue-700'
-                }`}
-              >
-                {autoDownloadStatus.includes('selesai') ? (
-                  <CheckCircle className="w-4 h-4 text-emerald-600" />
-                ) : (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                )}
-                <span>{autoDownloadStatus}</span>
-              </div>
-            )}
 
             {/* BOX PERINGATAN ZERO DATABASE */}
             <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-3.5 text-left space-y-1">
