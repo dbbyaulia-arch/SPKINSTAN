@@ -296,6 +296,11 @@ export default function Home() {
             await captureDocumentToPdf(paidDocTarget);
           }
           setAutoDownloadStatus('Unduhan selesai!');
+
+          // Sembunyikan notifikasi otomatis setelah 2.5 detik
+          setTimeout(() => {
+            setAutoDownloadStatus('');
+          }, 2500);
         } catch (autoErr) {
           console.warn('Browser memblokir auto download:', autoErr);
           setAutoDownloadStatus('Silakan klik tombol unduh hijau di bawah ini.');
@@ -2217,10 +2222,20 @@ export default function Home() {
               </p>
             </div>
 
-            {/* Indikator Status Auto-Download */}
+            {/* Indikator Status Auto-Download Dinamis */}
             {autoDownloadStatus && (
-              <div className="bg-blue-50 border border-blue-200 text-blue-700 px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-2">
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              <div
+                className={`px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 border transition-all ${
+                  autoDownloadStatus.includes('selesai')
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                    : 'bg-blue-50 border-blue-200 text-blue-700'
+                }`}
+              >
+                {autoDownloadStatus.includes('selesai') ? (
+                  <CheckCircle className="w-4 h-4 text-emerald-600" />
+                ) : (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                )}
                 <span>{autoDownloadStatus}</span>
               </div>
             )}
@@ -2232,7 +2247,7 @@ export default function Home() {
                 <span>PENTING: Segera Unduh & Simpan Dokumen!</span>
               </div>
               <p className="text-[11px] text-amber-800 leading-relaxed font-medium">
-                Platform ini berjalan <strong>tanpa database & tanpa login</strong>. Jika modal ini ditutup, Anda <strong>tidak bisa mengunduh ulang</strong> dan Admin juga tidak menyimpan/memiliki riwayat file Anda.
+                Platform ini berjalan <strong>tanpa database & tanpa login</strong>. Jika Tab ini ditutup, Anda <strong>tidak bisa mengunduh ulang</strong> dan Admin juga tidak menyimpan/memiliki riwayat file Anda.
               </p>
             </div>
 
