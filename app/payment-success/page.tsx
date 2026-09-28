@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2, CheckCircle } from 'lucide-react';
 
-export default function PaymentSuccessPage() {
+function PaymentSuccessContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -18,7 +18,7 @@ export default function PaymentSuccessPage() {
           const parsed = JSON.parse(savedPaid);
           paidState = { ...parsed, SPK: true, NDA: true, BAST: true };
         } catch (e) {
-          console.error(e);
+          console.error('Gagal membaca data pembayaran dari local storage:', e);
         }
       }
 
@@ -32,20 +32,35 @@ export default function PaymentSuccessPage() {
   }, [router, searchParams]);
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 font-sans text-center">
-      <div className="bg-white p-8 rounded-3xl shadow-xl border border-slate-100 max-w-md w-full space-y-4">
-        <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
-          <CheckCircle className="w-7 h-7" />
-        </div>
-        <h2 className="text-lg font-extrabold text-slate-900">Pembayaran Berhasil!</h2>
-        <p className="text-xs text-slate-500 leading-relaxed">
-          Lisensi dokumen PRO Anda telah aktif. Memindahkan Anda kembali ke editor untuk mengunduh PDF Clean...
-        </p>
-        <div className="flex items-center justify-center gap-2 text-xs font-bold text-emerald-600 pt-2">
-          <Loader2 className="w-4 h-4 animate-spin" />
-          <span>Membuka Editor Dokumen...</span>
-        </div>
+    <div className="bg-white p-8 rounded-3xl shadow-xl border border-slate-100 max-w-md w-full space-y-4">
+      <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
+        <CheckCircle className="w-7 h-7" />
       </div>
+      <h2 className="text-lg font-extrabold text-slate-900">Pembayaran Berhasil!</h2>
+      <p className="text-xs text-slate-500 leading-relaxed">
+        Lisensi dokumen PRO Anda telah aktif. Memindahkan Anda kembali ke editor untuk mengunduh PDF Clean...
+      </p>
+      <div className="flex items-center justify-center gap-2 text-xs font-bold text-emerald-600 pt-2">
+        <Loader2 className="w-4 h-4 animate-spin" />
+        <span>Membuka Editor Dokumen...</span>
+      </div>
+    </div>
+  );
+}
+
+export default function PaymentSuccessPage() {
+  return (
+    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 font-sans text-center">
+      <Suspense
+        fallback={
+          <div className="bg-white p-8 rounded-3xl shadow-xl border border-slate-100 max-w-md w-full flex items-center justify-center gap-2 text-xs font-bold text-slate-600">
+            <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
+            <span>Memuat status pembayaran...</span>
+          </div>
+        }
+      >
+        <PaymentSuccessContent />
+      </Suspense>
     </div>
   );
 }
