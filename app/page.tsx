@@ -92,7 +92,7 @@ export default function Home() {
   const [isExporting, setIsExporting] = useState(false);
 
   const [sessionId, setSessionId] = useState('');
-  const [mayarPaymentId, setMayarPaymentId] = useState<string | null>(null);
+  const [, setMayarPaymentId] = useState<string | null>(null);
   const [timeLeft, setTimeLeft] = useState(899);
 
   const [, setQrCodeData] = useState<string | null>(null);
@@ -109,7 +109,7 @@ export default function Home() {
   const [clientName, setClientName] = useState('');
   const [clientWa, setClientWa] = useState('');
 
-  // Multi-Doc State untuk Nomor Surat
+  // Multi-Doc State untuk Nomor Surat Berbasis Objek
   const [docNumbers, setDocNumbers] = useState({
     SPK: '001/SPK/IX/2026',
     NDA: '001/NDA/IX/2026',
@@ -146,19 +146,21 @@ export default function Home() {
   const page2ContentRef = useRef<HTMLDivElement | null>(null);
   const [heightNeedsPage2, setHeightNeedsPage2] = useState(false);
 
+  // Initial Master Clauses dengan Dasar Hukum UU Terlampir
   const [clauses, setClauses] = useState<Clause[]>([
+    // --- PASAL-PASAL DOKUMEN SPK ---
     {
       id: 'spk-1',
       docType: 'SPK',
-      title: 'Ruang Lingkup Pekerjaan',
-      content: 'PIHAK PERTAMA berkewajiban melaksanakan pengerjaan proyek sesuai dengan acuan spesifikasi teknis dan deliverables yang telah disepakati bersama PIHAK KEDUA.',
+      title: 'Ruang Lingkup Pekerjaan & Asas Iktikad Baik',
+      content: 'Sesuai Pasal 17 ayat (2) & Pasal 18A ayat (2) UU No. 1 Tahun 2024 (UU ITE), Para Pihak sepakat melaksanakan perjanjian dengan iktikad baik, transparan, dan jelas. PIHAK PERTAMA berkewajiban melaksanakan pengerjaan proyek sesuai dengan acuan spesifikasi teknis dan deliverables yang disepakati.',
       isEnabled: true,
     },
     {
       id: 'spk-2',
       docType: 'SPK',
-      title: 'Jangka Waktu & Timeline Pekerjaan',
-      content: 'Pelaksanaan pekerjaan dimulai sejak Uang Muka (DP) diterima oleh PIHAK PERTAMA. Timeline pekerjaan, milestone penyerahan, dan tanggal penyelesaian proyek wajib dipatuhi oleh Para Pihak.',
+      title: 'Keabsahan Kontrak & Tanda Tangan Elektronik',
+      content: 'Berdasarkan Pasal 5 ayat (1) UU No. 1 Tahun 2024 jo. Pasal 1 angka 17 UU No. 19 Tahun 2016, Kontrak Elektronik dan Tanda Tangan Elektronik ini merupakan alat bukti hukum yang sah dan mengikat Para Pihak sejak dibubuhi tanda tangan secara elektronik maupun fisik.',
       isEnabled: true,
     },
     {
@@ -171,64 +173,66 @@ export default function Home() {
     {
       id: 'spk-4',
       docType: 'SPK',
-      title: 'Ketentuan Revisi & SLA Feedback',
+      title: 'Ketentuan Revisi & SLA Feedback Auto-Approval',
       content: 'Revisi pekerjaan dibatasi maksimal 2 (dua) kali sesuai cakupan kesepakatan awal. Evaluasi atau feedback dari PIHAK KEDUA wajib diberikan maksimal 5 (lima) hari kerja; jika melebihi batas waktu tersebut, pekerjaan dianggap disetujui secara otomatis (auto-approved).',
       isEnabled: true,
     },
     {
       id: 'spk-5',
       docType: 'SPK',
-      title: 'Retensi Hak Milik & Master File',
-      content: 'Seluruh file master, aset Figma, serta Source Code aplikasi tetap menjadi hak milik PIHAK PERTAMA dan baru akan diserahkan secara penuh kepada PIHAK KEDUA setelah sisa pembayaran dilunasi 100%.',
+      title: 'Kepemilikan Hak Cipta & Retensi Master File',
+      content: 'Sesuai Pasal 36, Pasal 16 ayat (1)-(2), dan Pasal 80 ayat (1) UU No. 28 Tahun 2014 tentang Hak Cipta, Hak Cipta atas Ciptaan yang dibuat berdasarkan pesanan tetap berada pada Pembuat Ciptaan (PIHAK PERTAMA) dan baru dialihkan/dilisensikan secara tertulis kepada PIHAK KEDUA setelah sisa pembayaran dilunasi 100%.',
       isEnabled: true,
     },
     {
       id: 'spk-6',
       docType: 'SPK',
-      title: 'Pembatalan & DP Non-Refundable',
-      content: 'Sesuai ketentuan Pasal 1464 KUHPerdata, apabila pembatalan perjanjian dilakukan secara sepihak oleh PIHAK KEDUA, maka Uang Muka (DP) yang telah dibayarkan dianggap hangus dan tidak dapat ditarik kembali (non-refundable).',
+      title: 'Kepemilikan Hak Invensi, Paten & Lisensi',
+      content: 'Berdasarkan Pasal 1 angka 1, angka 11, dan Pasal 19 ayat (1) UU No. 65 Tahun 2024 tentang Paten, apabila hasil pekerjaan menghasilkan invensi teknologi atau algoritma baru, Hak Paten dan Lisensi eksklusif/non-eksklusif diatur berdasarkan kesepakatan tertulis Para Pihak.',
       isEnabled: true,
     },
     {
       id: 'spk-7',
       docType: 'SPK',
-      title: 'Keadaan Memaksa (Force Majeure)',
-      content: 'Segala keterlambatan atau kegagalan pelaksanaan kewajiban akibat peristiwa di luar kendali wajar Para Pihak (seperti bencana alam, perang, pandemi, atau regulasi resmi pemerintah) dibebaskan dari tuntutan ganti rugi.',
+      title: 'Pembatalan & Uang Muka (DP) Non-Refundable',
+      content: 'Sesuai ketentuan Pasal 1464 KUHPerdata, apabila pembatalan perjanjian dilakukan secara sepihak oleh PIHAK KEDUA, maka Uang Muka (DP) yang telah dibayarkan dianggap hangus dan tidak dapat ditarik kembali (non-refundable).',
       isEnabled: true,
     },
     {
       id: 'spk-8',
       docType: 'SPK',
-      title: 'Akses Server & Layanan Pihak Ketiga',
-      content: 'PIHAK KEDUA wajib menyediakan akses kredensial server/hosting/API yang diperlukan. Seluruh biaya lisensi layanan pihak ketiga berbayar (seperti domain, hosting, API premium, atau plugin) berada di luar nilai imbalan SPK dan ditanggung penuh oleh PIHAK KEDUA.',
+      title: 'Keamanan Akses Sistem & Larangan Akses Ilegal',
+      content: 'PIHAK KEDUA wajib menyediakan akses kredensial server/hosting/API yang diperlukan. Sesuai ketentuan pidana akses ilegal sistem elektronik (UU ITE jo. KUHP), dilarang keras melakukan pengaksesan tanpa hak atas server atau kode sumber sebelum atau sesudah penyerahan resmi.',
       isEnabled: true,
     },
     {
       id: 'spk-9',
       docType: 'SPK',
-      title: 'Hak Cipta Portofolio & Penyelesaian Sengketa',
-      content: 'PIHAK PERTAMA berhak menampilkan hasil karya visual/desain sebagai portofolio profesional selama tidak melanggar kerahasiaan NDA. Setiap sengketa akan diselesaikan secara musyawarah, dan apabila tidak tercapai kesepakatan, diselesaikan melalui domisili Pengadilan Negeri yang berwenang.',
+      title: 'Hukum Yang Berlaku & Penyelesaian Sengketa',
+      content: 'Sesuai Pasal 18A ayat (1) UU No. 1 Tahun 2024, Kontrak Elektronik ini tunduk pada hukum Republik Indonesia. Setiap sengketa akan diselesaikan secara musyawarah untuk mufakat, dan apabila tidak tercapai kesepakatan, diselesaikan melalui domisili Pengadilan Negeri yang berwenang.',
       isEnabled: true,
     },
+
+    // --- PASAL-PASAL DOKUMEN NDA ---
     {
       id: 'nda-1',
       docType: 'NDA',
-      title: 'Definisi Informasi Rahasia',
-      content: 'Sesuai UU No. 30 Tahun 2000 tentang Rahasia Dagang, Informasi Rahasia mencakup seluruh data teknis, kode sumber, skema database, aset desain, strategi pemasaran, serta data finansial yang diberikan oleh Pemilik Informasi.',
+      title: 'Definisi Rahasia Dagang & Informasi Rahasia',
+      content: 'Sesuai Pasal 1 angka 1 & Pasal 4 huruf b UU No. 30 Tahun 2000 tentang Rahasia Dagang, Informasi Rahasia mencakup seluruh data teknis, kode sumber, skema database, aset desain, strategi bisnis, serta data finansial yang dijaga kerahasiaannya oleh Pemilik Informasi.',
       isEnabled: true,
     },
     {
       id: 'nda-2',
       docType: 'NDA',
-      title: 'Kewajiban & Pembatasan Kerahasiaan',
-      content: 'Penerima Informasi dilarang keras mengungkapkan, menggandakan, menyebarluaskan, atau memanfaatkan Informasi Rahasia kepada pihak ketiga mana pun tanpa persetujuan tertulis terlebih dahulu dari Pemilik Informasi.',
+      title: 'Kewajiban & Pembatasan Pengungkapan',
+      content: 'Berdasarkan Pasal 13 UU No. 30 Tahun 2000, Penerima Informasi dilarang keras mengutarakan, membocorkan, menyebarluaskan, atau memanfaatkan Informasi Rahasia kepada pihak ketiga tanpa persetujuan tertulis dari Pemilik Informasi.',
       isEnabled: true,
     },
     {
       id: 'nda-3',
       docType: 'NDA',
-      title: 'Pengecualian Kerahasiaan',
-      content: 'Kewajiban kerahasiaan tidak berlaku atas informasi yang: (a) telah menjadi milik umum (public domain) tanpa pelanggaran NDA; (b) telah diketahui sebelumnya secara sah; atau (c) wajib dibuka berdasarkan perintah hukum / keputusan Pengadilan.',
+      title: 'Pelindungan Data Pribadi Para Pihak',
+      content: 'Sesuai Pasal 20 ayat (2) huruf b, Pasal 22 ayat (1)-(2), dan Pasal 36 UU No. 27 Tahun 2022 tentang Pelindungan Data Pribadi (UU PDP), Pengendali Data Pribadi wajib menjaga kerahasiaan Data Pribadi Para Pihak yang diperoleh dalam rangka pemenuhan perjanjian.',
       isEnabled: true,
     },
     {
@@ -249,16 +253,18 @@ export default function Home() {
       id: 'nda-6',
       docType: 'NDA',
       title: 'Sanksi Pelanggaran & Denda Finansial',
-      content: 'Setiap bentuk kebocoran atau pelanggaran kerahasiaan dikenakan denda penalti finansial serta hak untuk menuntut ganti rugi materiil/immateriil sesuai ketentuan hukum perdata.',
+      content: 'Setiap bentuk kebocoran atau pelanggaran kerahasiaan dikenakan denda penalti finansial serta hak untuk menuntut ganti rugi materiil/immateriil sesuai ketentuan hukum perdata dan pidana yang berlaku.',
       isEnabled: true,
     },
     {
       id: 'nda-7',
       docType: 'NDA',
       title: 'Penyelesaian Sengketa',
-      content: 'Setiap perselisihan yang timbul dari pelaksanaan NDA ini diselesaikan melalui musyawarah untuk mufakat, dan apabila gagal, diselesaikan di forum hukum Pengadilan Negeri setempat.',
+      content: 'Setiap perselisihan yang timbul dari pelaksanaan NDA ini diselesaikan secara musyawarah untuk mufakat, dan apabila gagal, diselesaikan di forum hukum Pengadilan Negeri setempat.',
       isEnabled: true,
     },
+
+    // --- PASAL-PASAL DOKUMEN BAST ---
     {
       id: 'bast-1',
       docType: 'BAST',
@@ -290,8 +296,8 @@ export default function Home() {
     {
       id: 'bast-5',
       docType: 'BAST',
-      title: 'Pengesahan Hak Pelunasan Pembayaran',
-      content: 'Dengan ditandatanganinya BAST ini, kewajiban pengerjaan PIHAK PERTAMA dinyatakan selesai sempurna, dan PIHAK PERTAMA berhak penuh atas pencairan pelunasan 100% dari PIHAK KEDUA.',
+      title: 'Pengesahan Pelunasan & Pengalihan Hak',
+      content: 'Sesuai UU Hak Cipta & UU Paten, dengan ditandatanganinya BAST ini dan dilunasinya kewajiban pembayaran 100%, seluruh hasil pengerjaan resmi diserahterimakan dan hak penggunaan dialihkan kepada PIHAK KEDUA.',
       isEnabled: true,
     },
   ]);
@@ -404,13 +410,14 @@ export default function Home() {
     }
   }, []);
 
+  // Sync Dinamis Variabel ke Dalam Teks Pasal Terkait
   useEffect(() => {
     setClauses((prev) =>
       prev.map((c) => {
         if (c.id === 'spk-1') {
           return {
             ...c,
-            content: `PIHAK PERTAMA berkewajiban melaksanakan pekerjaan "${projectTitle || 'Pengembangan Aplikasi Web & API Integration'}" sesuai dengan acuan spesifikasi teknis dan deliverables yang telah disepakati bersama PIHAK KEDUA.`,
+            content: `Sesuai Pasal 17 ayat (2) & Pasal 18A ayat (2) UU No. 1 Tahun 2024 (UU ITE), Para Pihak sepakat melaksanakan pekerjaan "${projectTitle || 'Pengembangan Aplikasi Web & API Integration'}" dengan iktikad baik, transparan, dan jelas sesuai acuan spesifikasi teknis dan deliverables yang disepakati.`,
           };
         }
         if (c.id === 'spk-3') {
@@ -422,7 +429,7 @@ export default function Home() {
         if (c.id === 'nda-1') {
           return {
             ...c,
-            content: `Sesuai UU No. 30 Tahun 2000 tentang Rahasia Dagang, Informasi Rahasia mencakup seluruh data teknis, "${ndaScope || 'Source Code, Skema Database, Aset Desain Figma, & Strategi Bisnis'}", kode sumber, strategi pemasaran, serta data finansial yang diberikan oleh Pemilik Informasi.`,
+            content: `Sesuai Pasal 1 angka 1 & Pasal 4 huruf b UU No. 30 Tahun 2000 tentang Rahasia Dagang, Informasi Rahasia mencakup seluruh data teknis, "${ndaScope || 'Source Code, Skema Database, Aset Desain Figma, & Strategi Bisnis'}", kode sumber, strategi pemasaran, serta data finansial yang diberikan oleh Pemilik Informasi.`,
           };
         }
         if (c.id === 'nda-4') {
@@ -769,6 +776,7 @@ export default function Home() {
         }
       }
 
+      // Penamaan File Format Sederhana tanpa status: spk_namapihakpertama.pdf
       const cleanName = (freelancerName || 'pihak_pertama')
         .trim()
         .toLowerCase()
@@ -1140,7 +1148,7 @@ export default function Home() {
         .a4-page.export-pdf-mode {
           display: flex !important;
           flex-direction: column !important;
-          justify-between: space-between !important;
+          justify-content: space-between !important;
           padding: 40px !important;
           box-sizing: border-box !important;
         }
@@ -1898,11 +1906,11 @@ export default function Home() {
 
                         {!needsPage2 && (
                           <div className="pt-2 sm:pt-3 grid grid-cols-2 gap-3 sm:gap-4 text-center">
-                            <div className="bg-slate-50/80 border border-slate-200/80 rounded-xl p-2.5 sm:p-3 space-y-1.5">
+                            <div className="bg-slate-50/80 border border-slate-200/80 rounded-xl p-2.5 sm:p-3 space-y-1.5 min-h-[100px] flex flex-col justify-between">
                               <span className="text-[11px] font-bold text-blue-600 uppercase tracking-wider block">
                                 PIHAK PERTAMA
                               </span>
-                              <div className="h-8 sm:h-12 flex items-center justify-center">
+                              <div className="h-10 sm:h-12 flex items-center justify-center">
                                 {signatureFirstParty && (
                                   <img src={signatureFirstParty} alt="TTD Pihak Pertama" className="max-h-8 sm:max-h-12 mx-auto object-contain" />
                                 )}
@@ -1912,11 +1920,11 @@ export default function Home() {
                               </p>
                             </div>
 
-                            <div className="bg-slate-50/80 border border-slate-200/80 rounded-xl p-2.5 sm:p-3 space-y-1.5">
+                            <div className="bg-slate-50/80 border border-slate-200/80 rounded-xl p-2.5 sm:p-3 space-y-1.5 min-h-[100px] flex flex-col justify-between">
                               <span className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider block">
                                 PIHAK KEDUA
                               </span>
-                              <div className="h-8 sm:h-12 flex items-center justify-center">
+                              <div className="h-10 sm:h-12 flex items-center justify-center">
                                 {signatureSecondParty && (
                                   <img src={signatureSecondParty} alt="TTD Pihak Kedua" className="max-h-8 sm:max-h-12 mx-auto object-contain" />
                                 )}
@@ -1974,7 +1982,7 @@ export default function Home() {
                           </div>
 
                           <div className="pt-4 sm:pt-6 grid grid-cols-2 gap-3 sm:gap-4 text-center">
-                            <div className="bg-slate-50/80 border border-slate-200/80 rounded-xl p-3 sm:p-4 space-y-2 sm:space-y-3">
+                            <div className="bg-slate-50/80 border border-slate-200/80 rounded-xl p-3 sm:p-4 space-y-2 sm:space-y-3 min-h-[120px] flex flex-col justify-between">
                               <span className="text-[11px] font-bold text-blue-600 uppercase tracking-wider block">
                                 PIHAK PERTAMA
                               </span>
@@ -1988,7 +1996,7 @@ export default function Home() {
                               </p>
                             </div>
 
-                            <div className="bg-slate-50/80 border border-slate-200/80 rounded-xl p-3 sm:p-4 space-y-2 sm:space-y-3">
+                            <div className="bg-slate-50/80 border border-slate-200/80 rounded-xl p-3 sm:p-4 space-y-2 sm:space-y-3 min-h-[120px] flex flex-col justify-between">
                               <span className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider block">
                                 PIHAK KEDUA
                               </span>
@@ -2302,7 +2310,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* PUSAT UNDUHAN BUNDLING & INDIVIDUAL (MODAL SUKSES - BERSIH TANPA SPINNER LOADER BERSARING) */}
+      {/* PUSAT UNDUHAN BUNDLING & INDIVIDUAL (MODAL SUKSES - BERSIH TANPA SPINNER BERPUTAR) */}
       {showSuccessModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white max-w-md w-full rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-5 text-center my-8 max-h-[90vh] overflow-y-auto relative">
@@ -2589,9 +2597,11 @@ export default function Home() {
                 Landasan Hukum
               </h4>
               <ul className="space-y-2 text-xs">
-                <li>Pasal 1320 KUHPerdata</li>
-                <li>Pasal 1338 KUHPerdata</li>
-                <li>Pasal 1464 KUHPerdata</li>
+                <li>Pasal 1320 & 1338 KUHPerdata</li>
+                <li>UU No. 28/2014 (Hak Cipta)</li>
+                <li>UU No. 30/2000 (Rahasia Dagang)</li>
+                <li>UU No. 27/2022 (Pelindungan Data)</li>
+                <li>UU No. 1/2024 (ITE & Kontrak Digital)</li>
               </ul>
             </div>
 
