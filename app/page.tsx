@@ -1903,12 +1903,8 @@ export default function Home() {
                                 PIHAK PERTAMA
                               </span>
                               <div className="h-8 sm:h-12 flex items-center justify-center">
-                                {signatureFirstParty ? (
+                                {signatureFirstParty && (
                                   <img src={signatureFirstParty} alt="TTD Pihak Pertama" className="max-h-8 sm:max-h-12 mx-auto object-contain" />
-                                ) : (
-                                  <div className="w-20 sm:w-28 h-6 sm:h-8 border border-dashed border-slate-300/80 rounded-lg flex items-center justify-center text-[10px] text-slate-400">
-                                    [Tanda Tangan]
-                                  </div>
                                 )}
                               </div>
                               <p className="font-bold underline text-slate-900 text-[12px] sm:text-[13px]">
@@ -1921,12 +1917,8 @@ export default function Home() {
                                 PIHAK KEDUA
                               </span>
                               <div className="h-8 sm:h-12 flex items-center justify-center">
-                                {signatureSecondParty ? (
+                                {signatureSecondParty && (
                                   <img src={signatureSecondParty} alt="TTD Pihak Kedua" className="max-h-8 sm:max-h-12 mx-auto object-contain" />
-                                ) : (
-                                  <div className="w-20 sm:w-28 h-6 sm:h-8 border border-dashed border-slate-300/80 rounded-lg flex items-center justify-center text-[10px] text-slate-400">
-                                    [Tanda Tangan]
-                                  </div>
                                 )}
                               </div>
                               <p className="font-bold underline text-slate-900 text-[12px] sm:text-[13px]">
@@ -1987,12 +1979,8 @@ export default function Home() {
                                 PIHAK PERTAMA
                               </span>
                               <div className="h-10 sm:h-14 flex items-center justify-center">
-                                {signatureFirstParty ? (
+                                {signatureFirstParty && (
                                   <img src={signatureFirstParty} alt="TTD Pihak Pertama" className="max-h-10 sm:max-h-14 mx-auto object-contain" />
-                                ) : (
-                                  <div className="w-20 sm:w-28 h-7 sm:h-9 border border-dashed border-slate-300/80 rounded-lg flex items-center justify-center text-[10px] text-slate-400">
-                                    [Tanda Tangan]
-                                  </div>
                                 )}
                               </div>
                               <p className="font-bold underline text-slate-900 text-[12px] sm:text-[13px]">
@@ -2005,12 +1993,8 @@ export default function Home() {
                                 PIHAK KEDUA
                               </span>
                               <div className="h-10 sm:h-14 flex items-center justify-center">
-                                {signatureSecondParty ? (
+                                {signatureSecondParty && (
                                   <img src={signatureSecondParty} alt="TTD Pihak Kedua" className="max-h-10 sm:max-h-14 mx-auto object-contain" />
-                                ) : (
-                                  <div className="w-20 sm:w-28 h-7 sm:h-9 border border-dashed border-slate-300/80 rounded-lg flex items-center justify-center text-[10px] text-slate-400">
-                                    [Tanda Tangan]
-                                  </div>
                                 )}
                               </div>
                               <p className="font-bold underline text-slate-900 text-[12px] sm:text-[13px]">
