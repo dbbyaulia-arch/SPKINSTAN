@@ -87,6 +87,9 @@ export default function Home() {
     BAST: false,
   });
 
+  // State Tracking Proses Unduh Individual
+  const [processingDoc, setProcessingDoc] = useState<'SPK' | 'NDA' | 'BAST' | 'ALL' | null>(null);
+
   const [paidDocTarget, setPaidDocTarget] = useState<'SPK' | 'NDA' | 'BAST'>('SPK');
   const [shouldAutoDownload, setShouldAutoDownload] = useState(false);
   const [, setAutoDownloadStatus] = useState<string>('');
@@ -322,7 +325,7 @@ export default function Home() {
     }));
   };
 
-  // Pemulihan State Status Pembayaran dari LocalStorage
+  // PHASE 1: Pemulihan & Rehidrasi State Modal & Lisensi Pembayaran dari LocalStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedPaid = localStorage.getItem('spkinstan_paid_docs');
@@ -561,7 +564,7 @@ export default function Home() {
     );
   };
 
-  // DYNAMIC CLAUSE PARTITIONING & HALAMAN A4
+  // DYNAMIC CLAUSE PARTITIONING & HALAMAN A4 (MAX_PAGE_CONTENT_HEIGHT = 960)
   const activeClauses = clauses.filter((c) => c.docType === activeDocTab && c.isEnabled);
   const SPLIT_LIMIT = 4;
   const isClauseSplit = activeClauses.length > SPLIT_LIMIT;
@@ -668,7 +671,7 @@ export default function Home() {
     }
   }, [showCheckoutModal]);
 
-  // Eksekusi Kelunasan & Pencabutan Watermark
+  // Eksekusi Kelunasan & Pencabutan Watermark (Menyimpan State di LocalStorage)
   const handlePaymentSuccess = () => {
     stopPolling();
     setIsProcessingSuccess(true);
@@ -712,12 +715,12 @@ export default function Home() {
     });
   };
 
-  // GENERATOR PDF DENGAN NATIVE jsPDF.save() — TERUJI DI DESKTOP, ANDROID, & APPLE
+  // PHASE 2 & 3: GENERATOR PDF DENGAN PENAMAAN STERIL ASCII & SAFARI OPTIMIZATION
   const captureDocumentToPdf = async (
     docType: 'SPK' | 'NDA' | 'BAST',
     shouldConsumeLicense = true
   ) => {
-    setMobileViewMode('preview');
+    setProcessingDoc(docType);
     setIsExporting(true);
 
     if (activeDocTab !== docType) {
@@ -734,6 +737,7 @@ export default function Home() {
     if (!element) {
       console.error('Elemen #a4-document-preview tidak ditemukan');
       setIsExporting(false);
+      setProcessingDoc(null);
       return;
     }
 
@@ -745,6 +749,7 @@ export default function Home() {
         orientation: 'portrait',
         unit: 'mm',
         format: 'a4',
+        compress: true,
       });
 
       const pageElements = element.querySelectorAll('.a4-page');
@@ -805,9 +810,14 @@ export default function Home() {
 
       const isPaidDoc = paidDocs[docType] || paidDocs[activeDocTab];
       const fileSuffix = isPaidDoc ? 'CLEAN' : 'WATERMARKED_DRAFT';
-      const fileName = `SPKInstan_${docType}_${(freelancerName || 'PihakPertama').replace(/\s+/g, '_')}_${fileSuffix}.pdf`;
+      // Pembersihan Karakter Khusus Menjadi Format ASCII Steril
+      const cleanName = (freelancerName || 'PihakPertama')
+        .trim()
+        .replace(/[^a-zA-Z0-9]/g, '_')
+        .replace(/_+/g, '_');
+      const fileName = `SPKInstan_${docType}_${cleanName}_${fileSuffix}.pdf`;
 
-      // METODE NATIVE jsPDF.save() — TERUJI DI LAPTOP & MOBILE (Mencegah Network Error / Premature Revoke)
+      // METODE NATIVE jsPDF.save() — Mencegah Isu Teks tambaham di Safari
       pdf.save(fileName);
 
       setDownloadedDocs((prev) => {
@@ -826,11 +836,13 @@ export default function Home() {
       alert('Gagal mengekspor PDF.');
     } finally {
       setIsExporting(false);
+      setProcessingDoc(null);
     }
   };
 
-  // HANDLER BATCH DOWNLOADER BUNDLING
+  // PHASE 3: HANDLER BATCH DOWNLOADER BUNDLING DENGAN DELAY 800MS UNTUK MENCEGAH POP-UP BLOCKER
   const handleDownloadAllBundling = async () => {
+    setProcessingDoc('ALL');
     setIsExporting(true);
     const docs: ('SPK' | 'NDA' | 'BAST')[] = ['SPK', 'NDA', 'BAST'];
 
@@ -838,6 +850,7 @@ export default function Home() {
       for (const doc of docs) {
         await switchTabAndAwaitRender(doc);
         await captureDocumentToPdf(doc, false);
+        // Delay 800ms mencegah pencegatan Pop-up Blocker di Android & Safari
         await new Promise((res) => setTimeout(res, 800));
       }
 
@@ -849,6 +862,7 @@ export default function Home() {
       alert('Terjadi kendala saat mengunduh paket bundling.');
     } finally {
       setIsExporting(false);
+      setProcessingDoc(null);
     }
   };
 
@@ -857,7 +871,7 @@ export default function Home() {
     await captureDocumentToPdf(docType, true);
   };
 
-  // Handler Menutup Modal Sukses
+  // PHASE 1: HANDLER MENUTUP MODAL SUKSES SECARA EKSPLISIT (PEMBERSIHAN SESSION LOCALSTORAGE)
   const handleCloseSuccessModal = () => {
     setShowSuccessModal(false);
     if (typeof window !== 'undefined') {
@@ -2040,7 +2054,7 @@ export default function Home() {
                           </div>
                         </div>
 
-                        {/* Document Title Block (18px-20px Bold) */}
+                        {/* Document Title Block (18px-20px Bold Standard Calibri) */}
                         <div className="border-l-4 border-blue-600 pl-3 sm:pl-4 py-0.5">
                           <h2 className="text-[18px] sm:text-[20px] font-extrabold tracking-wide text-slate-900 uppercase leading-[1.2]">
                             {activeDocTab === 'SPK' && 'PERJANJIAN KERJA SAMA PEKERJAAN JASA'}
@@ -2052,7 +2066,7 @@ export default function Home() {
                           </p>
                         </div>
 
-                        {/* Parties Identification Paragraph (12px-13px Regular) */}
+                        {/* Parties Identification Paragraph (12px-13px Regular Standard) */}
                         <div className="bg-slate-50/70 border border-slate-200/80 rounded-xl p-2.5 sm:p-3 space-y-1.5">
                           <p className="text-slate-700 text-[12px] sm:text-[13px] leading-[1.5]">
                             Pada hari ini, <strong>{getTodayFormattedDate()}</strong>, kami yang bertanda tangan di bawah ini secara sadar dan tanpa paksaan sepakat mengikatkan diri dalam perikatan hukum perdata:
@@ -2395,7 +2409,7 @@ export default function Home() {
                   <button
                     type="button"
                     onClick={() => setShowCheckoutModal(false)}
-                    className="text-slate-400 hover:text-slate-600"
+                    className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -2472,7 +2486,7 @@ export default function Home() {
               </div>
             )}
 
-            {/* STEP 2: Payment Process View */}
+            {/* STEP 2: Payment Process View dengan Banner Peringatan Tegas */}
             {modalStep === 'qris' && (
               <div className="space-y-4 text-center">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -2596,10 +2610,28 @@ export default function Home() {
         </div>
       )}
 
-      {/* Modal Sukses (Tanpa Animasi Spinner Berputar) */}
+      {/* PHASE 2 & 4: Modal Sukses Ringkas (Download Hub Tanpa Render Preview DOM Berat & Tanpa Spinner Berputar) */}
       {showSuccessModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white max-w-md w-full rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-5 text-center my-8 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white max-w-md w-full rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-5 text-center my-8 max-h-[90vh] overflow-y-auto relative">
+
+            {/* Header Modal Sukses & Tombol X Close */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 text-left">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-emerald-600" />
+                <span className="text-xs font-extrabold text-slate-900 uppercase">
+                  Pusat Unduhan Dokumen Legal
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={handleCloseSuccessModal}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition"
+                title="Tutup Modal"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
             {/* Header Status Sukses */}
             <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
@@ -2634,7 +2666,7 @@ export default function Home() {
                   onClick={handleDownloadAllBundling}
                   className="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white font-extrabold rounded-2xl text-xs shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 transition"
                 >
-                  {isExporting ? (
+                  {processingDoc === 'ALL' ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
                       <span>MENGUNDUH PAKET BUNDLING (SPK, NDA, BAST)...</span>
@@ -2656,7 +2688,7 @@ export default function Home() {
                 </div>
 
                 <div className="space-y-2">
-                  {/* Tombol 1: SPK */}
+                  {/* PHASE 4: Tombol 1 - SPK */}
                   <button
                     type="button"
                     disabled={isExporting}
@@ -2672,7 +2704,11 @@ export default function Home() {
                       <span>1. Perjanjian Kerja Sama (SPK)</span>
                     </div>
                     <span className="font-extrabold flex items-center gap-1 text-[11px]">
-                      {downloadedDocs.SPK ? (
+                      {processingDoc === 'SPK' ? (
+                        <span className="text-blue-600 flex items-center gap-1">
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Memproses PDF...
+                        </span>
+                      ) : downloadedDocs.SPK ? (
                         <span className="text-emerald-600 flex items-center gap-1">
                           <CheckCircle className="w-3.5 h-3.5" /> ✓ Terunduh
                         </span>
@@ -2684,7 +2720,7 @@ export default function Home() {
                     </span>
                   </button>
 
-                  {/* Tombol 2: NDA */}
+                  {/* PHASE 4: Tombol 2 - NDA */}
                   <button
                     type="button"
                     disabled={isExporting}
@@ -2700,7 +2736,11 @@ export default function Home() {
                       <span>2. Perjanjian Kerahasiaan (NDA)</span>
                     </div>
                     <span className="font-extrabold flex items-center gap-1 text-[11px]">
-                      {downloadedDocs.NDA ? (
+                      {processingDoc === 'NDA' ? (
+                        <span className="text-indigo-600 flex items-center gap-1">
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Memproses PDF...
+                        </span>
+                      ) : downloadedDocs.NDA ? (
                         <span className="text-emerald-600 flex items-center gap-1">
                           <CheckCircle className="w-3.5 h-3.5" /> ✓ Terunduh
                         </span>
@@ -2712,7 +2752,7 @@ export default function Home() {
                     </span>
                   </button>
 
-                  {/* Tombol 3: BAST */}
+                  {/* PHASE 4: Tombol 3 - BAST */}
                   <button
                     type="button"
                     disabled={isExporting}
@@ -2728,7 +2768,11 @@ export default function Home() {
                       <span>3. Berita Acara Serah Terima (BAST)</span>
                     </div>
                     <span className="font-extrabold flex items-center gap-1 text-[11px]">
-                      {downloadedDocs.BAST ? (
+                      {processingDoc === 'BAST' ? (
+                        <span className="text-purple-600 flex items-center gap-1">
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Memproses PDF...
+                        </span>
+                      ) : downloadedDocs.BAST ? (
                         <span className="text-emerald-600 flex items-center gap-1">
                           <CheckCircle className="w-3.5 h-3.5" /> ✓ Terunduh
                         </span>
@@ -2752,10 +2796,28 @@ export default function Home() {
                   type="button"
                   disabled={isExporting}
                   onClick={() => handleIndividualDownload(paidDocTarget)}
-                  className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white font-extrabold rounded-2xl text-xs shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2"
+                  className={`w-full py-3.5 rounded-2xl text-xs font-extrabold flex items-center justify-center gap-2 transition border ${
+                    downloadedDocs[paidDocTarget]
+                      ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                      : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/30'
+                  }`}
                 >
-                  <Download className="w-4 h-4" />
-                  <span>UNDUH PDF CLEAN ({paidDocTarget})</span>
+                  {processingDoc === paidDocTarget ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Memproses PDF {paidDocTarget}...</span>
+                    </>
+                  ) : downloadedDocs[paidDocTarget] ? (
+                    <>
+                      <CheckCircle className="w-4 h-4 text-emerald-600" />
+                      <span>✓ TERUNDUH — KLIK UNTUK UNDUH ULANG ({paidDocTarget})</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4" />
+                      <span>UNDUH PDF CLEAN ({paidDocTarget})</span>
+                    </>
+                  )}
                 </button>
               </div>
             )}
@@ -2794,7 +2856,7 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Tombol Selesai */}
+            {/* Tombol Selesai & Pembersihan Explicit */}
             <button
               type="button"
               onClick={handleCloseSuccessModal}
