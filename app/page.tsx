@@ -109,6 +109,7 @@ export default function Home() {
   const [clientName, setClientName] = useState('');
   const [clientWa, setClientWa] = useState('');
 
+  // Multi-Doc State untuk Nomor Surat
   const [docNumbers, setDocNumbers] = useState({
     SPK: '001/SPK/IX/2026',
     NDA: '001/NDA/IX/2026',
@@ -675,7 +676,7 @@ export default function Home() {
     });
   };
 
-  // PERBAIKAN UTAMA: GENERATOR PDF NATIVE BLOB DOWNLOAD
+  // PERBAIKAN GENERATOR PDF: Menggunakan pdf.save() jsPDF secara langsung yang terbukti stabil
   const captureDocumentToPdf = async (
     docType: 'SPK' | 'NDA' | 'BAST',
     shouldConsumeLicense = true
@@ -777,17 +778,8 @@ export default function Home() {
         .replace(/_+/g, '_');
       const fileName = `SPKInstan_${docType}_${cleanName}_${fileSuffix}.pdf`;
 
-      // NATIVE BLOB TRIGGER — Mencegah Kegagalan Unduh Browser
-      const pdfBlob = pdf.output('blob');
-      const blobUrl = URL.createObjectURL(pdfBlob);
-      const downloadAnchor = document.createElement('a');
-      downloadAnchor.href = blobUrl;
-      downloadAnchor.download = fileName;
-      document.body.appendChild(downloadAnchor);
-      downloadAnchor.click();
-      document.body.removeChild(downloadAnchor);
-
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+      // Eksekusi Save PDF Bawaan jsPDF (Sangat stabil di semua browser)
+      pdf.save(fileName);
 
       setDownloadedDocs((prev) => {
         const nextState = { ...prev, [docType]: true };
@@ -809,7 +801,11 @@ export default function Home() {
     }
   };
 
-  const handleDownloadAllBundling = async () => {
+  const handleDownloadAllBundling = async (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     setProcessingDoc('ALL');
     setIsExporting(true);
     const docs: ('SPK' | 'NDA' | 'BAST')[] = ['SPK', 'NDA', 'BAST'];
@@ -833,7 +829,11 @@ export default function Home() {
     }
   };
 
-  const handleIndividualDownload = async (docType: 'SPK' | 'NDA' | 'BAST') => {
+  const handleIndividualDownload = async (docType: 'SPK' | 'NDA' | 'BAST', e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     await captureDocumentToPdf(docType, true);
   };
 
@@ -1073,12 +1073,18 @@ export default function Home() {
     }
   };
 
-  const handleFreeDownload = () => {
+  // PERBAIKAN FUNGSI HANDLER DOWNLOAD GRATIS (WATERMARK)
+  const handleFreeDownload = (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     setShowCheckoutModal(false);
-    captureDocumentToPdf(activeDocTab);
+    captureDocumentToPdf(activeDocTab, false);
   };
 
-  const handleFinishForm = () => {
+  const handleFinishForm = (e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
     setMobileViewMode('preview');
     if (!paidDocs[activeDocTab]) {
       setModalStep('download_choice');
@@ -1109,7 +1115,6 @@ export default function Home() {
     'Legalisasi & Tanda Tangan'
   ];
 
-  // Pengecekan status bundling universal
   const isBundlingPackage = selectedPackage === 'BUNDLING' || (paidDocs.SPK && paidDocs.NDA && paidDocs.BAST);
 
   return (
@@ -1208,6 +1213,7 @@ export default function Home() {
               <div className="pt-2 flex items-center justify-center">
                 <div className="flex flex-col sm:flex-row p-1.5 bg-slate-200/70 rounded-2xl sm:rounded-full w-full sm:w-auto shadow-inner border border-slate-300/40 gap-1.5 sm:gap-0">
                   <button
+                    type="button"
                     onClick={() => setSelectedPackage('SINGLE')}
                     className={`w-full sm:w-auto px-4 py-2.5 rounded-xl sm:rounded-full text-xs sm:text-sm font-semibold transition-all duration-200 text-center ${
                       selectedPackage === 'SINGLE'
@@ -1218,6 +1224,7 @@ export default function Home() {
                     Dokumen Satuan — Rp 1.000
                   </button>
                   <button
+                    type="button"
                     onClick={() => setSelectedPackage('BUNDLING')}
                     className={`w-full sm:w-auto px-4 py-2.5 rounded-xl sm:rounded-full text-xs sm:text-sm font-semibold transition-all duration-200 flex items-center justify-center gap-1.5 ${
                       selectedPackage === 'BUNDLING'
@@ -1553,7 +1560,7 @@ export default function Home() {
                             className={`py-1.5 px-2 rounded-xl text-[10px] font-bold border transition-all ${
                               activePreset === 'web'
                                 ? 'bg-blue-600 text-white border-blue-600'
-                                : 'bg-white text-slate-700 border-slate-200'
+                                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                             }`}
                           >
                             Preset Web/App
@@ -1564,7 +1571,7 @@ export default function Home() {
                             className={`py-1.5 px-2 rounded-xl text-[10px] font-bold border transition-all ${
                               activePreset === 'design'
                                 ? 'bg-blue-600 text-white border-blue-600'
-                                : 'bg-white text-slate-700 border-slate-200'
+                                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                             }`}
                           >
                             Preset Desain
@@ -1575,7 +1582,7 @@ export default function Home() {
                             className={`py-1.5 px-2 rounded-xl text-[10px] font-bold border transition-all ${
                               activePreset === 'all'
                                 ? 'bg-blue-600 text-white border-blue-600'
-                                : 'bg-white text-blue-600 border-blue-200'
+                                : 'bg-white text-blue-600 border-blue-200 hover:bg-slate-50'
                             }`}
                           >
                             Aktifkan Semua
@@ -2044,8 +2051,8 @@ export default function Home() {
                   <div className="w-full sm:w-auto flex flex-col sm:flex-row items-center gap-2">
                     <button
                       type="button"
-                      onClick={handleFreeDownload}
-                      className="w-full sm:w-auto px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-full text-xs flex items-center justify-center gap-1.5 border border-slate-300"
+                      onClick={(e) => handleFreeDownload(e)}
+                      className="w-full sm:w-auto px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-full text-xs flex items-center justify-center gap-1.5 border border-slate-300 transition-all"
                     >
                       <Download className="w-4 h-4 text-slate-600" />
                       <span>Download Draf Watermark</span>
@@ -2054,8 +2061,8 @@ export default function Home() {
                     {paidDocs[activeDocTab] ? (
                       <button
                         type="button"
-                        onClick={() => handleIndividualDownload(activeDocTab)}
-                        className="w-full sm:w-auto px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-full text-xs shadow-md flex items-center justify-center gap-1.5"
+                        onClick={(e) => handleIndividualDownload(activeDocTab, e)}
+                        className="w-full sm:w-auto px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-full text-xs shadow-md flex items-center justify-center gap-1.5 transition-all"
                       >
                         <Download className="w-4 h-4" />
                         <span>Unduh PDF Clean</span>
@@ -2067,7 +2074,7 @@ export default function Home() {
                           setModalStep('download_choice');
                           setShowCheckoutModal(true);
                         }}
-                        className="w-full sm:w-auto px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-full text-xs shadow-md flex items-center justify-center gap-1.5"
+                        className="w-full sm:w-auto px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-full text-xs shadow-md flex items-center justify-center gap-1.5 transition-all"
                       >
                         <Unlock className="w-4 h-4" />
                         <span>Buka PDF HD Tanpa Watermark</span>
@@ -2130,7 +2137,7 @@ export default function Home() {
         </section>
       </main>
 
-      {/* INTEGRATED PAYMENT MODAL (NO NEW TAB, NO FULL-WEB IFRAME RECURSION) */}
+      {/* INTEGRATED PAYMENT MODAL */}
       {showCheckoutModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white max-w-lg w-full rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-5 my-8 relative">
@@ -2238,7 +2245,18 @@ export default function Home() {
                   </p>
                 </div>
 
-                {/* CONTAINER IFRAME MAYAR LANGSUNG DI DALAM MODAL */}
+                {/* Banner Peringatan Modal Pembayaran */}
+                <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-3 text-left space-y-1">
+                  <div className="flex items-center gap-1.5 font-extrabold text-amber-900 text-xs">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>PERINGATAN SANGAT PENTING:</span>
+                  </div>
+                  <p className="text-[11px] text-amber-800 leading-relaxed font-medium">
+                    Jangan menutup, memuat ulang (refresh), atau berpindah dari halaman ini saat atau setelah pembayaran. Dokumen Anda akan diproses secara otomatis di layar ini.
+                  </p>
+                </div>
+
+                {/* CONTAINER IFRAME MAYAR */}
                 <div className="w-full h-[400px] rounded-2xl border border-slate-200 overflow-hidden bg-slate-50 relative shadow-inner">
                   {paymentUrl ? (
                     <iframe
@@ -2294,7 +2312,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* PUSAT UNDUHAN BUNDLING & INDIVIDUAL FLEKSIBEL (MODAL SUKSES) */}
+      {/* PUSAT UNDUHAN BUNDLING & INDIVIDUAL (MODAL SUKSES - BERSIH TANPA SPINNER LOADER BERSARING) */}
       {showSuccessModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white max-w-md w-full rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-5 text-center my-8 max-h-[90vh] overflow-y-auto relative">
@@ -2333,7 +2351,7 @@ export default function Home() {
                 <span>PENTING: Segera Unduh & Simpan Dokumen!</span>
               </div>
               <p className="text-[11px] text-amber-800 leading-relaxed font-medium">
-                Platform ini berjalan <strong>tanpa database & tanpa login</strong>. Jika Tab ini ditutup, Anda <strong>tidak bisa mengunduh ulang</strong>.
+                Platform ini berjalan <strong>tanpa database & tanpa login</strong>. Jika tab ini ditutup, Anda <strong>tidak bisa mengunduh ulang</strong>.
               </p>
             </div>
 
@@ -2344,7 +2362,7 @@ export default function Home() {
                 <button
                   type="button"
                   disabled={isExporting}
-                  onClick={handleDownloadAllBundling}
+                  onClick={(e) => handleDownloadAllBundling(e)}
                   className="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white font-extrabold rounded-2xl text-xs shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 transition"
                 >
                   {processingDoc === 'ALL' ? (
@@ -2373,7 +2391,7 @@ export default function Home() {
                   <button
                     type="button"
                     disabled={isExporting}
-                    onClick={() => handleIndividualDownload('SPK')}
+                    onClick={(e) => handleIndividualDownload('SPK', e)}
                     className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold flex items-center justify-between border transition-all ${
                       downloadedDocs.SPK
                         ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
@@ -2405,7 +2423,7 @@ export default function Home() {
                   <button
                     type="button"
                     disabled={isExporting}
-                    onClick={() => handleIndividualDownload('NDA')}
+                    onClick={(e) => handleIndividualDownload('NDA', e)}
                     className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold flex items-center justify-between border transition-all ${
                       downloadedDocs.NDA
                         ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
@@ -2437,7 +2455,7 @@ export default function Home() {
                   <button
                     type="button"
                     disabled={isExporting}
-                    onClick={() => handleIndividualDownload('BAST')}
+                    onClick={(e) => handleIndividualDownload('BAST', e)}
                     className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold flex items-center justify-between border transition-all ${
                       downloadedDocs.BAST
                         ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
@@ -2472,7 +2490,7 @@ export default function Home() {
                 <button
                   type="button"
                   disabled={isExporting}
-                  onClick={() => handleIndividualDownload(paidDocTarget)}
+                  onClick={(e) => handleIndividualDownload(paidDocTarget, e)}
                   className={`w-full py-3.5 rounded-2xl text-xs font-extrabold flex items-center justify-center gap-2 transition border ${
                     downloadedDocs[paidDocTarget]
                       ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
@@ -2537,7 +2555,7 @@ export default function Home() {
       <div className="lg:hidden fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-slate-200 p-3 z-30 shadow-lg flex gap-2">
         <button
           type="button"
-          onClick={handleFreeDownload}
+          onClick={(e) => handleFreeDownload(e)}
           className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-full text-xs flex items-center justify-center gap-1 border border-slate-300"
         >
           <Download className="w-3.5 h-3.5 text-slate-600" />
@@ -2545,9 +2563,9 @@ export default function Home() {
         </button>
         <button
           type="button"
-          onClick={() => {
+          onClick={(e) => {
             if (paidDocs[activeDocTab]) {
-              handleIndividualDownload(activeDocTab);
+              handleIndividualDownload(activeDocTab, e);
             } else {
               setModalStep('download_choice');
               setShowCheckoutModal(true);
