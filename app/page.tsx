@@ -676,7 +676,9 @@ export default function Home() {
     });
   };
 
-  // PERBAIKAN GENERATOR PDF: Menggunakan pdf.save() jsPDF secara langsung yang terbukti stabil
+  // =========================================================================
+  // FUNGSI GENERATOR PDF PERBAIKAN TOTAL (STABIL DI MOBILE & DESKTOP)
+  // =========================================================================
   const captureDocumentToPdf = async (
     docType: 'SPK' | 'NDA' | 'BAST',
     shouldConsumeLicense = true
@@ -684,13 +686,15 @@ export default function Home() {
     setProcessingDoc(docType);
     setIsExporting(true);
 
+    // 1. Paksakan perpindahan ke mode preview di mobile agar DOM ter-render
     setMobileViewMode('preview');
 
     if (activeDocTab !== docType) {
       await switchTabAndAwaitRender(docType);
-    } else {
-      await new Promise((resolve) => setTimeout(resolve, 300));
     }
+
+    // 2. Beri waktu jeda ekstra untuk memastikan DOM & font benar-benar ter-paint di browser
+    await new Promise((resolve) => setTimeout(resolve, 600));
 
     if (typeof document !== 'undefined' && document.fonts) {
       await document.fonts.ready;
@@ -706,8 +710,20 @@ export default function Home() {
     }
 
     try {
-      const html2canvasPro = (await import('html2canvas-pro')).default;
+      // Fallback impor library jika html2canvas-pro tidak ter-install
+      let html2canvasLib: any;
+      try {
+        html2canvasLib = (await import('html2canvas-pro')).default;
+      } catch (e) {
+        html2canvasLib = (await import('html2canvas')).default;
+      }
+
       const { jsPDF } = await import('jspdf');
+
+      const pageElements = element.querySelectorAll('.a4-page');
+      if (!pageElements || pageElements.length === 0) {
+        throw new Error('Tidak ada halaman A4 yang dapat diproses.');
+      }
 
       const pdf = new jsPDF({
         orientation: 'portrait',
@@ -715,8 +731,6 @@ export default function Home() {
         format: 'a4',
         compress: true,
       });
-
-      const pageElements = element.querySelectorAll('.a4-page');
 
       for (let i = 0; i < pageElements.length; i++) {
         const pageEl = pageElements[i] as HTMLElement;
@@ -736,7 +750,7 @@ export default function Home() {
         pageEl.style.height = 'auto';
         pageEl.classList.add('export-pdf-mode');
 
-        const canvas = await html2canvasPro(pageEl, {
+        const canvas = await html2canvasLib(pageEl, {
           scale: 2,
           useCORS: true,
           allowTaint: true,
@@ -753,7 +767,7 @@ export default function Home() {
           watermarkElement.style.display = 'flex';
         }
 
-        const imgData = canvas.toDataURL('image/jpeg', 0.98);
+        const imgData = canvas.toDataURL('image/jpeg', 0.95);
         const imgWidth = 210;
         const pageHeight = 297;
         const imgHeight = (canvas.height * imgWidth) / canvas.width;
@@ -778,8 +792,25 @@ export default function Home() {
         .replace(/_+/g, '_');
       const fileName = `SPKInstan_${docType}_${cleanName}_${fileSuffix}.pdf`;
 
-      // Eksekusi Save PDF Bawaan jsPDF (Sangat stabil di semua browser)
-      pdf.save(fileName);
+      // Mekanisme Unduh Universal: Pemicu Blob URL untuk Mobile & Fallback Direct Save
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+        typeof navigator !== 'undefined' ? navigator.userAgent : ''
+      );
+
+      if (isMobile) {
+        const blob = pdf.output('blob');
+        const blobUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = fileName;
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+      } else {
+        pdf.save(fileName);
+      }
 
       setDownloadedDocs((prev) => {
         const nextState = { ...prev, [docType]: true };
@@ -792,9 +823,9 @@ export default function Home() {
       if (shouldConsumeLicense && isPaidDoc && sessionId) {
         await consumePaymentLicense(sessionId);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error generating PDF:', err);
-      alert('Gagal mengekspor PDF. Pastikan browser memberikan izin unduh file.');
+      alert(`Gagal mengekspor PDF: ${err?.message || 'Pastikan browser memberikan izin unduh file.'}`);
     } finally {
       setIsExporting(false);
       setProcessingDoc(null);
@@ -1073,7 +1104,6 @@ export default function Home() {
     }
   };
 
-  // PERBAIKAN FUNGSI HANDLER DOWNLOAD GRATIS (WATERMARK)
   const handleFreeDownload = (e?: React.MouseEvent) => {
     if (e) {
       e.preventDefault();
@@ -2312,7 +2342,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* PUSAT UNDUHAN BUNDLING & INDIVIDUAL (MODAL SUKSES - BERSIH TANPA SPINNER LOADER BERSARING) */}
+      {/* PUSAT UNDUHAN BUNDLING & INDIVIDUAL */}
       {showSuccessModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white max-w-md w-full rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-5 text-center my-8 max-h-[90vh] overflow-y-auto relative">
