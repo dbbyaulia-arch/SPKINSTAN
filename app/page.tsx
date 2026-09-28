@@ -715,7 +715,7 @@ export default function Home() {
     });
   };
 
-  // PHASE 2 & 3: GENERATOR PDF DENGAN PENAMAAN STERIL ASCII & SAFARI OPTIMIZATION
+  // PHASE 2 & 3: GENERATOR PDF DENGAN PENAMAAN STERIL ASCII, AUTO-PREVIEW SWITCH, & SAFARI OPTIMIZATION
   const captureDocumentToPdf = async (
     docType: 'SPK' | 'NDA' | 'BAST',
     shouldConsumeLicense = true
@@ -723,15 +723,18 @@ export default function Home() {
     setProcessingDoc(docType);
     setIsExporting(true);
 
+    // Beralih otomatis ke mode preview jika sebelumnya berada di mode form (Mencegah elemen 0px x 0px)
+    setMobileViewMode('preview');
+
     if (activeDocTab !== docType) {
       await switchTabAndAwaitRender(docType);
+    } else {
+      await new Promise((resolve) => setTimeout(resolve, 300));
     }
 
     if (typeof document !== 'undefined' && document.fonts) {
       await document.fonts.ready;
     }
-
-    await new Promise((resolve) => setTimeout(resolve, 300));
 
     const element = document.getElementById('a4-document-preview');
     if (!element) {
@@ -817,7 +820,7 @@ export default function Home() {
         .replace(/_+/g, '_');
       const fileName = `SPKInstan_${docType}_${cleanName}_${fileSuffix}.pdf`;
 
-      // METODE NATIVE jsPDF.save() — Mencegah Isu Teks tambaham di Safari
+      // METODE NATIVE jsPDF.save() — Mencegah Isu Teks tambahan di Safari
       pdf.save(fileName);
 
       setDownloadedDocs((prev) => {
@@ -1168,9 +1171,9 @@ export default function Home() {
     let text = '';
 
     if (selectedPackage === 'BUNDLING' && !specificDoc) {
-      text = `Halo ${clientName || 'Pihak Kedua'},\n\nBerikut dikirimkan draf resmi *Paket Perjanjian Kerja Sama (SPK, NDA, & BAST)* untuk proyek "${projectTitle || 'Pekerjaan Jasa'}" yang telah diterbitkan secara legal.\n\n*Pihak Pertama:* ${freelancerName || 'budi'}\n*Status Dokumen:* Sah (Terverifikasi Pelunasan PRO)\n\nMohon diperiksa dan ditandatangani kembali. Terima kasih!`;
+      text = `Halo ${clientName || 'Pihak Kedua'},\n\nBerikut dikirimkan draf resmi *Paket Perjanjian Kerja Sama (SPK, NDA, & BAST)* untuk proyek "${projectTitle || 'Pekerjaan Jasa'}" yang telah diterbitkan secara legal.\n\n*Pihak Pertama:* ${freelancerName || 'budi'}\n*Status Dokumen:* Sah (Terverifikasi Pelunasan PRO)\n\nMohon diperiksa dan ditandatangan kembali. Terima kasih!`;
     } else {
-      text = `Halo ${clientName || 'Pihak Kedua'},\n\nBerikut dikirimkan draf resmi *${targetDoc} Perjanjian Kerja Sama* untuk proyek "${projectTitle || 'Pekerjaan Jasa'}" yang telah diterbitkan secara legal.\n\n*Pihak Pertama:* ${freelancerName || 'budi'}\n*Status Dokumen:* Sah (Terverifikasi Pelunasan)\n\nMohon diperiksa dan ditandatangani kembali. Terima kasih!`;
+      text = `Halo ${clientName || 'Pihak Kedua'},\n\nBerikut dikirimkan draf resmi *${targetDoc} Perjanjian Kerja Sama* untuk proyek "${projectTitle || 'Pekerjaan Jasa'}" yang telah diterbitkan secara legal.\n\n*Pihak Pertama:* ${freelancerName || 'budi'}\n*Status Dokumen:* Sah (Terverifikasi Pelunasan)\n\nMohon diperiksa dan ditandatangan kembali. Terima kasih!`;
     }
 
     const waTarget = clientWa || adminWaNumber;
@@ -2486,7 +2489,7 @@ export default function Home() {
               </div>
             )}
 
-            {/* STEP 2: Payment Process View dengan Banner Peringatan Tegas */}
+            {/* STEP 2: Payment Process View dengan Portal Eksternal & Banner Peringatan */}
             {modalStep === 'qris' && (
               <div className="space-y-4 text-center">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -2519,41 +2522,36 @@ export default function Home() {
                   </p>
                 </div>
 
-                {/* Container Direct Embedded Portal Mayar */}
-                <div className="bg-slate-50 p-2 sm:p-4 rounded-2xl border border-slate-200 overflow-hidden w-full space-y-3">
-                  {isLoadingQris ? (
-                    <div className="w-full h-64 rounded-xl bg-slate-100 flex items-center justify-center text-xs text-slate-500 animate-pulse font-sans font-bold gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
-                      <span>Menyiapkan Payment Gateway Mayar...</span>
-                    </div>
-                  ) : paymentUrl ? (
-                    <div className="w-full h-[380px] rounded-xl overflow-hidden border border-slate-200 bg-white relative">
-                      <iframe
-                        src={paymentUrl}
-                        className="w-full h-full border-0"
-                        title="Mayar Payment Gateway"
-                      />
-                    </div>
-                  ) : (
-                    <div className="w-full h-32 rounded-xl bg-red-50 text-red-500 flex items-center justify-center text-xs p-4 text-center font-sans font-medium">
-                      Gagal memuat metode pembayaran. Silakan klik tombol di bawah untuk membuka tab baru.
-                    </div>
-                  )}
+                {/* Direct Link Pembayaran Portal Resmi Mayar (Bebas Masalah Iframe Redirection) */}
+                <div className="bg-slate-50 p-4 sm:p-5 rounded-2xl border border-slate-200 w-full space-y-4 text-center">
+                  <div className="space-y-2">
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
+                      Portal Pembayaran Resmi Mayar
+                    </span>
+                    <p className="text-xs text-slate-600">
+                      Klik tombol di bawah ini untuk membuka halaman pembayaran resmi Mayar (QRIS, VA, E-Wallet) di tab baru.
+                    </p>
+                  </div>
 
-                  {paymentUrl && (
+                  {paymentUrl ? (
                     <a
                       href={paymentUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-[11px] font-bold text-blue-600 hover:text-blue-800 flex items-center justify-center gap-1 pt-1"
+                      className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-md flex items-center justify-center gap-2 transition"
                     >
-                      <span>Buka Portal Mayar di Tab Baru (Jika Iframe Terkendala)</span>
-                      <ExternalLink className="w-3 h-3" />
+                      <span>BUKA PORTAL PEMBAYARAN MAYAR (TAB BARU)</span>
+                      <ExternalLink className="w-4 h-4" />
                     </a>
+                  ) : (
+                    <div className="w-full py-4 rounded-xl bg-slate-100 flex items-center justify-center text-xs text-slate-500 font-bold gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
+                      <span>Menyiapkan Link Pembayaran Mayar...</span>
+                    </div>
                   )}
 
                   <span className="block text-[10px] font-bold text-slate-400">
-                    Secured by Mayar Payment Gateway (QRIS, VA, E-Wallet)
+                    Secured by Mayar Payment Gateway (QRIS, Bank Transfer, E-Wallet)
                   </span>
                 </div>
 
@@ -2610,7 +2608,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* PHASE 2 & 4: Modal Sukses Ringkas (Download Hub Tanpa Render Preview DOM Berat & Tanpa Spinner Berputar) */}
+      {/* PHASE 2 & 4: Modal Sukses Ringkas (Download Hub Steril Tanpa Spinner Berputar) */}
       {showSuccessModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white max-w-md w-full rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-5 text-center my-8 max-h-[90vh] overflow-y-auto relative">
@@ -2688,7 +2686,7 @@ export default function Home() {
                 </div>
 
                 <div className="space-y-2">
-                  {/* PHASE 4: Tombol 1 - SPK */}
+                  {/* Tombol 1 - SPK */}
                   <button
                     type="button"
                     disabled={isExporting}
@@ -2706,7 +2704,7 @@ export default function Home() {
                     <span className="font-extrabold flex items-center gap-1 text-[11px]">
                       {processingDoc === 'SPK' ? (
                         <span className="text-blue-600 flex items-center gap-1">
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Memproses PDF...
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Memproses...
                         </span>
                       ) : downloadedDocs.SPK ? (
                         <span className="text-emerald-600 flex items-center gap-1">
@@ -2720,7 +2718,7 @@ export default function Home() {
                     </span>
                   </button>
 
-                  {/* PHASE 4: Tombol 2 - NDA */}
+                  {/* Tombol 2 - NDA */}
                   <button
                     type="button"
                     disabled={isExporting}
@@ -2738,7 +2736,7 @@ export default function Home() {
                     <span className="font-extrabold flex items-center gap-1 text-[11px]">
                       {processingDoc === 'NDA' ? (
                         <span className="text-indigo-600 flex items-center gap-1">
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Memproses PDF...
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Memproses...
                         </span>
                       ) : downloadedDocs.NDA ? (
                         <span className="text-emerald-600 flex items-center gap-1">
@@ -2752,7 +2750,7 @@ export default function Home() {
                     </span>
                   </button>
 
-                  {/* PHASE 4: Tombol 3 - BAST */}
+                  {/* Tombol 3 - BAST */}
                   <button
                     type="button"
                     disabled={isExporting}
@@ -2770,7 +2768,7 @@ export default function Home() {
                     <span className="font-extrabold flex items-center gap-1 text-[11px]">
                       {processingDoc === 'BAST' ? (
                         <span className="text-purple-600 flex items-center gap-1">
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Memproses PDF...
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Memproses...
                         </span>
                       ) : downloadedDocs.BAST ? (
                         <span className="text-emerald-600 flex items-center gap-1">
