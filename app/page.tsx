@@ -60,11 +60,11 @@ interface Clause {
 const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
 export default function Home() {
-  // Pengaturan Terpusat Nomor WA Admin
+  // Pengaturan Terpusat Nomor WA Admin via Env Variable
   const adminWaNumber = process.env.NEXT_PUBLIC_ADMIN_WA_NUMBER || '62881027908462';
 
   // ---------------------------------------------------------
-  // DEKLARASI ALL STATES & REFS DI BAGIAN PALING ATAS
+  // DEKLARASI ALL STATES & REFS
   // ---------------------------------------------------------
   const [activeDocTab, setActiveDocTab] = useState<'SPK' | 'NDA' | 'BAST'>('SPK');
   const [selectedPackage, setSelectedPackage] = useState<'SINGLE' | 'BUNDLING'>('SINGLE');
@@ -116,7 +116,7 @@ export default function Home() {
   const [clientName, setClientName] = useState('');
   const [clientWa, setClientWa] = useState('');
 
-  // Multi-State Nomor Dokumen Terpisah per Jenis Dokumen
+  // Multi-State Nomor Dokumen Terpisah per Jenis Dokumen (Anti-Terganti)
   const [docNumbers, setDocNumbers] = useState({
     SPK: '001/SPK/IX/2026',
     NDA: '001/NDA/IX/2026',
@@ -127,7 +127,7 @@ export default function Home() {
   const [signerFirstParty, setSignerFirstParty] = useState('');
   const [signerSecondParty, setSignerSecondParty] = useState('');
 
-  // Signature Pad Canvas States & Refs (Dipindahkan ke atas untuk cegah TS2448 & TS2454)
+  // Signature Pad Canvas States & Refs
   const canvasRef1 = useRef<HTMLCanvasElement | null>(null);
   const [isDrawing1, setIsDrawing1] = useState(false);
   const [signatureFirstParty, setSignatureFirstParty] = useState<string | null>(null);
@@ -356,7 +356,7 @@ export default function Home() {
     }
   }, []);
 
-  // 1. Simpan State Form ke LocalStorage Setiap Ada Perubahan
+  // Simpan State Form ke LocalStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const formData = {
@@ -391,7 +391,7 @@ export default function Home() {
     bastDate, signatureFirstParty, signatureSecondParty, clauses
   ]);
 
-  // 2. Pulihkan State Form saat Halaman Utama Dimuat Kembali
+  // Pulihkan State Form dari LocalStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedDraft = localStorage.getItem('spkinstan_form_draft');
@@ -426,7 +426,7 @@ export default function Home() {
     }
   }, []);
 
-  // Sinkronisasi input form ke Teks Pasal State
+  // Sinkronisasi Input Form ke Teks Pasal
   useEffect(() => {
     setClauses((prev) =>
       prev.map((c) => {
@@ -483,7 +483,7 @@ export default function Home() {
     );
   }, [projectTitle, projectAmount, dpPercent, bankInfo, ndaScope, ndaYears, ndaPenalty, bastRef, bastDate, bastWarranty]);
 
-  // Handler Manajemen Pasal State
+  // Handler Manajemen Pasal
   const handleToggleClause = (id: string) => {
     setClauses((prev) =>
       prev.map((c) => (c.id === id ? { ...c, isEnabled: !c.isEnabled } : c))
@@ -624,7 +624,7 @@ export default function Home() {
     setSessionId(generateNewSessionId());
   }, []);
 
-  // Proteksi Anti-Inspect & Shortcut Keyboard jika belum lunas
+  // Proteksi Anti-Inspect & Shortcut Keyboard
   useEffect(() => {
     const isPaid = paidDocs[activeDocTab];
     if (isPaid) return;
@@ -702,20 +702,162 @@ export default function Home() {
     }
   };
 
-  // Handler Unduh Individual
-  const handleIndividualDownload = async (docType: 'SPK' | 'NDA' | 'BAST') => {
-    await captureDocumentToPdf(docType);
-
-    setDownloadedDocs((prev) => {
-      const nextState = { ...prev, [docType]: true };
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('spkinstan_downloaded_docs', JSON.stringify(nextState));
-      }
-      return nextState;
+  // Helper Switch Tab dengan Delay Rendering DOM React
+  const switchTabAndAwaitRender = (targetDoc: 'SPK' | 'NDA' | 'BAST') => {
+    return new Promise<void>((resolve) => {
+      setActiveDocTab(targetDoc);
+      setTimeout(() => {
+        resolve();
+      }, 500);
     });
   };
 
-  // Handler Menutup Modal
+  // GENERATOR PDF DENGAN NATIVE jsPDF.save() — TERUJI DI DESKTOP, ANDROID, & APPLE
+  const captureDocumentToPdf = async (
+    docType: 'SPK' | 'NDA' | 'BAST',
+    shouldConsumeLicense = true
+  ) => {
+    setMobileViewMode('preview');
+    setIsExporting(true);
+
+    if (activeDocTab !== docType) {
+      await switchTabAndAwaitRender(docType);
+    }
+
+    if (typeof document !== 'undefined' && document.fonts) {
+      await document.fonts.ready;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    const element = document.getElementById('a4-document-preview');
+    if (!element) {
+      console.error('Elemen #a4-document-preview tidak ditemukan');
+      setIsExporting(false);
+      return;
+    }
+
+    try {
+      const html2canvasPro = (await import('html2canvas-pro')).default;
+      const { jsPDF } = await import('jspdf');
+
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
+
+      const pageElements = element.querySelectorAll('.a4-page');
+
+      for (let i = 0; i < pageElements.length; i++) {
+        const pageEl = pageElements[i] as HTMLElement;
+        const isPaidDoc = paidDocs[docType] || paidDocs[activeDocTab];
+
+        const watermarkElement = pageEl.querySelector('.watermark-layer') as HTMLElement;
+        if (isPaidDoc && watermarkElement) {
+          watermarkElement.style.display = 'none';
+        }
+
+        const originalWidth = pageEl.style.width;
+        const originalHeight = pageEl.style.height;
+        const originalMinHeight = pageEl.style.minHeight;
+        const originalPosition = pageEl.style.position;
+
+        pageEl.style.width = '794px';
+        pageEl.style.minHeight = '1123px';
+        pageEl.style.height = 'auto';
+        pageEl.classList.add('export-pdf-mode');
+
+        const canvas = await html2canvasPro(pageEl, {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          logging: false,
+          windowWidth: 794,
+        });
+
+        pageEl.style.width = originalWidth;
+        pageEl.style.height = originalHeight;
+        pageEl.style.minHeight = originalMinHeight;
+        pageEl.style.position = originalPosition;
+        pageEl.classList.remove('export-pdf-mode');
+
+        if (watermarkElement && !isPaidDoc) {
+          watermarkElement.style.display = 'flex';
+        }
+
+        const imgData = canvas.toDataURL('image/jpeg', 0.98);
+        const imgWidth = 210;
+        const pageHeight = 297;
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+        if (i > 0) pdf.addPage();
+
+        if (imgHeight > pageHeight) {
+          const ratio = pageHeight / imgHeight;
+          const scaledWidth = imgWidth * ratio;
+          const xCenterOffset = (imgWidth - scaledWidth) / 2;
+          pdf.addImage(imgData, 'JPEG', xCenterOffset, 0, scaledWidth, pageHeight);
+        } else {
+          pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
+        }
+      }
+
+      const isPaidDoc = paidDocs[docType] || paidDocs[activeDocTab];
+      const fileSuffix = isPaidDoc ? 'CLEAN' : 'WATERMARKED_DRAFT';
+      const fileName = `SPKInstan_${docType}_${(freelancerName || 'PihakPertama').replace(/\s+/g, '_')}_${fileSuffix}.pdf`;
+
+      // METODE NATIVE jsPDF.save() — TERUJI DI LAPTOP & MOBILE (Mencegah Network Error / Premature Revoke)
+      pdf.save(fileName);
+
+      setDownloadedDocs((prev) => {
+        const nextState = { ...prev, [docType]: true };
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('spkinstan_downloaded_docs', JSON.stringify(nextState));
+        }
+        return nextState;
+      });
+
+      if (shouldConsumeLicense && isPaidDoc && sessionId) {
+        await consumePaymentLicense(sessionId);
+      }
+    } catch (err) {
+      console.error('Error generating PDF:', err);
+      alert('Gagal mengekspor PDF.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // HANDLER BATCH DOWNLOADER BUNDLING
+  const handleDownloadAllBundling = async () => {
+    setIsExporting(true);
+    const docs: ('SPK' | 'NDA' | 'BAST')[] = ['SPK', 'NDA', 'BAST'];
+
+    try {
+      for (const doc of docs) {
+        await switchTabAndAwaitRender(doc);
+        await captureDocumentToPdf(doc, false);
+        await new Promise((res) => setTimeout(res, 800));
+      }
+
+      if (sessionId) {
+        await consumePaymentLicense(sessionId);
+      }
+    } catch (err) {
+      console.error('Gagal mengunduh paket bundling:', err);
+      alert('Terjadi kendala saat mengunduh paket bundling.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // Handler Unduh Individual
+  const handleIndividualDownload = async (docType: 'SPK' | 'NDA' | 'BAST') => {
+    await captureDocumentToPdf(docType, true);
+  };
+
+  // Handler Menutup Modal Sukses
   const handleCloseSuccessModal = () => {
     setShowSuccessModal(false);
     if (typeof window !== 'undefined') {
@@ -726,11 +868,10 @@ export default function Home() {
     }
   };
 
-  // Matikan pemicu auto download otomatis agar Safari tidak memblokir / membuat file 'teks'
   useEffect(() => {
     if (shouldAutoDownload) {
       setShouldAutoDownload(false);
-      setAutoDownloadStatus('Pembayaran berhasil! Silakan klik tombol unduh hijau di bawah ini.');
+      setAutoDownloadStatus('Pembayaran berhasil! Silakan klik tombol unduh di bawah ini.');
     }
   }, [shouldAutoDownload]);
 
@@ -993,129 +1134,6 @@ export default function Home() {
     }
   };
 
-  // GENERATOR PDF AMAN SAFARI & APPLE ECOSYSTEM
-  const captureDocumentToPdf = async (docType: 'SPK' | 'NDA' | 'BAST') => {
-    setActiveDocTab(docType);
-    setMobileViewMode('preview');
-    setIsExporting(true);
-
-    if (typeof document !== 'undefined' && document.fonts) {
-      await document.fonts.ready;
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 300));
-
-    const element = document.getElementById('a4-document-preview');
-    if (!element) {
-      console.error('Elemen #a4-document-preview tidak ditemukan');
-      setIsExporting(false);
-      return;
-    }
-
-    try {
-      const html2canvasPro = (await import('html2canvas-pro')).default;
-      const { jsPDF } = await import('jspdf');
-
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4',
-      });
-
-      const pageElements = element.querySelectorAll('.a4-page');
-
-      for (let i = 0; i < pageElements.length; i++) {
-        const pageEl = pageElements[i] as HTMLElement;
-        const isPaidDoc = paidDocs[docType] || paidDocs[activeDocTab];
-
-        const watermarkElement = pageEl.querySelector('.watermark-layer') as HTMLElement;
-        if (isPaidDoc && watermarkElement) {
-          watermarkElement.style.display = 'none';
-        }
-
-        // Simpan Style Asli Live Preview
-        const originalWidth = pageEl.style.width;
-        const originalHeight = pageEl.style.height;
-        const originalMinHeight = pageEl.style.minHeight;
-        const originalPosition = pageEl.style.position;
-
-        // Terapkan Dimensi Standar A4 Cetak
-        pageEl.style.width = '794px';
-        pageEl.style.minHeight = '1123px';
-        pageEl.style.height = 'auto';
-        pageEl.classList.add('export-pdf-mode');
-
-        const canvas = await html2canvasPro(pageEl, {
-          scale: 2,
-          useCORS: true,
-          allowTaint: true,
-          logging: false,
-          windowWidth: 794,
-        });
-
-        // Kembalikan Style Asli
-        pageEl.style.width = originalWidth;
-        pageEl.style.height = originalHeight;
-        pageEl.style.minHeight = originalMinHeight;
-        pageEl.style.position = originalPosition;
-        pageEl.classList.remove('export-pdf-mode');
-
-        if (watermarkElement && !isPaidDoc) {
-          watermarkElement.style.display = 'flex';
-        }
-
-        const imgData = canvas.toDataURL('image/jpeg', 0.98);
-        const imgWidth = 210;
-        const pageHeight = 297;
-        const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-        if (i > 0) pdf.addPage();
-
-        if (imgHeight > pageHeight) {
-          const ratio = pageHeight / imgHeight;
-          const scaledWidth = imgWidth * ratio;
-          const xCenterOffset = (imgWidth - scaledWidth) / 2;
-          pdf.addImage(imgData, 'JPEG', xCenterOffset, 0, scaledWidth, pageHeight);
-        } else {
-          pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
-        }
-      }
-
-      const isPaidDoc = paidDocs[docType] || paidDocs[activeDocTab];
-      const fileSuffix = isPaidDoc ? 'CLEAN' : 'WATERMARKED_DRAFT';
-      const fileName = `SPKInstan_${docType}_${(freelancerName || 'PihakPertama').replace(/\s+/g, '_')}_${fileSuffix}.pdf`;
-
-      // PENGELOLAAN BLOB LOKAL (SOLUSI MUTLAK SAFARI APPLE)
-      const pdfBlob = pdf.output('blob');
-      const blobUrl = URL.createObjectURL(pdfBlob);
-
-      const downloadLink = document.createElement('a');
-      downloadLink.style.display = 'none';
-      downloadLink.href = blobUrl;
-      downloadLink.download = fileName;
-
-      document.body.appendChild(downloadLink);
-      downloadLink.click();
-
-      // Cleanup Elemen DOM & Blob URL
-      setTimeout(() => {
-        if (document.body.contains(downloadLink)) {
-          document.body.removeChild(downloadLink);
-        }
-        URL.revokeObjectURL(blobUrl);
-      }, 1000);
-
-      if (isPaidDoc && sessionId) {
-        await consumePaymentLicense(sessionId);
-      }
-    } catch (err) {
-      console.error('Error generating PDF:', err);
-      alert('Gagal mengekspor PDF.');
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
   const handleFreeDownload = () => {
     setShowCheckoutModal(false);
     captureDocumentToPdf(activeDocTab);
@@ -1155,7 +1173,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col justify-between font-sans antialiased selection:bg-blue-100 selection:text-blue-700 pb-20 md:pb-0">
       
-      {/* CSS Typography & Printing Rules */}
+      {/* CSS Typography Calibri Standard & Responsive Rules */}
       <style>{`
         #a4-document-preview, .a4-page {
           font-family: 'Calibri', 'Carlito', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
@@ -1964,7 +1982,7 @@ export default function Home() {
                   </span>
                 </div>
 
-                {/* Wrapper Responsif UI + Presisi Mutlak saat PDF Canvas */}
+                {/* Wrapper Responsif UI + Presisi Mutlak A4 (794px x 1123px) */}
                 <div className="w-full bg-slate-300/40 p-2 sm:p-6 rounded-3xl border border-slate-200 flex justify-center items-center overflow-x-auto pb-4">
                   <div
                     id="a4-document-preview"
@@ -2022,7 +2040,7 @@ export default function Home() {
                           </div>
                         </div>
 
-                        {/* Document Title Block */}
+                        {/* Document Title Block (18px-20px Bold) */}
                         <div className="border-l-4 border-blue-600 pl-3 sm:pl-4 py-0.5">
                           <h2 className="text-[18px] sm:text-[20px] font-extrabold tracking-wide text-slate-900 uppercase leading-[1.2]">
                             {activeDocTab === 'SPK' && 'PERJANJIAN KERJA SAMA PEKERJAAN JASA'}
@@ -2034,7 +2052,7 @@ export default function Home() {
                           </p>
                         </div>
 
-                        {/* Parties Identification Paragraph */}
+                        {/* Parties Identification Paragraph (12px-13px Regular) */}
                         <div className="bg-slate-50/70 border border-slate-200/80 rounded-xl p-2.5 sm:p-3 space-y-1.5">
                           <p className="text-slate-700 text-[12px] sm:text-[13px] leading-[1.5]">
                             Pada hari ini, <strong>{getTodayFormattedDate()}</strong>, kami yang bertanda tangan di bawah ini secara sadar dan tanpa paksaan sepakat mengikatkan diri dalam perikatan hukum perdata:
@@ -2051,7 +2069,7 @@ export default function Home() {
                           </div>
                         </div>
 
-                        {/* RENDER PASAL HALAMAN 1 */}
+                        {/* RENDER PASAL HALAMAN 1 (14px-15px Title, 12px-13px Content) */}
                         <div className="space-y-2 sm:space-y-2.5">
                           {page1Clauses.map((clause, index) => (
                             <div key={clause.id} className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
@@ -2578,12 +2596,12 @@ export default function Home() {
         </div>
       )}
 
-      {/* Modal Sukses (Tanpa Animasi/Spinner Berputar) */}
+      {/* Modal Sukses (Tanpa Animasi Spinner Berputar) */}
       {showSuccessModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white max-w-md w-full rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-5 text-center my-8 max-h-[90vh] overflow-y-auto">
 
-            {/* Header Status */}
+            {/* Header Status Sukses */}
             <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
               <CheckCircle className="w-7 h-7" />
             </div>
@@ -2606,24 +2624,44 @@ export default function Home() {
               </p>
             </div>
 
-            {/* PUSAT UNDUHAN BUNDLING (3 FILE TERPISAH) */}
+            {/* PUSAT UNDUHAN BUNDLING (3 FILE TERPISAH + TOMBOL BATCH) */}
             {selectedPackage === 'BUNDLING' ? (
               <div className="space-y-3 pt-1 text-left">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
-                    File Dokumen Bundling (3 File)
+                {/* Tombol Unduh Sekaligus Semua File */}
+                <button
+                  type="button"
+                  disabled={isExporting}
+                  onClick={handleDownloadAllBundling}
+                  className="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white font-extrabold rounded-2xl text-xs shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 transition"
+                >
+                  {isExporting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>MENGUNDUH PAKET BUNDLING (SPK, NDA, BAST)...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4" />
+                      <span>UNDUH SEMUA 3 DOKUMEN SEKALIGUS</span>
+                    </>
+                  )}
+                </button>
+
+                <div className="relative flex py-1 items-center">
+                  <div className="flex-grow border-t border-slate-200"></div>
+                  <span className="flex-shrink mx-2 text-[10px] text-slate-400 font-bold uppercase">
+                    Atau Unduh File Satu per Satu
                   </span>
-                  <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
-                    3-in-1 Lunas
-                  </span>
+                  <div className="flex-grow border-t border-slate-200"></div>
                 </div>
 
                 <div className="space-y-2">
                   {/* Tombol 1: SPK */}
                   <button
                     type="button"
+                    disabled={isExporting}
                     onClick={() => handleIndividualDownload('SPK')}
-                    className={`w-full py-3 px-4 rounded-2xl text-xs font-bold flex items-center justify-between border transition-all ${
+                    className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold flex items-center justify-between border transition-all ${
                       downloadedDocs.SPK
                         ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
                         : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-800'
@@ -2649,8 +2687,9 @@ export default function Home() {
                   {/* Tombol 2: NDA */}
                   <button
                     type="button"
+                    disabled={isExporting}
                     onClick={() => handleIndividualDownload('NDA')}
-                    className={`w-full py-3 px-4 rounded-2xl text-xs font-bold flex items-center justify-between border transition-all ${
+                    className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold flex items-center justify-between border transition-all ${
                       downloadedDocs.NDA
                         ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
                         : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-800'
@@ -2676,8 +2715,9 @@ export default function Home() {
                   {/* Tombol 3: BAST */}
                   <button
                     type="button"
+                    disabled={isExporting}
                     onClick={() => handleIndividualDownload('BAST')}
-                    className={`w-full py-3 px-4 rounded-2xl text-xs font-bold flex items-center justify-between border transition-all ${
+                    className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold flex items-center justify-between border transition-all ${
                       downloadedDocs.BAST
                         ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
                         : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-800'
@@ -2710,8 +2750,9 @@ export default function Home() {
               <div className="space-y-3 pt-1">
                 <button
                   type="button"
+                  disabled={isExporting}
                   onClick={() => handleIndividualDownload(paidDocTarget)}
-                  className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-2xl text-xs shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2"
+                  className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white font-extrabold rounded-2xl text-xs shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2"
                 >
                   <Download className="w-4 h-4" />
                   <span>UNDUH PDF CLEAN ({paidDocTarget})</span>
