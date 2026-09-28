@@ -1940,7 +1940,6 @@ export default function Home() {
                       </div>
 
                       <div className="pt-2 border-t border-slate-200 flex justify-between items-center text-[10px] sm:text-[11px] text-slate-500 font-mono">
-                        <span>SPKInstan Legal Document</span>
                         <span>Hal 1 dari {totalPages}</span>
                       </div>
                     </div>
