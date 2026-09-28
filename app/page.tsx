@@ -60,6 +60,9 @@ interface Clause {
 const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
 export default function Home() {
+  // Pengaturan Terpusat Nomor WA Admin
+  const adminWaNumber = process.env.NEXT_PUBLIC_ADMIN_WA_NUMBER || '62881027908462';
+
   const [activeDocTab, setActiveDocTab] = useState<'SPK' | 'NDA' | 'BAST'>('SPK');
   const [selectedPackage, setSelectedPackage] = useState<'SINGLE' | 'BUNDLING'>('SINGLE');
   const [currentWizardStep, setCurrentWizardStep] = useState(1);
@@ -386,51 +389,46 @@ export default function Home() {
     setClauses((prev) => prev.filter((c) => c.id !== id));
   };
 
-  // LOGIKA PERBAIKAN PRESET DUKUNGAN SPK, NDA, & BAST
+  // LOGIKA PRESET DUKUNGAN SPK, NDA, & BAST
   const handleApplyPreset = (presetType: 'web' | 'design' | 'all') => {
     setActivePreset(presetType);
 
     setClauses((prev) =>
       prev.map((c) => {
-        // 1. Jika menekan 'Aktifkan Semua', aktifkan semua pasal
         if (presetType === 'all') {
           return { ...c, isEnabled: true };
         }
 
-        // 2. Hanya ubah pasal yang sesuai dengan TAB DOKUMEN YANG SEDANG AKTIF
         if (c.docType !== activeDocTab) {
           return c;
         }
 
-        // === LOGIKA PRESET SPK ===
         if (c.docType === 'SPK') {
           if (presetType === 'web') {
-            return { ...c, isEnabled: true }; // Web/App butuh semua pasal (termasuk Akses Server spk-8)
+            return { ...c, isEnabled: true };
           }
           if (presetType === 'design') {
-            if (c.id === 'spk-8') return { ...c, isEnabled: false }; // Nonaktifkan Akses Server
+            if (c.id === 'spk-8') return { ...c, isEnabled: false };
             return { ...c, isEnabled: true };
           }
         }
 
-        // === LOGIKA PRESET NDA ===
         if (c.docType === 'NDA') {
           if (presetType === 'web') {
-            return { ...c, isEnabled: true }; // Web/App butuh Kerahasiaan penuh + Denda Penalti (nda-6)
+            return { ...c, isEnabled: true };
           }
           if (presetType === 'design') {
-            if (c.id === 'nda-6') return { ...c, isEnabled: false }; // Nonaktifkan Denda Penalti untuk Desain
+            if (c.id === 'nda-6') return { ...c, isEnabled: false };
             return { ...c, isEnabled: true };
           }
         }
 
-        // === LOGIKA PRESET BAST ===
         if (c.docType === 'BAST') {
           if (presetType === 'web') {
-            return { ...c, isEnabled: true }; // Web/App butuh Garansi Bug (bast-4)
+            return { ...c, isEnabled: true };
           }
           if (presetType === 'design') {
-            if (c.id === 'bast-4') return { ...c, isEnabled: false }; // Desain tidak butuh Garansi Bug Software
+            if (c.id === 'bast-4') return { ...c, isEnabled: false };
             return { ...c, isEnabled: true };
           }
         }
@@ -877,7 +875,7 @@ export default function Home() {
   };
 
   // =========================================================
-  // GENERATOR PDF DINAMIS (PENGATURAN SKALA UTUH ANTI-GEPENG)
+  // GENERATOR PDF DINAMIS (SOLUSI 2: BLOB & TARGET _BLANK)
   // =========================================================
   const captureDocumentToPdf = async (docType: 'SPK' | 'NDA' | 'BAST') => {
     setActiveDocTab(docType);
@@ -927,7 +925,7 @@ export default function Home() {
         // 2. Terapkan Dimensi Standar A4 Cetak Dinamis
         pageEl.style.width = '794px';
         pageEl.style.minHeight = '1123px';
-        pageEl.style.height = 'auto'; // Mengalir alami sesuai tinggi isi teks
+        pageEl.style.height = 'auto';
         pageEl.classList.add('export-pdf-mode');
 
         const canvas = await html2canvasPro(pageEl, {
@@ -951,14 +949,12 @@ export default function Home() {
 
         const imgData = canvas.toDataURL('image/jpeg', 0.98);
 
-        // Hitung proporsi tinggi gambar di canvas PDF A4 (210mm x 297mm)
         const imgWidth = 210;
         const pageHeight = 297;
         const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
         if (i > 0) pdf.addPage();
 
-        // SOLUSI FIX GEPENG: Jaga aspect ratio (rasio proporsional)
         if (imgHeight > pageHeight) {
           const ratio = pageHeight / imgHeight;
           const scaledWidth = imgWidth * ratio;
@@ -973,7 +969,20 @@ export default function Home() {
       const isPaidDoc = paidDocs[docType] || paidDocs[activeDocTab];
       const fileSuffix = isPaidDoc ? 'CLEAN' : 'WATERMARKED_DRAFT';
 
-      pdf.save(`SPKInstan_${docType}_${(freelancerName || 'PihakPertama').replace(/\s+/g, '_')}_${fileSuffix}.pdf`);
+      // PENGGUNAAN SOLUSI 2: BLOB OBJECT URL DENGAN ANCHOR TARGET="_BLANK"
+      const pdfBlob = pdf.output('blob');
+      const blobUrl = URL.createObjectURL(pdfBlob);
+
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.href = blobUrl;
+      downloadAnchor.target = '_blank';
+      downloadAnchor.download = `SPKInstan_${docType}_${(freelancerName || 'PihakPertama').replace(/\s+/g, '_')}_${fileSuffix}.pdf`;
+
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      document.body.removeChild(downloadAnchor);
+
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 3000);
 
       if (isPaidDoc) {
         if (sessionId) {
@@ -1038,7 +1047,8 @@ export default function Home() {
       text = `Halo ${clientName || 'Pihak Kedua'},\n\nBerikut dikirimkan draf resmi *${targetDoc} Perjanjian Kerja Sama* untuk proyek "${projectTitle || 'Pekerjaan Jasa'}" yang telah diterbitkan secara legal.\n\n*Pihak Pertama:* ${freelancerName || 'budi'}\n*Status Dokumen:* Sah (Terverifikasi Pelunasan)\n\nMohon diperiksa dan ditandatangani kembali. Terima kasih!`;
     }
 
-    window.open(`https://wa.me/${clientWa}?text=${encodeURIComponent(text)}`, '_blank');
+    const waTarget = clientWa || adminWaNumber;
+    window.open(`https://wa.me/${waTarget}?text=${encodeURIComponent(text)}`, '_blank');
   };
 
   const wizardTitles = [
@@ -1051,7 +1061,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col justify-between font-sans antialiased selection:bg-blue-100 selection:text-blue-700 pb-20 md:pb-0">
       
-      {/* CSS Import Font Calibri & Rules */}
+      {/* CSS Import Font Calibri & Typography Rules */}
       <style>{`
         #a4-document-preview, .a4-page {
           font-family: 'Calibri', 'Carlito', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
@@ -1107,7 +1117,7 @@ export default function Home() {
 
           <div className="flex items-center gap-4">
             <a
-              href="https://wa.me/6281234567890?text=Halo%20Admin%20SPKInstan,%20saya%20butuh%20bantuan"
+              href={`https://wa.me/${adminWaNumber}?text=${encodeURIComponent("Halo Admin SPKInstan, saya butuh bantuan")}`}
               target="_blank"
               rel="noreferrer"
               className="hidden md:inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-blue-600 transition-colors"
@@ -1542,7 +1552,7 @@ export default function Home() {
                     </div>
                   )}
 
-                  {/* STEP 3: MANAJER PASAL DINAMIS (ARRAY-BASED CLAUSE MANAGER) */}
+                  {/* STEP 3: MANAJER PASAL DINAMIS */}
                   {currentWizardStep === 3 && (
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
@@ -1595,7 +1605,7 @@ export default function Home() {
                         </div>
                       </div>
 
-                      {/* Daftar Pasal Dinamis dengan Inline Edit & Enable/Disable Switch */}
+                      {/* Daftar Pasal Dinamis */}
                       <div className="space-y-3 max-h-[360px] overflow-y-auto pr-1">
                         {clauses
                           .filter((c) => c.docType === activeDocTab)
@@ -1843,7 +1853,7 @@ export default function Home() {
                 </form>
               </div>
 
-              {/* RIGHT COLUMN: SPKInstan Signature Template Exclusive Preview */}
+              {/* RIGHT COLUMN: SPKInstan Live Preview A4 */}
               <div
                 className={`lg:col-span-7 space-y-4 ${
                   mobileViewMode === 'form' ? 'hidden lg:block' : 'block'
@@ -1873,11 +1883,11 @@ export default function Home() {
                       !paidDocs[activeDocTab] ? 'select-none' : ''
                     }`}
                   >
-                    {/* === HALAMAN 1 (Single Page First Layout) === */}
+                    {/* === HALAMAN 1 === */}
                     <div
                       className="a4-page w-full max-w-[794px] min-h-[1123px] h-auto bg-white text-slate-900 p-6 sm:p-8 relative flex flex-col justify-between shadow-xl rounded-xl border border-slate-200 shrink-0"
                     >
-                      {/* Watermark Overlay Minimalis Halaman 1 */}
+                      {/* Watermark Overlay Halaman 1 */}
                       {!paidDocs[activeDocTab] && (
                         <div className="watermark-layer absolute inset-0 pointer-events-none z-20 flex items-center justify-center overflow-hidden">
                           <span className="text-5xl sm:text-7xl font-black tracking-[0.25em] text-slate-300/25 uppercase select-none -rotate-12 transform">
@@ -1886,15 +1896,15 @@ export default function Home() {
                         </div>
                       )}
 
-                      {/* Konten Halaman 1 dengan Ref Pengukuran DOM */}
+                      {/* Konten Halaman 1 */}
                       <div
                         ref={needsPage2 ? page1MainContentRef : page1ContentRef}
                         className="space-y-3 sm:space-y-3.5 text-[12px] sm:text-[13px] leading-[1.5] text-slate-700 relative z-10"
                       >
-                        {/* Header Top Accent Floating Bar */}
+                        {/* Header Top Accent Bar */}
                         <div className="h-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 w-full rounded-full shadow-xs mb-3" />
 
-                        {/* Brand Header & Document Information Box */}
+                        {/* Brand Header & Metadata Box */}
                         <div className="flex items-start justify-between pb-2.5 border-b border-slate-200/80 gap-4">
                           <div className="space-y-0.5">
                             <span className="text-[11px] font-bold tracking-widest text-blue-600 uppercase">
@@ -1948,7 +1958,7 @@ export default function Home() {
                           </div>
                         </div>
 
-                        {/* RENDER PASAL HALAMAN 1 (AKSES DARI PAGE 1 CLAUSES) */}
+                        {/* RENDER PASAL HALAMAN 1 */}
                         <div className="space-y-2 sm:space-y-2.5">
                           {page1Clauses.map((clause, index) => (
                             <div key={clause.id} className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
@@ -1973,7 +1983,7 @@ export default function Home() {
                           ))}
                         </div>
 
-                        {/* Kolom Tanda Tangan Utama di Halaman 1 (Hanya Jika Semua Pasal Muat di Halaman 1) */}
+                        {/* Kolom Tanda Tangan Utama di Halaman 1 (Jika Tidak Butuh Hal 2) */}
                         {!needsPage2 && (
                           <div className="pt-2 sm:pt-3 grid grid-cols-2 gap-3 sm:gap-4 text-center">
                             <div className="bg-slate-50/80 border border-slate-200/80 rounded-xl p-2.5 sm:p-3 space-y-1.5">
@@ -2030,12 +2040,12 @@ export default function Home() {
                       </div>
                     </div>
 
-                    {/* === HALAMAN 2 (Otomatis Aktif Jika Pasal > 4 atau Konten Overflow) === */}
+                    {/* === HALAMAN 2 === */}
                     {needsPage2 && (
                       <div
                         className="a4-page w-full max-w-[794px] min-h-[1123px] h-auto bg-white text-slate-900 p-6 sm:p-8 relative flex flex-col justify-between shadow-xl rounded-xl border border-slate-200 shrink-0"
                       >
-                        {/* Watermark Overlay Minimalis Halaman 2 */}
+                        {/* Watermark Overlay Halaman 2 */}
                         {!paidDocs[activeDocTab] && (
                           <div className="watermark-layer absolute inset-0 pointer-events-none z-20 flex items-center justify-center overflow-hidden">
                             <span className="text-5xl sm:text-7xl font-black tracking-[0.25em] text-slate-300/25 uppercase select-none -rotate-12 transform">
@@ -2048,10 +2058,10 @@ export default function Home() {
                           ref={page2ContentRef}
                           className="space-y-3 sm:space-y-3.5 text-[12px] sm:text-[13px] leading-[1.5] text-slate-700 relative z-10"
                         >
-                          {/* Header Top Accent Floating Bar */}
+                          {/* Header Top Accent Bar */}
                           <div className="h-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 w-full rounded-full shadow-xs mb-4" />
 
-                          {/* RENDER PASAL SISA DI HALAMAN 2 (JIKA ADA PASAL LIMA DAN SETERUSNYA) */}
+                          {/* RENDER PASAL SISA DI HALAMAN 2 */}
                           {page2Clauses.length > 0 && (
                             <div className="space-y-2 sm:space-y-2.5 mb-4">
                               {page2Clauses.map((clause, index) => (
@@ -2140,7 +2150,6 @@ export default function Home() {
                             Paraf II: [ {signatureSecondParty ? <img src={signatureSecondParty} alt="Paraf II" className="h-3 sm:h-4 inline-block object-contain" /> : '___'} ]
                           </span>
                           <span className="font-mono">Hal 2 dari 2</span>
-
                         </div>
                       </div>
                     )}
@@ -2352,7 +2361,7 @@ export default function Home() {
               </div>
             )}
 
-            {/* STEP 2: Payment Process View (Embedded Mayar Portal) */}
+            {/* STEP 2: Payment Process View */}
             {modalStep === 'qris' && (
               <div className="space-y-4 text-center">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -2476,12 +2485,12 @@ export default function Home() {
         </div>
       )}
 
-      {/* Success & Download Receipt Modal (BERSIH TANPA INDIKATOR BERPUTAR) */}
+      {/* Success & Download Receipt Modal (BERSIH TANPA SPINNER) */}
       {showSuccessModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white max-w-md w-full rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-4 text-center my-8 max-h-[90vh] overflow-y-auto">
 
-            {/* Icon & Header Status Bersih Tanpa Animasi Spinner */}
+            {/* Icon & Status Bersih */}
             <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
               <CheckCircle className="w-7 h-7" />
             </div>
@@ -2585,7 +2594,7 @@ export default function Home() {
                   Pengalaman Anda sangat berharga. Kirim kesan atau masukan Anda langsung ke WhatsApp Admin Business kami.
                 </p>
                 <a
-                  href="https://wa.me/6281234567890?text=Halo%20Admin%20SPKInstan,%20saya%20baru%20saja%20membuat%20dokumen%20dan%20ingin%20memberikan%20ulasan/kritik:"
+                  href={`https://wa.me/${adminWaNumber}?text=${encodeURIComponent("Halo Admin SPKInstan, saya baru saja membuat dokumen dan ingin memberikan ulasan/kritik:")}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2 transition"
@@ -2606,6 +2615,17 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      {/* Floating WhatsApp Chat Widget */}
+      <a
+        href={`https://wa.me/${adminWaNumber}?text=${encodeURIComponent("Halo Admin SPKInstan, saya butuh bantuan mengenai pembuatan dokumen.")}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="fixed bottom-20 md:bottom-6 right-6 z-50 bg-emerald-500 hover:bg-emerald-600 text-white p-3.5 rounded-full shadow-2xl flex items-center justify-center transition-all hover:scale-110 active:scale-95"
+        aria-label="Chat WhatsApp Admin"
+      >
+        <MessageCircle className="w-6 h-6" />
+      </a>
 
       {/* Mobile Floating Sticky Bottom Bar */}
       <div className="lg:hidden fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-slate-200 p-3 z-30 shadow-lg flex gap-2">
@@ -2683,7 +2703,7 @@ export default function Home() {
                 Ada kendala teknis atau pertanyaan perikatan legal? CS WhatsApp kami siap membantu.
               </p>
               <a
-                href="https://wa.me/6281234567890?text=Halo%20Admin%20SPKInstan,%20saya%20butuh%20bantuan"
+                href={`https://wa.me/${adminWaNumber}?text=${encodeURIComponent("Halo Admin SPKInstan, saya butuh bantuan")}`}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 rounded-xl text-xs font-semibold border border-emerald-500/30 transition-all"
