@@ -769,13 +769,14 @@ export default function Home() {
         }
       }
 
-      const isPaidDoc = paidDocs[docType] || (paidDocs.SPK && paidDocs.NDA && paidDocs.BAST);
-      const fileSuffix = isPaidDoc ? 'CLEAN' : 'WATERMARKED_DRAFT';
-      const cleanName = (freelancerName || 'PihakPertama')
+      const cleanName = (freelancerName || 'pihak_pertama')
         .trim()
-        .replace(/[^a-zA-Z0-9]/g, '_')
-        .replace(/_+/g, '_');
-      const fileName = `SPKInstan_${docType}_${cleanName}_${fileSuffix}.pdf`;
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_+|_+$/g, '');
+      
+      const fileName = `${docType.toLowerCase()}_${cleanName || 'pihak_pertama'}.pdf`;
 
       pdf.save(fileName);
 
@@ -787,7 +788,7 @@ export default function Home() {
         return nextState;
       });
 
-      if (shouldConsumeLicense && isPaidDoc && sessionId) {
+      if (shouldConsumeLicense && (paidDocs[docType] || (paidDocs.SPK && paidDocs.NDA && paidDocs.BAST)) && sessionId) {
         await consumePaymentLicense(sessionId);
       }
     } catch (err) {
@@ -1139,7 +1140,7 @@ export default function Home() {
         .a4-page.export-pdf-mode {
           display: flex !important;
           flex-direction: column !important;
-          justify-content: space-between !important;
+          justify-between: space-between !important;
           padding: 40px !important;
           box-sizing: border-box !important;
         }
