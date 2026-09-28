@@ -76,6 +76,14 @@ export default function Home() {
     NDA: false,
     BAST: false,
   });
+
+  // State Tracking Unduhan Individual per File
+  const [downloadedDocs, setDownloadedDocs] = useState<{ SPK: boolean; NDA: boolean; BAST: boolean }>({
+    SPK: false,
+    NDA: false,
+    BAST: false,
+  });
+
   const [paidDocTarget, setPaidDocTarget] = useState<'SPK' | 'NDA' | 'BAST'>('SPK');
   const [shouldAutoDownload, setShouldAutoDownload] = useState(false);
   const [, setAutoDownloadStatus] = useState<string>('');
@@ -296,6 +304,40 @@ export default function Home() {
       isEnabled: true,
     },
   ]);
+
+  // PEMULIHAN STATE DARI LOCALSTORAGE UNTUK SAFARI iOS REFRESH RESILIENCE
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedPaid = localStorage.getItem('spkinstan_paid_docs');
+      const savedModal = localStorage.getItem('spkinstan_show_success_modal');
+      const savedDownloaded = localStorage.getItem('spkinstan_downloaded_docs');
+      const savedPackage = localStorage.getItem('spkinstan_package');
+
+      if (savedPaid) {
+        try {
+          setPaidDocs(JSON.parse(savedPaid));
+        } catch (e) {
+          console.error('Failed to parse saved paid docs:', e);
+        }
+      }
+
+      if (savedPackage === 'BUNDLING' || savedPackage === 'SINGLE') {
+        setSelectedPackage(savedPackage as 'SINGLE' | 'BUNDLING');
+      }
+
+      if (savedModal === 'true') {
+        setShowSuccessModal(true);
+      }
+
+      if (savedDownloaded) {
+        try {
+          setDownloadedDocs(JSON.parse(savedDownloaded));
+        } catch (e) {
+          console.error('Failed to parse saved downloaded docs:', e);
+        }
+      }
+    }
+  }, []);
 
   // Sinkronisasi otomatis input form spesifik ke dalam Teks Pasal State
   useEffect(() => {
@@ -563,16 +605,22 @@ export default function Home() {
     }
   }, [showCheckoutModal]);
 
-  // Eksekusi Kelunasan & Pencabutan Watermark
+  // Eksekusi Kelunasan & Pencabutan Watermark (Serta Simpan ke LocalStorage)
   const handlePaymentSuccess = () => {
     stopPolling();
-
     setIsProcessingSuccess(true);
 
-    if (selectedPackage === 'BUNDLING') {
-      setPaidDocs({ SPK: true, NDA: true, BAST: true });
-    } else {
-      setPaidDocs((prev) => ({ ...prev, [paidDocTarget]: true }));
+    const updatedPaid = selectedPackage === 'BUNDLING'
+      ? { SPK: true, NDA: true, BAST: true }
+      : { ...paidDocs, [paidDocTarget]: true };
+
+    setPaidDocs(updatedPaid);
+
+    // SIMPAN KE LOCALSTORAGE AGAR TAHAN REFRESH SAFARI iOS
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('spkinstan_paid_docs', JSON.stringify(updatedPaid));
+      localStorage.setItem('spkinstan_show_success_modal', 'true');
+      localStorage.setItem('spkinstan_package', selectedPackage);
     }
 
     setTimeout(() => {
@@ -582,13 +630,37 @@ export default function Home() {
       setShowSuccessModal(true);
       setShouldAutoDownload(true);
       setAutoDownloadStatus('Memproses pencabutan watermark & menyiapkan PDF...');
-    }, 2000);
+    }, 1500);
 
     if (typeof window !== 'undefined' && window.fbq) {
       window.fbq('track', 'Purchase', {
         value: selectedPackage === 'SINGLE' ? 1000 : 1000,
         currency: 'IDR',
       });
+    }
+  };
+
+  // HANDLER UNDUH INDIVIDUAL RAMAH SAFARI iOS
+  const handleIndividualDownload = async (docType: 'SPK' | 'NDA' | 'BAST') => {
+    await captureDocumentToPdf(docType);
+
+    setDownloadedDocs((prev) => {
+      const nextState = { ...prev, [docType]: true };
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('spkinstan_downloaded_docs', JSON.stringify(nextState));
+      }
+      return nextState;
+    });
+  };
+
+  // HANDLER MENUTUP MODAL SECARA MANUAL
+  const handleCloseSuccessModal = () => {
+    setShowSuccessModal(false);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('spkinstan_show_success_modal');
+      localStorage.removeItem('spkinstan_paid_docs');
+      localStorage.removeItem('spkinstan_downloaded_docs');
+      localStorage.removeItem('spkinstan_package');
     }
   };
 
@@ -600,9 +672,9 @@ export default function Home() {
         try {
           setAutoDownloadStatus('Mengunduh file PDF Clean otomatis...');
           if (selectedPackage === 'BUNDLING') {
-            await captureDocumentToPdf('SPK');
+            await handleIndividualDownload('SPK');
           } else {
-            await captureDocumentToPdf(paidDocTarget);
+            await handleIndividualDownload(paidDocTarget);
           }
           setAutoDownloadStatus('Unduhan selesai!');
         } catch (autoErr) {
@@ -875,7 +947,7 @@ export default function Home() {
   };
 
   // =========================================================
-  // GENERATOR PDF DINAMIS (SOLUSI 2: BLOB & TARGET _BLANK)
+  // GENERATOR PDF DINAMIS (BLOB OBJECT URL TERPISAH)
   // =========================================================
   const captureDocumentToPdf = async (docType: 'SPK' | 'NDA' | 'BAST') => {
     setActiveDocTab(docType);
@@ -969,7 +1041,6 @@ export default function Home() {
       const isPaidDoc = paidDocs[docType] || paidDocs[activeDocTab];
       const fileSuffix = isPaidDoc ? 'CLEAN' : 'WATERMARKED_DRAFT';
 
-      // PENGGUNAAN SOLUSI 2: BLOB OBJECT URL DENGAN ANCHOR TARGET="_BLANK"
       const pdfBlob = pdf.output('blob');
       const blobUrl = URL.createObjectURL(pdfBlob);
 
@@ -984,16 +1055,8 @@ export default function Home() {
 
       setTimeout(() => URL.revokeObjectURL(blobUrl), 3000);
 
-      if (isPaidDoc) {
-        if (sessionId) {
-          await consumePaymentLicense(sessionId);
-        }
-
-        if (selectedPackage === 'BUNDLING') {
-          setPaidDocs({ SPK: false, NDA: false, BAST: false });
-        } else {
-          setPaidDocs((prev) => ({ ...prev, [docType]: false }));
-        }
+      if (isPaidDoc && sessionId) {
+        await consumePaymentLicense(sessionId);
       }
     } catch (err) {
       console.error('Error generating PDF:', err);
@@ -1007,15 +1070,15 @@ export default function Home() {
   const handleDownloadPDF = async (specificDoc?: 'SPK' | 'NDA' | 'BAST') => {
     try {
       if (specificDoc) {
-        await captureDocumentToPdf(specificDoc);
+        await handleIndividualDownload(specificDoc);
       } else if (selectedPackage === 'BUNDLING') {
-        await captureDocumentToPdf('SPK');
+        await handleIndividualDownload('SPK');
         await new Promise((r) => setTimeout(r, 600));
-        await captureDocumentToPdf('NDA');
+        await handleIndividualDownload('NDA');
         await new Promise((r) => setTimeout(r, 600));
-        await captureDocumentToPdf('BAST');
+        await handleIndividualDownload('BAST');
       } else {
-        await captureDocumentToPdf(activeDocTab);
+        await handleIndividualDownload(activeDocTab);
       }
     } catch (err) {
       console.error('Gagal membuat PDF:', err);
@@ -1024,7 +1087,7 @@ export default function Home() {
 
   const handleFreeDownload = () => {
     setShowCheckoutModal(false);
-    handleDownloadPDF();
+    captureDocumentToPdf(activeDocTab);
   };
 
   const handleFinishForm = () => {
@@ -1117,7 +1180,7 @@ export default function Home() {
 
           <div className="flex items-center gap-4">
             <a
-              href={`https://wa.me/${adminWaNumber}?text=${encodeURIComponent("Halo Admin SPKInstan, saya butuh bantuan")}`}
+              href={`https://wa.me/${adminWaNumber}?text=${encodeURIComponent("Halo Admin SPKInstan, saya ingin Kirim Testimoni")}`}
               target="_blank"
               rel="noreferrer"
               className="hidden md:inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-blue-600 transition-colors"
@@ -1561,7 +1624,7 @@ export default function Home() {
                         </label>
                       </div>
 
-                      {/* Preset Accelerator Pills dengan Respon Warna Aktif */}
+                      {/* Preset Accelerator Pills dengan Indikator Visual Biru Solid */}
                       <div className="p-2 bg-slate-100 rounded-2xl border border-slate-200/80 space-y-1.5">
                         <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider block px-1 flex items-center gap-1">
                           <Sliders className="w-3 h-3 text-blue-600" /> Preset Akselerator Cepat ({activeDocTab}):
@@ -2187,7 +2250,7 @@ export default function Home() {
                     {paidDocs[activeDocTab] ? (
                       <button
                         type="button"
-                        onClick={() => handleDownloadPDF(activeDocTab)}
+                        onClick={() => handleIndividualDownload(activeDocTab)}
                         className="w-full sm:w-auto px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-full text-xs transition-all shadow-md flex items-center justify-center gap-1.5"
                       >
                         <Download className="w-4 h-4" />
@@ -2485,12 +2548,12 @@ export default function Home() {
         </div>
       )}
 
-      {/* Success & Download Receipt Modal (BERSIH TANPA SPINNER) */}
+      {/* Modal Sukses: Persistent Download Center (Tahan Refresh Safari iOS) */}
       {showSuccessModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white max-w-md w-full rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-4 text-center my-8 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white max-w-md w-full rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-5 text-center my-8 max-h-[90vh] overflow-y-auto">
 
-            {/* Icon & Status Bersih */}
+            {/* Header Status */}
             <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
               <CheckCircle className="w-7 h-7" />
             </div>
@@ -2498,7 +2561,7 @@ export default function Home() {
             <div>
               <h3 className="font-extrabold text-slate-900 text-lg">Pembayaran Terverifikasi Lunas!</h3>
               <p className="text-xs text-slate-500 mt-1">
-                Watermark SPKINSTAN telah resmi dicabut. Dokumen PDF Clean Anda siap diunduh.
+                Watermark telah dicabut. Silakan unduh dokumen Anda di bawah ini:
               </p>
             </div>
 
@@ -2513,79 +2576,134 @@ export default function Home() {
               </p>
             </div>
 
-            {/* Tombol Unduh / Kirim WA */}
+            {/* PUSAT UNDUHAN BUNDLING (3 FILE TERPISAH) */}
             {selectedPackage === 'BUNDLING' ? (
               <div className="space-y-3 pt-1 text-left">
-                <span className="text-xs font-bold text-slate-700 block text-center uppercase tracking-wider">
-                  Paket Bundling 3 Dokumen (Lunas)
-                </span>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
+                    File Dokumen Bundling (3 File)
+                  </span>
+                  <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
+                    3-in-1 Lunas
+                  </span>
+                </div>
 
-                <button
-                  type="button"
-                  onClick={() => handleDownloadPDF()}
-                  className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-2xl text-xs shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>KLIK UNDUH SEMUA DOKUMEN (SPK + NDA + BAST)</span>
-                </button>
+                <div className="space-y-2">
+                  {/* Tombol 1: SPK */}
+                  <button
+                    type="button"
+                    onClick={() => handleIndividualDownload('SPK')}
+                    className={`w-full py-3 px-4 rounded-2xl text-xs font-bold flex items-center justify-between border transition-all ${
+                      downloadedDocs.SPK
+                        ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                        : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-800'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-blue-600" />
+                      <span>1. Perjanjian Kerja Sama (SPK)</span>
+                    </div>
+                    <span className="font-extrabold flex items-center gap-1 text-[11px]">
+                      {downloadedDocs.SPK ? (
+                        <span className="text-emerald-600 flex items-center gap-1">
+                          <CheckCircle className="w-3.5 h-3.5" /> ✓ Terunduh
+                        </span>
+                      ) : (
+                        <span className="text-blue-600 flex items-center gap-1">
+                          <Download className="w-3.5 h-3.5" /> Unduh PDF
+                        </span>
+                      )}
+                    </span>
+                  </button>
 
-                <div className="grid grid-cols-3 gap-1.5 pt-1">
+                  {/* Tombol 2: NDA */}
                   <button
                     type="button"
-                    onClick={() => handleDownloadPDF('SPK')}
-                    className="py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-xl text-[11px] text-center border border-slate-200"
+                    onClick={() => handleIndividualDownload('NDA')}
+                    className={`w-full py-3 px-4 rounded-2xl text-xs font-bold flex items-center justify-between border transition-all ${
+                      downloadedDocs.NDA
+                        ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                        : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-800'
+                    }`}
                   >
-                    1. Unduh SPK
+                    <div className="flex items-center gap-2">
+                      <Lock className="w-4 h-4 text-indigo-600" />
+                      <span>2. Perjanjian Kerahasiaan (NDA)</span>
+                    </div>
+                    <span className="font-extrabold flex items-center gap-1 text-[11px]">
+                      {downloadedDocs.NDA ? (
+                        <span className="text-emerald-600 flex items-center gap-1">
+                          <CheckCircle className="w-3.5 h-3.5" /> ✓ Terunduh
+                        </span>
+                      ) : (
+                        <span className="text-indigo-600 flex items-center gap-1">
+                          <Download className="w-3.5 h-3.5" /> Unduh PDF
+                        </span>
+                      )}
+                    </span>
                   </button>
+
+                  {/* Tombol 3: BAST */}
                   <button
                     type="button"
-                    onClick={() => handleDownloadPDF('NDA')}
-                    className="py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-xl text-[11px] text-center border border-slate-200"
+                    onClick={() => handleIndividualDownload('BAST')}
+                    className={`w-full py-3 px-4 rounded-2xl text-xs font-bold flex items-center justify-between border transition-all ${
+                      downloadedDocs.BAST
+                        ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                        : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-800'
+                    }`}
                   >
-                    2. Unduh NDA
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDownloadPDF('BAST')}
-                    className="py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-xl text-[11px] text-center border border-slate-200"
-                  >
-                    3. Unduh BAST
+                    <div className="flex items-center gap-2">
+                      <CheckSquare className="w-4 h-4 text-purple-600" />
+                      <span>3. Berita Acara Serah Terima (BAST)</span>
+                    </div>
+                    <span className="font-extrabold flex items-center gap-1 text-[11px]">
+                      {downloadedDocs.BAST ? (
+                        <span className="text-emerald-600 flex items-center gap-1">
+                          <CheckCircle className="w-3.5 h-3.5" /> ✓ Terunduh
+                        </span>
+                      ) : (
+                        <span className="text-purple-600 flex items-center gap-1">
+                          <Download className="w-3.5 h-3.5" /> Unduh PDF
+                        </span>
+                      )}
+                    </span>
                   </button>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => handleShareWhatsApp()}
-                  className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl text-xs shadow-md flex items-center justify-center gap-2"
-                >
-                  <Send className="w-4 h-4" />
-                  <span>Kirim Paket Bundling ke WA Pihak Kedua</span>
-                </button>
+                <p className="text-[10px] text-slate-400 text-center pt-1">
+                  *Pengguna Apple/Safari: Anda dapat mengunduh file satu per satu kapan saja. Modal tidak akan tertutup secara otomatis.
+                </p>
               </div>
             ) : (
-              <div className="space-y-2.5 pt-1">
+              /* DOKUMEN SATUAN */
+              <div className="space-y-3 pt-1">
                 <button
                   type="button"
-                  onClick={() => handleDownloadPDF(paidDocTarget)}
+                  onClick={() => handleIndividualDownload(paidDocTarget)}
                   className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-2xl text-xs shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2"
                 >
                   <Download className="w-4 h-4" />
-                  <span>KLIK UNDUH PDF CLEAN (TANPA WATERMARK)</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleShareWhatsApp(paidDocTarget)}
-                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl text-xs shadow-md flex items-center justify-center gap-2"
-                >
-                  <Send className="w-4 h-4" />
-                  <span>Kirim Langsung ke WhatsApp Pihak Kedua</span>
+                  <span>UNDUH PDF CLEAN ({paidDocTarget})</span>
                 </button>
               </div>
             )}
 
+            {/* Bagian Bantuan & Kirim WA */}
+            <div className="pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => handleShareWhatsApp()}
+                className="w-full py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs rounded-xl transition flex items-center justify-center gap-2"
+              >
+                <Send className="w-4 h-4" />
+                <span>Kirim Draf ke WhatsApp Pihak Kedua</span>
+              </button>
+            </div>
+
             {/* Bagian Ulasan WA */}
-            <div className="pt-3 border-t border-slate-100">
-              <div className="bg-emerald-50/80 border border-emerald-200/80 rounded-2xl p-3.5 text-center space-y-2">
+            <div className="pt-1 border-t border-slate-100">
+              <div className="bg-emerald-50/80 border border-emerald-200/80 rounded-2xl p-3 text-center space-y-1.5">
                 <div className="text-xs font-extrabold text-slate-900 flex items-center justify-center gap-1.5">
                   <MessageSquarePlus className="w-4 h-4 text-emerald-600" />
                   <span>Berikan Ulasan & Kritik via WhatsApp</span>
@@ -2597,7 +2715,7 @@ export default function Home() {
                   href={`https://wa.me/${adminWaNumber}?text=${encodeURIComponent("Halo Admin SPKInstan, saya baru saja membuat dokumen dan ingin memberikan ulasan/kritik:")}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2 transition"
+                  className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2 transition"
                 >
                   <MessageCircle className="w-4 h-4" />
                   <span>Chat WA Admin Business</span>
@@ -2605,13 +2723,15 @@ export default function Home() {
               </div>
             </div>
 
+            {/* Tombol Selesai Manual (Satu-satunya Cara Menutup Modal & Membersihkan Storage) */}
             <button
               type="button"
-              onClick={() => setShowSuccessModal(false)}
-              className="text-xs text-slate-400 hover:text-slate-600 pt-1 block mx-auto font-medium"
+              onClick={handleCloseSuccessModal}
+              className="w-full py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs rounded-xl transition"
             >
-              Selesai
+              Selesai & Tutup Modal
             </button>
+
           </div>
         </div>
       )}
@@ -2641,7 +2761,7 @@ export default function Home() {
           type="button"
           onClick={() => {
             if (paidDocs[activeDocTab]) {
-              handleDownloadPDF(activeDocTab);
+              handleIndividualDownload(activeDocTab);
             } else {
               setModalStep('download_choice');
               setShowCheckoutModal(true);
