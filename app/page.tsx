@@ -63,11 +63,14 @@ export default function Home() {
   // Pengaturan Terpusat Nomor WA Admin
   const adminWaNumber = process.env.NEXT_PUBLIC_ADMIN_WA_NUMBER || '62881027908462';
 
+  // ---------------------------------------------------------
+  // DEKLARASI ALL STATES & REFS DI BAGIAN PALING ATAS
+  // ---------------------------------------------------------
   const [activeDocTab, setActiveDocTab] = useState<'SPK' | 'NDA' | 'BAST'>('SPK');
   const [selectedPackage, setSelectedPackage] = useState<'SINGLE' | 'BUNDLING'>('SINGLE');
   const [currentWizardStep, setCurrentWizardStep] = useState(1);
 
-  // State untuk melacak Preset Akselerator yang sedang aktif
+  // State Preset Akselerator
   const [activePreset, setActivePreset] = useState<'web' | 'design' | 'all' | null>(null);
 
   // Per-document Payment License state
@@ -120,16 +123,18 @@ export default function Home() {
     BAST: '001/BAST/IX/2026',
   });
 
-  const handleDocNumberChange = (value: string) => {
-    setDocNumbers((prev) => ({
-      ...prev,
-      [activeDocTab]: value,
-    }));
-  };
-
   // Signatory Customization Fields (Step 4)
   const [signerFirstParty, setSignerFirstParty] = useState('');
   const [signerSecondParty, setSignerSecondParty] = useState('');
+
+  // Signature Pad Canvas States & Refs (Dipindahkan ke atas untuk cegah TS2448 & TS2454)
+  const canvasRef1 = useRef<HTMLCanvasElement | null>(null);
+  const [isDrawing1, setIsDrawing1] = useState(false);
+  const [signatureFirstParty, setSignatureFirstParty] = useState<string | null>(null);
+
+  const canvasRef2 = useRef<HTMLCanvasElement | null>(null);
+  const [isDrawing2, setIsDrawing2] = useState(false);
+  const [signatureSecondParty, setSignatureSecondParty] = useState<string | null>(null);
 
   // SPK Fields
   const [projectTitle, setProjectTitle] = useState('');
@@ -147,9 +152,14 @@ export default function Home() {
   const [bastWarranty, setBastWarranty] = useState('');
   const [bastDate, setBastDate] = useState('');
 
-  // ==========================================
+  // Layout & Review States
+  const [reviews] = useState<Review[]>([]);
+  const page1ContentRef = useRef<HTMLDivElement | null>(null);
+  const page1MainContentRef = useRef<HTMLDivElement | null>(null);
+  const page2ContentRef = useRef<HTMLDivElement | null>(null);
+  const [heightNeedsPage2, setHeightNeedsPage2] = useState(false);
+
   // ARRAY-BASED CLAUSE MANAGER STATE & LOGIC
-  // ==========================================
   const [clauses, setClauses] = useState<Clause[]>([
     // SPK Clauses Bawaan
     {
@@ -305,7 +315,14 @@ export default function Home() {
     },
   ]);
 
-  // Pemulihan State dari LocalStorage
+  const handleDocNumberChange = (value: string) => {
+    setDocNumbers((prev) => ({
+      ...prev,
+      [activeDocTab]: value,
+    }));
+  };
+
+  // Pemulihan State Status Pembayaran dari LocalStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedPaid = localStorage.getItem('spkinstan_paid_docs');
@@ -334,6 +351,76 @@ export default function Home() {
           setDownloadedDocs(JSON.parse(savedDownloaded));
         } catch (e) {
           console.error('Failed to parse saved downloaded docs:', e);
+        }
+      }
+    }
+  }, []);
+
+  // 1. Simpan State Form ke LocalStorage Setiap Ada Perubahan
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const formData = {
+        freelancerName,
+        freelancerEmail,
+        freelancerWa,
+        clientName,
+        clientWa,
+        docNumbers,
+        signerFirstParty,
+        signerSecondParty,
+        projectTitle,
+        projectAmount,
+        dpPercent,
+        bankInfo,
+        ndaScope,
+        ndaYears,
+        ndaPenalty,
+        bastRef,
+        bastWarranty,
+        bastDate,
+        signatureFirstParty,
+        signatureSecondParty,
+        clauses,
+      };
+      localStorage.setItem('spkinstan_form_draft', JSON.stringify(formData));
+    }
+  }, [
+    freelancerName, freelancerEmail, freelancerWa, clientName, clientWa,
+    docNumbers, signerFirstParty, signerSecondParty, projectTitle, projectAmount,
+    dpPercent, bankInfo, ndaScope, ndaYears, ndaPenalty, bastRef, bastWarranty,
+    bastDate, signatureFirstParty, signatureSecondParty, clauses
+  ]);
+
+  // 2. Pulihkan State Form saat Halaman Utama Dimuat Kembali
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedDraft = localStorage.getItem('spkinstan_form_draft');
+      if (savedDraft) {
+        try {
+          const data = JSON.parse(savedDraft);
+          if (data.freelancerName) setFreelancerName(data.freelancerName);
+          if (data.freelancerEmail) setFreelancerEmail(data.freelancerEmail);
+          if (data.freelancerWa) setFreelancerWa(data.freelancerWa);
+          if (data.clientName) setClientName(data.clientName);
+          if (data.clientWa) setClientWa(data.clientWa);
+          if (data.docNumbers) setDocNumbers(data.docNumbers);
+          if (data.signerFirstParty) setSignerFirstParty(data.signerFirstParty);
+          if (data.signerSecondParty) setSignerSecondParty(data.signerSecondParty);
+          if (data.projectTitle) setProjectTitle(data.projectTitle);
+          if (data.projectAmount) setProjectAmount(data.projectAmount);
+          if (data.dpPercent) setDpPercent(data.dpPercent);
+          if (data.bankInfo) setBankInfo(data.bankInfo);
+          if (data.ndaScope) setNdaScope(data.ndaScope);
+          if (data.ndaYears) setNdaYears(data.ndaYears);
+          if (data.ndaPenalty) setNdaPenalty(data.ndaPenalty);
+          if (data.bastRef) setBastRef(data.bastRef);
+          if (data.bastWarranty) setBastWarranty(data.bastWarranty);
+          if (data.bastDate) setBastDate(data.bastDate);
+          if (data.signatureFirstParty) setSignatureFirstParty(data.signatureFirstParty);
+          if (data.signatureSecondParty) setSignatureSecondParty(data.signatureSecondParty);
+          if (data.clauses) setClauses(data.clauses);
+        } catch (e) {
+          console.error('Gagal memulihkan draf form:', e);
         }
       }
     }
@@ -474,31 +561,13 @@ export default function Home() {
     );
   };
 
-  // Signature Pad Canvas - PIHAK PERTAMA
-  const canvasRef1 = useRef<HTMLCanvasElement | null>(null);
-  const [isDrawing1, setIsDrawing1] = useState(false);
-  const [signatureFirstParty, setSignatureFirstParty] = useState<string | null>(null);
-
-  // Signature Pad Canvas - PIHAK KEDUA
-  const canvasRef2 = useRef<HTMLCanvasElement | null>(null);
-  const [isDrawing2, setIsDrawing2] = useState(false);
-  const [signatureSecondParty, setSignatureSecondParty] = useState<string | null>(null);
-
-  // Testimonials
-  const [reviews] = useState<Review[]>([]);
-
-  // === DYNAMIC CLAUSE PARTITIONING & HALAMAN A4 ===
+  // DYNAMIC CLAUSE PARTITIONING & HALAMAN A4
   const activeClauses = clauses.filter((c) => c.docType === activeDocTab && c.isEnabled);
   const SPLIT_LIMIT = 4;
   const isClauseSplit = activeClauses.length > SPLIT_LIMIT;
 
   const page1Clauses = isClauseSplit ? activeClauses.slice(0, SPLIT_LIMIT) : activeClauses;
   const page2Clauses = isClauseSplit ? activeClauses.slice(SPLIT_LIMIT) : [];
-
-  const [heightNeedsPage2, setHeightNeedsPage2] = useState(false);
-  const page1ContentRef = useRef<HTMLDivElement | null>(null);
-  const page1MainContentRef = useRef<HTMLDivElement | null>(null);
-  const page2ContentRef = useRef<HTMLDivElement | null>(null);
 
   useIsomorphicLayoutEffect(() => {
     if (isExporting) return;
@@ -657,27 +726,13 @@ export default function Home() {
     }
   };
 
-  // Trigger Unduh Otomatis
+  // Matikan pemicu auto download otomatis agar Safari tidak memblokir / membuat file 'teks'
   useEffect(() => {
     if (shouldAutoDownload) {
       setShouldAutoDownload(false);
-      const timer = setTimeout(async () => {
-        try {
-          setAutoDownloadStatus('Mengunduh file PDF Clean otomatis...');
-          if (selectedPackage === 'BUNDLING') {
-            await handleIndividualDownload('SPK');
-          } else {
-            await handleIndividualDownload(paidDocTarget);
-          }
-          setAutoDownloadStatus('Unduhan selesai!');
-        } catch (autoErr) {
-          console.warn('Browser memblokir auto download:', autoErr);
-          setAutoDownloadStatus('Silakan klik tombol unduh hijau di bawah ini.');
-        }
-      }, 700);
-      return () => clearTimeout(timer);
+      setAutoDownloadStatus('Pembayaran berhasil! Silakan klik tombol unduh hijau di bawah ini.');
     }
-  }, [shouldAutoDownload, paidDocs, selectedPackage, paidDocTarget]);
+  }, [shouldAutoDownload]);
 
   // Verifikasi Pembayaran via Server Redis
   const handleManualCheckPayment = async () => {
@@ -938,9 +993,7 @@ export default function Home() {
     }
   };
 
-  // =========================================================
-  // GENERATOR PDF TERPERBARUI (KHUSUS iOS SAFARI & DESKTOP)
-  // =========================================================
+  // GENERATOR PDF AMAN SAFARI & APPLE ECOSYSTEM
   const captureDocumentToPdf = async (docType: 'SPK' | 'NDA' | 'BAST') => {
     setActiveDocTab(docType);
     setMobileViewMode('preview');
@@ -980,13 +1033,13 @@ export default function Home() {
           watermarkElement.style.display = 'none';
         }
 
-        // 1. Simpan Style Asli Live Preview
+        // Simpan Style Asli Live Preview
         const originalWidth = pageEl.style.width;
         const originalHeight = pageEl.style.height;
         const originalMinHeight = pageEl.style.minHeight;
         const originalPosition = pageEl.style.position;
 
-        // 2. Terapkan Dimensi Standar A4 Cetak
+        // Terapkan Dimensi Standar A4 Cetak
         pageEl.style.width = '794px';
         pageEl.style.minHeight = '1123px';
         pageEl.style.height = 'auto';
@@ -1000,7 +1053,7 @@ export default function Home() {
           windowWidth: 794,
         });
 
-        // 3. Kembalikan Style Asli
+        // Kembalikan Style Asli
         pageEl.style.width = originalWidth;
         pageEl.style.height = originalHeight;
         pageEl.style.minHeight = originalMinHeight;
@@ -1032,22 +1085,25 @@ export default function Home() {
       const fileSuffix = isPaidDoc ? 'CLEAN' : 'WATERMARKED_DRAFT';
       const fileName = `SPKInstan_${docType}_${(freelancerName || 'PihakPertama').replace(/\s+/g, '_')}_${fileSuffix}.pdf`;
 
-      // =========================================================
-      // SOLUSI EKSPOR UTAMA KHUSUS iOS SAFARI & BROWSER DESKTOP
-      // =========================================================
+      // PENGELOLAAN BLOB LOKAL (SOLUSI MUTLAK SAFARI APPLE)
       const pdfBlob = pdf.output('blob');
-      const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
+      const blobUrl = URL.createObjectURL(pdfBlob);
 
-      // Cek apakah perangkat mendukung Web Share API (Ramah iOS Safari)
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({
-          files: [file],
-          title: fileName,
-        });
-      } else {
-        // Gunakan pdf.save() bawaan jsPDF (Langsung memicu dialog unduh tanpa redirect)
-        pdf.save(fileName);
-      }
+      const downloadLink = document.createElement('a');
+      downloadLink.style.display = 'none';
+      downloadLink.href = blobUrl;
+      downloadLink.download = fileName;
+
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+
+      // Cleanup Elemen DOM & Blob URL
+      setTimeout(() => {
+        if (document.body.contains(downloadLink)) {
+          document.body.removeChild(downloadLink);
+        }
+        URL.revokeObjectURL(blobUrl);
+      }, 1000);
 
       if (isPaidDoc && sessionId) {
         await consumePaymentLicense(sessionId);
@@ -1920,7 +1976,7 @@ export default function Home() {
                       !paidDocs[activeDocTab] ? 'select-none' : ''
                     }`}
                   >
-                    {/* === HALAMAN 1 === */}
+                    {/* HALAMAN 1 */}
                     <div
                       className="a4-page w-full max-w-[794px] min-h-[1123px] h-auto bg-white text-slate-900 p-6 sm:p-8 relative flex flex-col justify-between shadow-xl rounded-xl border border-slate-200 shrink-0"
                     >
@@ -2077,7 +2133,7 @@ export default function Home() {
                       </div>
                     </div>
 
-                    {/* === HALAMAN 2 === */}
+                    {/* HALAMAN 2 */}
                     {needsPage2 && (
                       <div
                         className="a4-page w-full max-w-[794px] min-h-[1123px] h-auto bg-white text-slate-900 p-6 sm:p-8 relative flex flex-col justify-between shadow-xl rounded-xl border border-slate-200 shrink-0"
