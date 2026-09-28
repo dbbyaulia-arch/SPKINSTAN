@@ -305,7 +305,7 @@ export default function Home() {
     },
   ]);
 
-  // PEMULIHAN STATE DARI LOCALSTORAGE UNTUK SAFARI iOS REFRESH RESILIENCE
+  // Pemulihan State dari LocalStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedPaid = localStorage.getItem('spkinstan_paid_docs');
@@ -339,7 +339,7 @@ export default function Home() {
     }
   }, []);
 
-  // Sinkronisasi otomatis input form spesifik ke dalam Teks Pasal State
+  // Sinkronisasi input form ke Teks Pasal State
   useEffect(() => {
     setClauses((prev) =>
       prev.map((c) => {
@@ -431,7 +431,7 @@ export default function Home() {
     setClauses((prev) => prev.filter((c) => c.id !== id));
   };
 
-  // LOGIKA PRESET DUKUNGAN SPK, NDA, & BAST
+  // Logika Preset SPK, NDA, & BAST
   const handleApplyPreset = (presetType: 'web' | 'design' | 'all') => {
     setActivePreset(presetType);
 
@@ -446,9 +446,7 @@ export default function Home() {
         }
 
         if (c.docType === 'SPK') {
-          if (presetType === 'web') {
-            return { ...c, isEnabled: true };
-          }
+          if (presetType === 'web') return { ...c, isEnabled: true };
           if (presetType === 'design') {
             if (c.id === 'spk-8') return { ...c, isEnabled: false };
             return { ...c, isEnabled: true };
@@ -456,9 +454,7 @@ export default function Home() {
         }
 
         if (c.docType === 'NDA') {
-          if (presetType === 'web') {
-            return { ...c, isEnabled: true };
-          }
+          if (presetType === 'web') return { ...c, isEnabled: true };
           if (presetType === 'design') {
             if (c.id === 'nda-6') return { ...c, isEnabled: false };
             return { ...c, isEnabled: true };
@@ -466,9 +462,7 @@ export default function Home() {
         }
 
         if (c.docType === 'BAST') {
-          if (presetType === 'web') {
-            return { ...c, isEnabled: true };
-          }
+          if (presetType === 'web') return { ...c, isEnabled: true };
           if (presetType === 'design') {
             if (c.id === 'bast-4') return { ...c, isEnabled: false };
             return { ...c, isEnabled: true };
@@ -605,7 +599,7 @@ export default function Home() {
     }
   }, [showCheckoutModal]);
 
-  // Eksekusi Kelunasan & Pencabutan Watermark (Serta Simpan ke LocalStorage)
+  // Eksekusi Kelunasan & Pencabutan Watermark
   const handlePaymentSuccess = () => {
     stopPolling();
     setIsProcessingSuccess(true);
@@ -616,7 +610,6 @@ export default function Home() {
 
     setPaidDocs(updatedPaid);
 
-    // SIMPAN KE LOCALSTORAGE AGAR TAHAN REFRESH SAFARI iOS
     if (typeof window !== 'undefined') {
       localStorage.setItem('spkinstan_paid_docs', JSON.stringify(updatedPaid));
       localStorage.setItem('spkinstan_show_success_modal', 'true');
@@ -640,7 +633,7 @@ export default function Home() {
     }
   };
 
-  // HANDLER UNDUH INDIVIDUAL RAMAH SAFARI iOS
+  // Handler Unduh Individual
   const handleIndividualDownload = async (docType: 'SPK' | 'NDA' | 'BAST') => {
     await captureDocumentToPdf(docType);
 
@@ -653,7 +646,7 @@ export default function Home() {
     });
   };
 
-  // HANDLER MENUTUP MODAL SECARA MANUAL
+  // Handler Menutup Modal
   const handleCloseSuccessModal = () => {
     setShowSuccessModal(false);
     if (typeof window !== 'undefined') {
@@ -664,7 +657,7 @@ export default function Home() {
     }
   };
 
-  // Trigger Unduh Otomatis Setelah DOM Rerender Tanpa Watermark
+  // Trigger Unduh Otomatis
   useEffect(() => {
     if (shouldAutoDownload) {
       setShouldAutoDownload(false);
@@ -739,7 +732,7 @@ export default function Home() {
         try {
           payload = JSON.parse(payload);
         } catch (e) {
-          // ignore parsing error
+          // ignore
         }
       }
 
@@ -933,7 +926,6 @@ export default function Home() {
     setSignatureSecondParty(null);
   };
 
-  // Fungsi untuk mengonsumsi lisensi di Redis
   const consumePaymentLicense = async (currentSessionId: string) => {
     try {
       await fetch('/api/qris/consume', {
@@ -947,7 +939,7 @@ export default function Home() {
   };
 
   // =========================================================
-  // GENERATOR PDF DINAMIS (BLOB OBJECT URL TERPISAH)
+  // GENERATOR PDF TERPERBARUI (KHUSUS iOS SAFARI & DESKTOP)
   // =========================================================
   const captureDocumentToPdf = async (docType: 'SPK' | 'NDA' | 'BAST') => {
     setActiveDocTab(docType);
@@ -994,7 +986,7 @@ export default function Home() {
         const originalMinHeight = pageEl.style.minHeight;
         const originalPosition = pageEl.style.position;
 
-        // 2. Terapkan Dimensi Standar A4 Cetak Dinamis
+        // 2. Terapkan Dimensi Standar A4 Cetak
         pageEl.style.width = '794px';
         pageEl.style.minHeight = '1123px';
         pageEl.style.height = 'auto';
@@ -1008,7 +1000,7 @@ export default function Home() {
           windowWidth: 794,
         });
 
-        // 3. Kembalikan Style Asli Live Preview Layar
+        // 3. Kembalikan Style Asli
         pageEl.style.width = originalWidth;
         pageEl.style.height = originalHeight;
         pageEl.style.minHeight = originalMinHeight;
@@ -1020,7 +1012,6 @@ export default function Home() {
         }
 
         const imgData = canvas.toDataURL('image/jpeg', 0.98);
-
         const imgWidth = 210;
         const pageHeight = 297;
         const imgHeight = (canvas.height * imgWidth) / canvas.width;
@@ -1031,7 +1022,6 @@ export default function Home() {
           const ratio = pageHeight / imgHeight;
           const scaledWidth = imgWidth * ratio;
           const xCenterOffset = (imgWidth - scaledWidth) / 2;
-
           pdf.addImage(imgData, 'JPEG', xCenterOffset, 0, scaledWidth, pageHeight);
         } else {
           pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
@@ -1040,20 +1030,24 @@ export default function Home() {
 
       const isPaidDoc = paidDocs[docType] || paidDocs[activeDocTab];
       const fileSuffix = isPaidDoc ? 'CLEAN' : 'WATERMARKED_DRAFT';
+      const fileName = `SPKInstan_${docType}_${(freelancerName || 'PihakPertama').replace(/\s+/g, '_')}_${fileSuffix}.pdf`;
 
+      // =========================================================
+      // SOLUSI EKSPOR UTAMA KHUSUS iOS SAFARI & BROWSER DESKTOP
+      // =========================================================
       const pdfBlob = pdf.output('blob');
-      const blobUrl = URL.createObjectURL(pdfBlob);
+      const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
 
-      const downloadAnchor = document.createElement('a');
-      downloadAnchor.href = blobUrl;
-      downloadAnchor.target = '_blank';
-      downloadAnchor.download = `SPKInstan_${docType}_${(freelancerName || 'PihakPertama').replace(/\s+/g, '_')}_${fileSuffix}.pdf`;
-
-      document.body.appendChild(downloadAnchor);
-      downloadAnchor.click();
-      document.body.removeChild(downloadAnchor);
-
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 3000);
+      // Cek apakah perangkat mendukung Web Share API (Ramah iOS Safari)
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: fileName,
+        });
+      } else {
+        // Gunakan pdf.save() bawaan jsPDF (Langsung memicu dialog unduh tanpa redirect)
+        pdf.save(fileName);
+      }
 
       if (isPaidDoc && sessionId) {
         await consumePaymentLicense(sessionId);
@@ -1063,25 +1057,6 @@ export default function Home() {
       alert('Gagal mengekspor PDF.');
     } finally {
       setIsExporting(false);
-    }
-  };
-
-  // PDF Export Handler
-  const handleDownloadPDF = async (specificDoc?: 'SPK' | 'NDA' | 'BAST') => {
-    try {
-      if (specificDoc) {
-        await handleIndividualDownload(specificDoc);
-      } else if (selectedPackage === 'BUNDLING') {
-        await handleIndividualDownload('SPK');
-        await new Promise((r) => setTimeout(r, 600));
-        await handleIndividualDownload('NDA');
-        await new Promise((r) => setTimeout(r, 600));
-        await handleIndividualDownload('BAST');
-      } else {
-        await handleIndividualDownload(activeDocTab);
-      }
-    } catch (err) {
-      console.error('Gagal membuat PDF:', err);
     }
   };
 
@@ -1124,7 +1099,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col justify-between font-sans antialiased selection:bg-blue-100 selection:text-blue-700 pb-20 md:pb-0">
       
-      {/* CSS Import Font Calibri & Typography Rules */}
+      {/* CSS Typography & Printing Rules */}
       <style>{`
         #a4-document-preview, .a4-page {
           font-family: 'Calibri', 'Carlito', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
@@ -1379,7 +1354,6 @@ export default function Home() {
                   {/* STEP 1: Identitas Para Pihak */}
                   {currentWizardStep === 1 && (
                     <div className="space-y-4">
-                      {/* Input Nomor Surat / Dokumen Custom dengan Multi-State */}
                       <div>
                         <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
                           <Hash className="w-3.5 h-3.5 text-blue-600" /> Nomor Dokumen / Surat ({activeDocTab})
@@ -1624,7 +1598,7 @@ export default function Home() {
                         </label>
                       </div>
 
-                      {/* Preset Accelerator Pills dengan Indikator Visual Biru Solid */}
+                      {/* Preset Accelerator Pills */}
                       <div className="p-2 bg-slate-100 rounded-2xl border border-slate-200/80 space-y-1.5">
                         <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider block px-1 flex items-center gap-1">
                           <Sliders className="w-3 h-3 text-blue-600" /> Preset Akselerator Cepat ({activeDocTab}):
@@ -1739,7 +1713,7 @@ export default function Home() {
                     </div>
                   )}
 
-                  {/* STEP 4: Legalisasi & Tanda Tangan Terpisah */}
+                  {/* STEP 4: Legalisasi & Tanda Tangan */}
                   {currentWizardStep === 4 && (
                     <div className="space-y-5">
                       {/* TANDA TANGAN PIHAK PERTAMA */}
@@ -2548,7 +2522,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* Modal Sukses: Persistent Download Center (Tahan Refresh Safari iOS) */}
+      {/* Modal Sukses (Tanpa Animasi/Spinner Berputar) */}
       {showSuccessModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white max-w-md w-full rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-5 text-center my-8 max-h-[90vh] overflow-y-auto">
@@ -2723,7 +2697,7 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Tombol Selesai Manual (Satu-satunya Cara Menutup Modal & Membersihkan Storage) */}
+            {/* Tombol Selesai */}
             <button
               type="button"
               onClick={handleCloseSuccessModal}
