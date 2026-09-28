@@ -2082,15 +2082,25 @@ export default function Home() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {reviews.length === 0 ? (
-                <div className="md:col-span-3 bg-slate-50 p-8 rounded-3xl border border-dashed border-slate-300 text-center space-y-2 max-w-xl mx-auto">
-                  <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mx-auto">
+                <a
+                  href={`https://wa.me/${adminWaNumber}?text=${encodeURIComponent("Halo Admin SPKInstan, saya ingin memberikan testimoni ulasan penggunaan SPKInstan.")}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="md:col-span-3 bg-slate-50 hover:bg-blue-50/50 p-8 rounded-3xl border border-dashed border-slate-300 hover:border-blue-400 text-center space-y-2 max-w-xl mx-auto block cursor-pointer transition-all duration-200 group shadow-xs hover:shadow-md"
+                >
+                  <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white flex items-center justify-center mx-auto transition-colors duration-200">
                     <MessageSquarePlus className="w-5 h-5" />
                   </div>
-                  <h4 className="text-xs font-bold text-slate-800">Belum Ada Testimoni Pengguna</h4>
-                  <p className="text-xs text-slate-500 leading-relaxed">
-                    Jadilah pengguna pertama yang membagikan ulasan setelah mengunduh dokumen legal Anda.
+                  <h4 className="text-xs sm:text-sm font-bold text-slate-800 group-hover:text-blue-700 transition-colors">
+                    Belum Ada Testimoni Pengguna
+                  </h4>
+                  <p className="text-xs text-slate-500 group-hover:text-slate-600 leading-relaxed">
+                    Jadilah pengguna pertama yang membagikan ulasan setelah mengunduh dokumen legal Anda.{' '}
+                    <span className="font-semibold text-blue-600 group-hover:underline block sm:inline mt-1 sm:mt-0">
+                      Klik di sini untuk kirim ulasan via WhatsApp &rarr;
+                    </span>
                   </p>
-                </div>
+                </a>
               ) : (
                 reviews.map((rev) => (
                   <div key={rev.id} className="bg-slate-50 p-6 rounded-3xl border border-slate-200/80 space-y-3">
