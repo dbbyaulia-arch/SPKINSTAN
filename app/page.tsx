@@ -29,6 +29,8 @@ import {
   Plus,
   Trash2,
   Loader2,
+  ExternalLink,
+  Hash,
   AlertTriangle,
   Sliders
 } from 'lucide-react';
@@ -58,32 +60,25 @@ interface Clause {
 const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
 export default function Home() {
+  // Pengaturan Terpusat Nomor WA Admin
   const adminWaNumber = process.env.NEXT_PUBLIC_ADMIN_WA_NUMBER || '62881027908462';
 
-  // ---------------------------------------------------------
-  // ALL STATES & REFS
-  // ---------------------------------------------------------
   const [activeDocTab, setActiveDocTab] = useState<'SPK' | 'NDA' | 'BAST'>('SPK');
   const [selectedPackage, setSelectedPackage] = useState<'SINGLE' | 'BUNDLING'>('SINGLE');
   const [currentWizardStep, setCurrentWizardStep] = useState(1);
 
+  // State untuk melacak Preset Akselerator yang sedang aktif
   const [activePreset, setActivePreset] = useState<'web' | 'design' | 'all' | null>(null);
 
+  // Per-document Payment License state
   const [paidDocs, setPaidDocs] = useState<{ SPK: boolean; NDA: boolean; BAST: boolean }>({
     SPK: false,
     NDA: false,
     BAST: false,
   });
-
-  const [downloadedDocs, setDownloadedDocs] = useState<{ SPK: boolean; NDA: boolean; BAST: boolean }>({
-    SPK: false,
-    NDA: false,
-    BAST: false,
-  });
-
-  const [processingDoc, setProcessingDoc] = useState<'SPK' | 'NDA' | 'BAST' | 'ALL' | null>(null);
-
   const [paidDocTarget, setPaidDocTarget] = useState<'SPK' | 'NDA' | 'BAST'>('SPK');
+  const [shouldAutoDownload, setShouldAutoDownload] = useState(false);
+  const [, setAutoDownloadStatus] = useState<string>('');
 
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -95,6 +90,7 @@ export default function Home() {
   const [mayarPaymentId, setMayarPaymentId] = useState<string | null>(null);
   const [timeLeft, setTimeLeft] = useState(899);
 
+  // Mayar API & Polling States
   const [, setQrCodeData] = useState<string | null>(null);
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
   const [isLoadingQris, setIsLoadingQris] = useState(false);
@@ -102,51 +98,52 @@ export default function Home() {
   const [isProcessingSuccess, setIsProcessingSuccess] = useState(false);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Form State
+  // Form State - Identitas Para Pihak
   const [freelancerName, setFreelancerName] = useState('');
   const [freelancerEmail, setFreelancerEmail] = useState('');
   const [freelancerWa, setFreelancerWa] = useState('');
   const [clientName, setClientName] = useState('');
   const [clientWa, setClientWa] = useState('');
 
-  // Multi-Doc State untuk Nomor Surat
+  // Multi-State Nomor Dokumen Terpisah per Jenis Dokumen
   const [docNumbers, setDocNumbers] = useState({
     SPK: '001/SPK/IX/2026',
     NDA: '001/NDA/IX/2026',
     BAST: '001/BAST/IX/2026',
   });
 
+  const handleDocNumberChange = (value: string) => {
+    setDocNumbers((prev) => ({
+      ...prev,
+      [activeDocTab]: value,
+    }));
+  };
+
+  // Signatory Customization Fields (Step 4)
   const [signerFirstParty, setSignerFirstParty] = useState('');
   const [signerSecondParty, setSignerSecondParty] = useState('');
 
-  const canvasRef1 = useRef<HTMLCanvasElement | null>(null);
-  const [isDrawing1, setIsDrawing1] = useState(false);
-  const [signatureFirstParty, setSignatureFirstParty] = useState<string | null>(null);
-
-  const canvasRef2 = useRef<HTMLCanvasElement | null>(null);
-  const [isDrawing2, setIsDrawing2] = useState(false);
-  const [signatureSecondParty, setSignatureSecondParty] = useState<string | null>(null);
-
+  // SPK Fields
   const [projectTitle, setProjectTitle] = useState('');
   const [projectAmount, setProjectAmount] = useState('');
   const [dpPercent, setDpPercent] = useState('');
   const [bankInfo, setBankInfo] = useState('');
 
+  // NDA Fields
   const [ndaScope, setNdaScope] = useState('');
   const [ndaYears, setNdaYears] = useState('');
   const [ndaPenalty, setNdaPenalty] = useState('');
 
+  // BAST Fields
   const [bastRef, setBastRef] = useState('');
   const [bastWarranty, setBastWarranty] = useState('');
   const [bastDate, setBastDate] = useState('');
 
-  const [reviews] = useState<Review[]>([]);
-  const page1ContentRef = useRef<HTMLDivElement | null>(null);
-  const page1MainContentRef = useRef<HTMLDivElement | null>(null);
-  const page2ContentRef = useRef<HTMLDivElement | null>(null);
-  const [heightNeedsPage2, setHeightNeedsPage2] = useState(false);
-
+  // ==========================================
+  // ARRAY-BASED CLAUSE MANAGER STATE & LOGIC
+  // ==========================================
   const [clauses, setClauses] = useState<Clause[]>([
+    // SPK Clauses Bawaan
     {
       id: 'spk-1',
       docType: 'SPK',
@@ -210,6 +207,8 @@ export default function Home() {
       content: 'PIHAK PERTAMA berhak menampilkan hasil karya visual/desain sebagai portofolio profesional selama tidak melanggar kerahasiaan NDA. Setiap sengketa akan diselesaikan secara musyawarah, dan apabila tidak tercapai kesepakatan, diselesaikan melalui domisili Pengadilan Negeri yang berwenang.',
       isEnabled: true,
     },
+
+    // NDA Clauses Bawaan
     {
       id: 'nda-1',
       docType: 'NDA',
@@ -259,6 +258,8 @@ export default function Home() {
       content: 'Setiap perselisihan yang timbul dari pelaksanaan NDA ini diselesaikan melalui musyawarah untuk mufakat, dan apabila gagal, diselesaikan di forum hukum Pengadilan Negeri setempat.',
       isEnabled: true,
     },
+
+    // BAST Clauses Bawaan
     {
       id: 'bast-1',
       docType: 'BAST',
@@ -296,114 +297,7 @@ export default function Home() {
     },
   ]);
 
-  const handleDocNumberChange = (value: string) => {
-    setDocNumbers((prev) => ({
-      ...prev,
-      [activeDocTab]: value,
-    }));
-  };
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedPaid = localStorage.getItem('spkinstan_paid_docs');
-      const savedModal = localStorage.getItem('spkinstan_show_success_modal');
-      const savedDownloaded = localStorage.getItem('spkinstan_downloaded_docs');
-      const savedPackage = localStorage.getItem('spkinstan_package');
-
-      if (savedPaid) {
-        try {
-          setPaidDocs(JSON.parse(savedPaid));
-        } catch (e) {
-          console.error('Failed to parse saved paid docs:', e);
-        }
-      }
-
-      if (savedPackage === 'BUNDLING' || savedPackage === 'SINGLE') {
-        setSelectedPackage(savedPackage as 'SINGLE' | 'BUNDLING');
-      }
-
-      if (savedModal === 'true') {
-        setShowSuccessModal(true);
-      }
-
-      if (savedDownloaded) {
-        try {
-          setDownloadedDocs(JSON.parse(savedDownloaded));
-        } catch (e) {
-          console.error('Failed to parse saved downloaded docs:', e);
-        }
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const formData = {
-        freelancerName,
-        freelancerEmail,
-        freelancerWa,
-        clientName,
-        clientWa,
-        docNumbers,
-        signerFirstParty,
-        signerSecondParty,
-        projectTitle,
-        projectAmount,
-        dpPercent,
-        bankInfo,
-        ndaScope,
-        ndaYears,
-        ndaPenalty,
-        bastRef,
-        bastWarranty,
-        bastDate,
-        signatureFirstParty,
-        signatureSecondParty,
-        clauses,
-      };
-      localStorage.setItem('spkinstan_form_draft', JSON.stringify(formData));
-    }
-  }, [
-    freelancerName, freelancerEmail, freelancerWa, clientName, clientWa,
-    docNumbers, signerFirstParty, signerSecondParty, projectTitle, projectAmount,
-    dpPercent, bankInfo, ndaScope, ndaYears, ndaPenalty, bastRef, bastWarranty,
-    bastDate, signatureFirstParty, signatureSecondParty, clauses
-  ]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedDraft = localStorage.getItem('spkinstan_form_draft');
-      if (savedDraft) {
-        try {
-          const data = JSON.parse(savedDraft);
-          if (data.freelancerName) setFreelancerName(data.freelancerName);
-          if (data.freelancerEmail) setFreelancerEmail(data.freelancerEmail);
-          if (data.freelancerWa) setFreelancerWa(data.freelancerWa);
-          if (data.clientName) setClientName(data.clientName);
-          if (data.clientWa) setClientWa(data.clientWa);
-          if (data.docNumbers) setDocNumbers(data.docNumbers);
-          if (data.signerFirstParty) setSignerFirstParty(data.signerFirstParty);
-          if (data.signerSecondParty) setSignerSecondParty(data.signerSecondParty);
-          if (data.projectTitle) setProjectTitle(data.projectTitle);
-          if (data.projectAmount) setProjectAmount(data.projectAmount);
-          if (data.dpPercent) setDpPercent(data.dpPercent);
-          if (data.bankInfo) setBankInfo(data.bankInfo);
-          if (data.ndaScope) setNdaScope(data.ndaScope);
-          if (data.ndaYears) setNdaYears(data.ndaYears);
-          if (data.ndaPenalty) setNdaPenalty(data.ndaPenalty);
-          if (data.bastRef) setBastRef(data.bastRef);
-          if (data.bastWarranty) setBastWarranty(data.bastWarranty);
-          if (data.bastDate) setBastDate(data.bastDate);
-          if (data.signatureFirstParty) setSignatureFirstParty(data.signatureFirstParty);
-          if (data.signatureSecondParty) setSignatureSecondParty(data.signatureSecondParty);
-          if (data.clauses) setClauses(data.clauses);
-        } catch (e) {
-          console.error('Gagal memulihkan draf form:', e);
-        }
-      }
-    }
-  }, []);
-
+  // Sinkronisasi otomatis input form spesifik ke dalam Teks Pasal State
   useEffect(() => {
     setClauses((prev) =>
       prev.map((c) => {
@@ -460,6 +354,7 @@ export default function Home() {
     );
   }, [projectTitle, projectAmount, dpPercent, bankInfo, ndaScope, ndaYears, ndaPenalty, bastRef, bastDate, bastWarranty]);
 
+  // Handler Manajemen Pasal State
   const handleToggleClause = (id: string) => {
     setClauses((prev) =>
       prev.map((c) => (c.id === id ? { ...c, isEnabled: !c.isEnabled } : c))
@@ -494,16 +389,24 @@ export default function Home() {
     setClauses((prev) => prev.filter((c) => c.id !== id));
   };
 
+  // LOGIKA PRESET DUKUNGAN SPK, NDA, & BAST
   const handleApplyPreset = (presetType: 'web' | 'design' | 'all') => {
     setActivePreset(presetType);
 
     setClauses((prev) =>
       prev.map((c) => {
-        if (presetType === 'all') return { ...c, isEnabled: true };
-        if (c.docType !== activeDocTab) return c;
+        if (presetType === 'all') {
+          return { ...c, isEnabled: true };
+        }
+
+        if (c.docType !== activeDocTab) {
+          return c;
+        }
 
         if (c.docType === 'SPK') {
-          if (presetType === 'web') return { ...c, isEnabled: true };
+          if (presetType === 'web') {
+            return { ...c, isEnabled: true };
+          }
           if (presetType === 'design') {
             if (c.id === 'spk-8') return { ...c, isEnabled: false };
             return { ...c, isEnabled: true };
@@ -511,7 +414,9 @@ export default function Home() {
         }
 
         if (c.docType === 'NDA') {
-          if (presetType === 'web') return { ...c, isEnabled: true };
+          if (presetType === 'web') {
+            return { ...c, isEnabled: true };
+          }
           if (presetType === 'design') {
             if (c.id === 'nda-6') return { ...c, isEnabled: false };
             return { ...c, isEnabled: true };
@@ -519,7 +424,9 @@ export default function Home() {
         }
 
         if (c.docType === 'BAST') {
-          if (presetType === 'web') return { ...c, isEnabled: true };
+          if (presetType === 'web') {
+            return { ...c, isEnabled: true };
+          }
           if (presetType === 'design') {
             if (c.id === 'bast-4') return { ...c, isEnabled: false };
             return { ...c, isEnabled: true };
@@ -531,12 +438,31 @@ export default function Home() {
     );
   };
 
+  // Signature Pad Canvas - PIHAK PERTAMA
+  const canvasRef1 = useRef<HTMLCanvasElement | null>(null);
+  const [isDrawing1, setIsDrawing1] = useState(false);
+  const [signatureFirstParty, setSignatureFirstParty] = useState<string | null>(null);
+
+  // Signature Pad Canvas - PIHAK KEDUA
+  const canvasRef2 = useRef<HTMLCanvasElement | null>(null);
+  const [isDrawing2, setIsDrawing2] = useState(false);
+  const [signatureSecondParty, setSignatureSecondParty] = useState<string | null>(null);
+
+  // Testimonials
+  const [reviews] = useState<Review[]>([]);
+
+  // === DYNAMIC CLAUSE PARTITIONING & HALAMAN A4 ===
   const activeClauses = clauses.filter((c) => c.docType === activeDocTab && c.isEnabled);
   const SPLIT_LIMIT = 4;
   const isClauseSplit = activeClauses.length > SPLIT_LIMIT;
 
   const page1Clauses = isClauseSplit ? activeClauses.slice(0, SPLIT_LIMIT) : activeClauses;
   const page2Clauses = isClauseSplit ? activeClauses.slice(SPLIT_LIMIT) : [];
+
+  const [heightNeedsPage2, setHeightNeedsPage2] = useState(false);
+  const page1ContentRef = useRef<HTMLDivElement | null>(null);
+  const page1MainContentRef = useRef<HTMLDivElement | null>(null);
+  const page2ContentRef = useRef<HTMLDivElement | null>(null);
 
   useIsomorphicLayoutEffect(() => {
     if (isExporting) return;
@@ -593,6 +519,7 @@ export default function Home() {
     setSessionId(generateNewSessionId());
   }, []);
 
+  // Proteksi Anti-Inspect & Shortcut Keyboard jika belum lunas
   useEffect(() => {
     const isPaid = paidDocs[activeDocTab];
     if (isPaid) return;
@@ -606,7 +533,7 @@ export default function Home() {
       ) {
         e.preventDefault();
         e.stopPropagation();
-        alert('Proteksi Keamanan: Fitur inspect dan simpan draf dibatasi. Silakan selesaikan pembayaran untuk mengunduh PDF Clean.');
+        alert('Proteksi Keamanan: Fitur inspect, cetak langsung, salin teks, dan simpan draf dibatasi. Silakan lakukan pembayaran untuk mendapatkan PDF HD Clean tanpa watermark.');
       }
     };
 
@@ -636,20 +563,16 @@ export default function Home() {
     }
   }, [showCheckoutModal]);
 
+  // Eksekusi Kelunasan & Pencabutan Watermark
   const handlePaymentSuccess = () => {
     stopPolling();
+
     setIsProcessingSuccess(true);
 
-    const updatedPaid = selectedPackage === 'BUNDLING'
-      ? { SPK: true, NDA: true, BAST: true }
-      : { ...paidDocs, [paidDocTarget]: true };
-
-    setPaidDocs(updatedPaid);
-
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('spkinstan_paid_docs', JSON.stringify(updatedPaid));
-      localStorage.setItem('spkinstan_show_success_modal', 'true');
-      localStorage.setItem('spkinstan_package', selectedPackage);
+    if (selectedPackage === 'BUNDLING') {
+      setPaidDocs({ SPK: true, NDA: true, BAST: true });
+    } else {
+      setPaidDocs((prev) => ({ ...prev, [paidDocTarget]: true }));
     }
 
     setTimeout(() => {
@@ -657,227 +580,41 @@ export default function Home() {
       setMobileViewMode('preview');
       setShowCheckoutModal(false);
       setShowSuccessModal(true);
-    }, 1200);
+      setShouldAutoDownload(true);
+      setAutoDownloadStatus('Memproses pencabutan watermark & menyiapkan PDF...');
+    }, 2000);
 
     if (typeof window !== 'undefined' && window.fbq) {
       window.fbq('track', 'Purchase', {
-        value: 1000,
+        value: selectedPackage === 'SINGLE' ? 1000 : 1000,
         currency: 'IDR',
       });
     }
   };
 
-  const switchTabAndAwaitRender = (targetDoc: 'SPK' | 'NDA' | 'BAST') => {
-    return new Promise<void>((resolve) => {
-      setActiveDocTab(targetDoc);
-      setTimeout(() => {
-        resolve();
-      }, 500);
-    });
-  };
-
-  // =========================================================================
-  // FUNGSI GENERATOR PDF PERBAIKAN TOTAL (STABIL DI MOBILE & DESKTOP)
-  // =========================================================================
-  const captureDocumentToPdf = async (
-    docType: 'SPK' | 'NDA' | 'BAST',
-    shouldConsumeLicense = true
-  ) => {
-    setProcessingDoc(docType);
-    setIsExporting(true);
-
-    // 1. Paksakan perpindahan ke mode preview di mobile agar DOM ter-render
-    setMobileViewMode('preview');
-
-    if (activeDocTab !== docType) {
-      await switchTabAndAwaitRender(docType);
-    }
-
-    // 2. Beri waktu jeda ekstra untuk memastikan DOM & font benar-benar ter-paint di browser
-    await new Promise((resolve) => setTimeout(resolve, 600));
-
-    if (typeof document !== 'undefined' && document.fonts) {
-      await document.fonts.ready;
-    }
-
-    const element = document.getElementById('a4-document-preview');
-    if (!element) {
-      console.error('Elemen #a4-document-preview tidak ditemukan');
-      alert('Pratinjau dokumen tidak ditemukan.');
-      setIsExporting(false);
-      setProcessingDoc(null);
-      return;
-    }
-
-    try {
-      // Fallback impor library jika html2canvas-pro tidak ter-install
-      let html2canvasLib: any;
-      try {
-        html2canvasLib = (await import('html2canvas-pro')).default;
-      } catch (e) {
-        html2canvasLib = (await import('html2canvas')).default;
-      }
-
-      const { jsPDF } = await import('jspdf');
-
-      const pageElements = element.querySelectorAll('.a4-page');
-      if (!pageElements || pageElements.length === 0) {
-        throw new Error('Tidak ada halaman A4 yang dapat diproses.');
-      }
-
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4',
-        compress: true,
-      });
-
-      for (let i = 0; i < pageElements.length; i++) {
-        const pageEl = pageElements[i] as HTMLElement;
-        const isPaidDoc = paidDocs[docType] || (paidDocs.SPK && paidDocs.NDA && paidDocs.BAST);
-
-        const watermarkElement = pageEl.querySelector('.watermark-layer') as HTMLElement;
-        if (isPaidDoc && watermarkElement) {
-          watermarkElement.style.display = 'none';
+  // Trigger Unduh Otomatis Setelah DOM Rerender Tanpa Watermark
+  useEffect(() => {
+    if (shouldAutoDownload) {
+      setShouldAutoDownload(false);
+      const timer = setTimeout(async () => {
+        try {
+          setAutoDownloadStatus('Mengunduh file PDF Clean otomatis...');
+          if (selectedPackage === 'BUNDLING') {
+            await captureDocumentToPdf('SPK');
+          } else {
+            await captureDocumentToPdf(paidDocTarget);
+          }
+          setAutoDownloadStatus('Unduhan selesai!');
+        } catch (autoErr) {
+          console.warn('Browser memblokir auto download:', autoErr);
+          setAutoDownloadStatus('Silakan klik tombol unduh hijau di bawah ini.');
         }
-
-        const originalWidth = pageEl.style.width;
-        const originalHeight = pageEl.style.height;
-        const originalMinHeight = pageEl.style.minHeight;
-
-        pageEl.style.width = '794px';
-        pageEl.style.minHeight = '1123px';
-        pageEl.style.height = 'auto';
-        pageEl.classList.add('export-pdf-mode');
-
-        const canvas = await html2canvasLib(pageEl, {
-          scale: 2,
-          useCORS: true,
-          allowTaint: true,
-          logging: false,
-          windowWidth: 794,
-        });
-
-        pageEl.style.width = originalWidth;
-        pageEl.style.height = originalHeight;
-        pageEl.style.minHeight = originalMinHeight;
-        pageEl.classList.remove('export-pdf-mode');
-
-        if (watermarkElement && !isPaidDoc) {
-          watermarkElement.style.display = 'flex';
-        }
-
-        const imgData = canvas.toDataURL('image/jpeg', 0.95);
-        const imgWidth = 210;
-        const pageHeight = 297;
-        const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-        if (i > 0) pdf.addPage();
-
-        if (imgHeight > pageHeight) {
-          const ratio = pageHeight / imgHeight;
-          const scaledWidth = imgWidth * ratio;
-          const xCenterOffset = (imgWidth - scaledWidth) / 2;
-          pdf.addImage(imgData, 'JPEG', xCenterOffset, 0, scaledWidth, pageHeight);
-        } else {
-          pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
-        }
-      }
-
-      const isPaidDoc = paidDocs[docType] || (paidDocs.SPK && paidDocs.NDA && paidDocs.BAST);
-      const fileSuffix = isPaidDoc ? 'CLEAN' : 'WATERMARKED_DRAFT';
-      const cleanName = (freelancerName || 'PihakPertama')
-        .trim()
-        .replace(/[^a-zA-Z0-9]/g, '_')
-        .replace(/_+/g, '_');
-      const fileName = `SPKInstan_${docType}_${cleanName}_${fileSuffix}.pdf`;
-
-      // Mekanisme Unduh Universal: Pemicu Blob URL untuk Mobile & Fallback Direct Save
-      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-        typeof navigator !== 'undefined' ? navigator.userAgent : ''
-      );
-
-      if (isMobile) {
-        const blob = pdf.output('blob');
-        const blobUrl = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = blobUrl;
-        link.download = fileName;
-        link.target = '_blank';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
-      } else {
-        pdf.save(fileName);
-      }
-
-      setDownloadedDocs((prev) => {
-        const nextState = { ...prev, [docType]: true };
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('spkinstan_downloaded_docs', JSON.stringify(nextState));
-        }
-        return nextState;
-      });
-
-      if (shouldConsumeLicense && isPaidDoc && sessionId) {
-        await consumePaymentLicense(sessionId);
-      }
-    } catch (err: any) {
-      console.error('Error generating PDF:', err);
-      alert(`Gagal mengekspor PDF: ${err?.message || 'Pastikan browser memberikan izin unduh file.'}`);
-    } finally {
-      setIsExporting(false);
-      setProcessingDoc(null);
+      }, 700);
+      return () => clearTimeout(timer);
     }
-  };
+  }, [shouldAutoDownload, paidDocs, selectedPackage, paidDocTarget]);
 
-  const handleDownloadAllBundling = async (e?: React.MouseEvent) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    setProcessingDoc('ALL');
-    setIsExporting(true);
-    const docs: ('SPK' | 'NDA' | 'BAST')[] = ['SPK', 'NDA', 'BAST'];
-
-    try {
-      for (const doc of docs) {
-        await switchTabAndAwaitRender(doc);
-        await captureDocumentToPdf(doc, false);
-        await new Promise((res) => setTimeout(res, 800));
-      }
-
-      if (sessionId) {
-        await consumePaymentLicense(sessionId);
-      }
-    } catch (err) {
-      console.error('Gagal mengunduh paket bundling:', err);
-      alert('Terjadi kendala saat mengunduh paket bundling.');
-    } finally {
-      setIsExporting(false);
-      setProcessingDoc(null);
-    }
-  };
-
-  const handleIndividualDownload = async (docType: 'SPK' | 'NDA' | 'BAST', e?: React.MouseEvent) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    await captureDocumentToPdf(docType, true);
-  };
-
-  const handleCloseSuccessModal = () => {
-    setShowSuccessModal(false);
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('spkinstan_show_success_modal');
-      localStorage.removeItem('spkinstan_paid_docs');
-      localStorage.removeItem('spkinstan_downloaded_docs');
-      localStorage.removeItem('spkinstan_package');
-    }
-  };
-
+  // Verifikasi Pembayaran via Server Redis
   const handleManualCheckPayment = async () => {
     if (!sessionId || isVerifyingPayment) return;
     setIsVerifyingPayment(true);
@@ -893,16 +630,17 @@ export default function Home() {
         }
       }
 
-      alert('Pembayaran belum terdeteksi. Silakan selesaikan transaksi pembayaran terlebih dahulu.');
+      alert('Pembayaran belum terdeteksi di server. Silakan selesaikan proses transfer/scan QRIS terlebih dahulu.');
     } catch (err) {
       console.error('Verifikasi pembayaran gagal:', err);
-      alert('Gagal terhubung ke server verifikasi.');
+      alert('Gagal terhubung ke server verifikasi. Silakan periksa koneksi internet Anda.');
     } finally {
       setIsVerifyingPayment(false);
     }
   };
 
-  const startPollingStatus = (currentSession: string) => {
+  // Polling Real-time ke Server Redis
+  const startPollingStatus = (currentSession: string, _mayarId?: string) => {
     stopPolling();
     pollingRef.current = setInterval(async () => {
       try {
@@ -916,9 +654,38 @@ export default function Home() {
       } catch (err) {
         console.error('Polling error:', err);
       }
-    }, 2500);
+    }, 3000);
   };
 
+  // PostMessage Event Listener dari Mayar Gateway
+  useEffect(() => {
+    const handleMayarMessage = (event: MessageEvent) => {
+      if (!event.data) return;
+
+      let payload = event.data;
+      if (typeof payload === 'string') {
+        try {
+          payload = JSON.parse(payload);
+        } catch (e) {
+          // ignore parsing error
+        }
+      }
+
+      if (
+        payload?.type === 'MAYAR_PAYMENT_SUCCESS' ||
+        payload?.type === 'mayar_payment_success' ||
+        payload?.status === 'success' ||
+        (payload?.event === 'payment.received' && payload?.status === 'PAID')
+      ) {
+        handlePaymentSuccess();
+      }
+    };
+
+    window.addEventListener('message', handleMayarMessage);
+    return () => window.removeEventListener('message', handleMayarMessage);
+  }, [paidDocTarget, selectedPackage, mayarPaymentId, sessionId]);
+
+  // Request Pembayaran Mayar
   const handleRequestQris = async () => {
     if (isLoadingQris) return;
 
@@ -932,7 +699,7 @@ export default function Home() {
     setSessionId(currentSession);
     setTimeLeft(899);
 
-    const amount = 1000;
+    const amount = selectedPackage === 'SINGLE' ? 1000 : 1000;
 
     if (typeof window !== 'undefined' && window.fbq) {
       window.fbq('track', 'InitiateCheckout', {
@@ -964,7 +731,7 @@ export default function Home() {
 
       const data = await res.json();
       if (res.ok && data.success) {
-        const realMayarId = data.mayarPaymentId || data.paymentId || data.id || currentSession;
+        const realMayarId = data.mayarPaymentId || data.paymentId || data.id || data.data?.id || currentSession;
         setMayarPaymentId(realMayarId);
 
         if (data.paymentUrl) {
@@ -974,9 +741,9 @@ export default function Home() {
           setQrCodeData(data.qrString);
         }
 
-        startPollingStatus(currentSession);
+        startPollingStatus(currentSession, realMayarId);
       } else {
-        console.error('Mayar Payment Error:', data.message);
+        console.error('Mayar Payment Generation Error:', data.message || 'Gagal membuat pembayaran Mayar');
       }
     } catch (err) {
       console.error('Network error during Mayar payment generation:', err);
@@ -996,6 +763,7 @@ export default function Home() {
     return new Date().toLocaleDateString('id-ID', options);
   };
 
+  // Canvas Drawing Handlers - PIHAK PERTAMA
   const startDraw1 = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef1.current;
     if (!canvas) return;
@@ -1044,6 +812,7 @@ export default function Home() {
     setSignatureFirstParty(null);
   };
 
+  // Canvas Drawing Handlers - PIHAK KEDUA
   const startDraw2 = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef2.current;
     if (!canvas) return;
@@ -1092,6 +861,7 @@ export default function Home() {
     setSignatureSecondParty(null);
   };
 
+  // Fungsi untuk mengonsumsi lisensi di Redis
   const consumePaymentLicense = async (currentSessionId: string) => {
     try {
       await fetch('/api/qris/consume', {
@@ -1104,17 +874,160 @@ export default function Home() {
     }
   };
 
-  const handleFreeDownload = (e?: React.MouseEvent) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
+  // =========================================================
+  // GENERATOR PDF DINAMIS (SOLUSI 2: BLOB & TARGET _BLANK)
+  // =========================================================
+  const captureDocumentToPdf = async (docType: 'SPK' | 'NDA' | 'BAST') => {
+    setActiveDocTab(docType);
+    setMobileViewMode('preview');
+    setIsExporting(true);
+
+    if (typeof document !== 'undefined' && document.fonts) {
+      await document.fonts.ready;
     }
-    setShowCheckoutModal(false);
-    captureDocumentToPdf(activeDocTab, false);
+
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    const element = document.getElementById('a4-document-preview');
+    if (!element) {
+      console.error('Elemen #a4-document-preview tidak ditemukan');
+      setIsExporting(false);
+      return;
+    }
+
+    try {
+      const html2canvasPro = (await import('html2canvas-pro')).default;
+      const { jsPDF } = await import('jspdf');
+
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
+
+      const pageElements = element.querySelectorAll('.a4-page');
+
+      for (let i = 0; i < pageElements.length; i++) {
+        const pageEl = pageElements[i] as HTMLElement;
+        const isPaidDoc = paidDocs[docType] || paidDocs[activeDocTab];
+
+        const watermarkElement = pageEl.querySelector('.watermark-layer') as HTMLElement;
+        if (isPaidDoc && watermarkElement) {
+          watermarkElement.style.display = 'none';
+        }
+
+        // 1. Simpan Style Asli Live Preview
+        const originalWidth = pageEl.style.width;
+        const originalHeight = pageEl.style.height;
+        const originalMinHeight = pageEl.style.minHeight;
+        const originalPosition = pageEl.style.position;
+
+        // 2. Terapkan Dimensi Standar A4 Cetak Dinamis
+        pageEl.style.width = '794px';
+        pageEl.style.minHeight = '1123px';
+        pageEl.style.height = 'auto';
+        pageEl.classList.add('export-pdf-mode');
+
+        const canvas = await html2canvasPro(pageEl, {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          logging: false,
+          windowWidth: 794,
+        });
+
+        // 3. Kembalikan Style Asli Live Preview Layar
+        pageEl.style.width = originalWidth;
+        pageEl.style.height = originalHeight;
+        pageEl.style.minHeight = originalMinHeight;
+        pageEl.style.position = originalPosition;
+        pageEl.classList.remove('export-pdf-mode');
+
+        if (watermarkElement && !isPaidDoc) {
+          watermarkElement.style.display = 'flex';
+        }
+
+        const imgData = canvas.toDataURL('image/jpeg', 0.98);
+
+        const imgWidth = 210;
+        const pageHeight = 297;
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+        if (i > 0) pdf.addPage();
+
+        if (imgHeight > pageHeight) {
+          const ratio = pageHeight / imgHeight;
+          const scaledWidth = imgWidth * ratio;
+          const xCenterOffset = (imgWidth - scaledWidth) / 2;
+
+          pdf.addImage(imgData, 'JPEG', xCenterOffset, 0, scaledWidth, pageHeight);
+        } else {
+          pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
+        }
+      }
+
+      const isPaidDoc = paidDocs[docType] || paidDocs[activeDocTab];
+      const fileSuffix = isPaidDoc ? 'CLEAN' : 'WATERMARKED_DRAFT';
+
+      // PENGGUNAAN SOLUSI 2: BLOB OBJECT URL DENGAN ANCHOR TARGET="_BLANK"
+      const pdfBlob = pdf.output('blob');
+      const blobUrl = URL.createObjectURL(pdfBlob);
+
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.href = blobUrl;
+      downloadAnchor.target = '_blank';
+      downloadAnchor.download = `SPKInstan_${docType}_${(freelancerName || 'PihakPertama').replace(/\s+/g, '_')}_${fileSuffix}.pdf`;
+
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      document.body.removeChild(downloadAnchor);
+
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 3000);
+
+      if (isPaidDoc) {
+        if (sessionId) {
+          await consumePaymentLicense(sessionId);
+        }
+
+        if (selectedPackage === 'BUNDLING') {
+          setPaidDocs({ SPK: false, NDA: false, BAST: false });
+        } else {
+          setPaidDocs((prev) => ({ ...prev, [docType]: false }));
+        }
+      }
+    } catch (err) {
+      console.error('Error generating PDF:', err);
+      alert('Gagal mengekspor PDF.');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
-  const handleFinishForm = (e?: React.MouseEvent) => {
-    if (e) e.preventDefault();
+  // PDF Export Handler
+  const handleDownloadPDF = async (specificDoc?: 'SPK' | 'NDA' | 'BAST') => {
+    try {
+      if (specificDoc) {
+        await captureDocumentToPdf(specificDoc);
+      } else if (selectedPackage === 'BUNDLING') {
+        await captureDocumentToPdf('SPK');
+        await new Promise((r) => setTimeout(r, 600));
+        await captureDocumentToPdf('NDA');
+        await new Promise((r) => setTimeout(r, 600));
+        await captureDocumentToPdf('BAST');
+      } else {
+        await captureDocumentToPdf(activeDocTab);
+      }
+    } catch (err) {
+      console.error('Gagal membuat PDF:', err);
+    }
+  };
+
+  const handleFreeDownload = () => {
+    setShowCheckoutModal(false);
+    handleDownloadPDF();
+  };
+
+  const handleFinishForm = () => {
     setMobileViewMode('preview');
     if (!paidDocs[activeDocTab]) {
       setModalStep('download_choice');
@@ -1129,9 +1042,9 @@ export default function Home() {
     let text = '';
 
     if (selectedPackage === 'BUNDLING' && !specificDoc) {
-      text = `Halo ${clientName || 'Pihak Kedua'},\n\nBerikut dikirimkan draf resmi *Paket Perjanjian Kerja Sama (SPK, NDA, & BAST)* untuk proyek "${projectTitle || 'Pekerjaan Jasa'}" yang telah diterbitkan secara legal.\n\n*Pihak Pertama:* ${freelancerName || 'budi'}\n*Status Dokumen:* Sah (Terverifikasi Pelunasan PRO)\n\nMohon diperiksa dan ditandatangan kembali. Terima kasih!`;
+      text = `Halo ${clientName || 'Pihak Kedua'},\n\nBerikut dikirimkan draf resmi *Paket Perjanjian Kerja Sama (SPK, NDA, & BAST)* untuk proyek "${projectTitle || 'Pekerjaan Jasa'}" yang telah diterbitkan secara legal.\n\n*Pihak Pertama:* ${freelancerName || 'budi'}\n*Status Dokumen:* Sah (Terverifikasi Pelunasan PRO)\n\nMohon diperiksa dan ditandatangani kembali. Terima kasih!`;
     } else {
-      text = `Halo ${clientName || 'Pihak Kedua'},\n\nBerikut dikirimkan draf resmi *${targetDoc} Perjanjian Kerja Sama* untuk proyek "${projectTitle || 'Pekerjaan Jasa'}" yang telah diterbitkan secara legal.\n\n*Pihak Pertama:* ${freelancerName || 'budi'}\n*Status Dokumen:* Sah (Terverifikasi Pelunasan)\n\nMohon diperiksa dan ditandatangan kembali. Terima kasih!`;
+      text = `Halo ${clientName || 'Pihak Kedua'},\n\nBerikut dikirimkan draf resmi *${targetDoc} Perjanjian Kerja Sama* untuk proyek "${projectTitle || 'Pekerjaan Jasa'}" yang telah diterbitkan secara legal.\n\n*Pihak Pertama:* ${freelancerName || 'budi'}\n*Status Dokumen:* Sah (Terverifikasi Pelunasan)\n\nMohon diperiksa dan ditandatangani kembali. Terima kasih!`;
     }
 
     const waTarget = clientWa || adminWaNumber;
@@ -1145,11 +1058,10 @@ export default function Home() {
     'Legalisasi & Tanda Tangan'
   ];
 
-  const isBundlingPackage = selectedPackage === 'BUNDLING' || (paidDocs.SPK && paidDocs.NDA && paidDocs.BAST);
-
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col justify-between font-sans antialiased selection:bg-blue-100 selection:text-blue-700 pb-20 md:pb-0">
       
+      {/* CSS Import Font Calibri & Typography Rules */}
       <style>{`
         #a4-document-preview, .a4-page {
           font-family: 'Calibri', 'Carlito', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
@@ -1205,7 +1117,7 @@ export default function Home() {
 
           <div className="flex items-center gap-4">
             <a
-              href={`https://wa.me/${adminWaNumber}?text=${encodeURIComponent("Halo Admin SPKInstan, saya ingin Kirim Testimoni")}`}
+              href={`https://wa.me/${adminWaNumber}?text=${encodeURIComponent("Halo Admin SPKInstan, saya butuh bantuan")}`}
               target="_blank"
               rel="noreferrer"
               className="hidden md:inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-blue-600 transition-colors"
@@ -1226,7 +1138,12 @@ export default function Home() {
 
       {/* Main Content */}
       <main className="flex-grow">
+        
+        {/* Hero Section */}
         <section className="relative pt-8 pb-10 sm:pt-12 sm:pb-14 overflow-hidden bg-gradient-to-b from-white via-slate-50/50 to-slate-100/70 border-b border-slate-200/60">
+          <div className="absolute top-0 right-1/4 w-96 h-96 bg-blue-100/50 rounded-full filter blur-3xl pointer-events-none"></div>
+          <div className="absolute bottom-0 left-1/3 w-80 h-80 bg-indigo-100/40 rounded-full filter blur-3xl pointer-events-none"></div>
+
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
             <div className="text-center max-w-3xl mx-auto space-y-4">
               <h1 className="text-2xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-900 leading-[1.2] sm:leading-[1.15]">
@@ -1240,10 +1157,10 @@ export default function Home() {
                 SPKInstan adalah platform LegalTech berbasis web yang membantu freelancer, creator, dan agensi mikro membuat dokumen perjanjian kerja sama (SPK, NDA, dan BAST) berstandar hukum perdata Indonesia secara instan, tanpa perlu login atau registrasi.
               </p>
 
+              {/* Package Selector Pills */}
               <div className="pt-2 flex items-center justify-center">
                 <div className="flex flex-col sm:flex-row p-1.5 bg-slate-200/70 rounded-2xl sm:rounded-full w-full sm:w-auto shadow-inner border border-slate-300/40 gap-1.5 sm:gap-0">
                   <button
-                    type="button"
                     onClick={() => setSelectedPackage('SINGLE')}
                     className={`w-full sm:w-auto px-4 py-2.5 rounded-xl sm:rounded-full text-xs sm:text-sm font-semibold transition-all duration-200 text-center ${
                       selectedPackage === 'SINGLE'
@@ -1254,7 +1171,6 @@ export default function Home() {
                     Dokumen Satuan — Rp 1.000
                   </button>
                   <button
-                    type="button"
                     onClick={() => setSelectedPackage('BUNDLING')}
                     className={`w-full sm:w-auto px-4 py-2.5 rounded-xl sm:rounded-full text-xs sm:text-sm font-semibold transition-all duration-200 flex items-center justify-center gap-1.5 ${
                       selectedPackage === 'BUNDLING'
@@ -1270,6 +1186,25 @@ export default function Home() {
                 </div>
               </div>
             </div>
+
+            {/* Trust Badges */}
+            <div className="mt-8 pt-6 border-t border-slate-200/60 flex flex-wrap items-center justify-center gap-6 sm:gap-8 opacity-90 text-xs font-semibold text-slate-600">
+              <span className="text-slate-500 font-medium w-full text-center sm:w-auto">
+                Solusi Perlindungan Hukum Legalitas Khusus Profesional & Agensi Mikro:
+              </span>
+              <span className="flex items-center gap-1.5 font-bold text-slate-700">
+                <Code2 className="w-4 h-4 text-blue-600" /> Software Devs
+              </span>
+              <span className="flex items-center gap-1.5 font-bold text-slate-700">
+                <Palette className="w-4 h-4 text-indigo-600" /> UI/UX Designers
+              </span>
+              <span className="flex items-center gap-1.5 font-bold text-slate-700">
+                <Video className="w-4 h-4 text-purple-600" /> Video Editors
+              </span>
+              <span className="flex items-center gap-1.5 font-bold text-slate-700">
+                <Briefcase className="w-4 h-4 text-emerald-600" /> Agensi Mikro
+              </span>
+            </div>
           </div>
         </section>
 
@@ -1277,6 +1212,7 @@ export default function Home() {
         <section id="editor" className="py-8 sm:py-10 bg-slate-100/70 border-t border-slate-200">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             
+            {/* Mobile Tab Toggle Switch */}
             <div className="lg:hidden flex bg-white rounded-2xl border border-slate-200 p-1 mb-6 shadow-sm text-xs font-bold">
               <button
                 type="button"
@@ -1306,6 +1242,7 @@ export default function Home() {
                   mobileViewMode === 'preview' ? 'hidden lg:block' : 'block'
                 }`}
               >
+                {/* Document Tab Selector */}
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
                     1. Jenis Dokumen Hukum
@@ -1339,8 +1276,20 @@ export default function Home() {
                       <CheckSquare className="w-3.5 h-3.5" /> BAST
                     </button>
                   </div>
+                  <p className="text-[11px] text-slate-500 mt-2 flex items-center gap-1">
+                    <Info className={`w-3.5 h-3.5 ${activeDocTab === 'SPK' ? 'text-blue-600' : activeDocTab === 'NDA' ? 'text-indigo-600' : 'text-purple-600'}`} />
+                    <span>
+                      Membuat Dokumen:{' '}
+                      <strong>
+                        {activeDocTab === 'SPK' && 'Surat Perjanjian Kerja Sama (SPK Proyek)'}
+                        {activeDocTab === 'NDA' && 'Non-Disclosure Agreement (NDA Kerahasiaan)'}
+                        {activeDocTab === 'BAST' && 'Berita Acara Serah Terima (BAST Final)'}
+                      </strong>
+                    </span>
+                  </p>
                 </div>
 
+                {/* Step Wizard Navigation Dots */}
                 <div className="flex items-center justify-between border-y border-slate-100 py-3">
                   <span className="text-xs font-bold text-slate-700 flex items-center gap-2">
                     <span className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px]">
@@ -1364,11 +1313,13 @@ export default function Home() {
 
                 {/* Form Steps */}
                 <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
+                  {/* STEP 1: Identitas Para Pihak */}
                   {currentWizardStep === 1 && (
                     <div className="space-y-4">
+                      {/* Input Nomor Surat / Dokumen Custom dengan Multi-State */}
                       <div>
-                        <label className="block text-xs font-semibold text-slate-700 mb-1">
-                          Nomor Dokumen / Surat ({activeDocTab})
+                        <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1">
+                          <Hash className="w-3.5 h-3.5 text-blue-600" /> Nomor Dokumen / Surat ({activeDocTab})
                         </label>
                         <input
                           type="text"
@@ -1377,6 +1328,9 @@ export default function Home() {
                           placeholder={`cth: 001/${activeDocTab}/IX/2026`}
                           className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-mono font-medium"
                         />
+                        <p className="text-[10px] text-slate-400 mt-1">
+                          Format baku Indonesia: <code>[Nomor]/[Kode]/[Bulan Romawi]/[Tahun]</code>
+                        </p>
                       </div>
 
                       <div className="space-y-3 pt-2 border-t border-slate-100">
@@ -1396,7 +1350,9 @@ export default function Home() {
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-slate-700 mb-1">Email</label>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1">
+                            Email
+                          </label>
                           <input
                             type="email"
                             value={freelancerEmail}
@@ -1406,7 +1362,9 @@ export default function Home() {
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-slate-700 mb-1">Nomor WhatsApp</label>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1">
+                            Nomor WhatsApp
+                          </label>
                           <input
                             type="text"
                             value={freelancerWa}
@@ -1434,7 +1392,9 @@ export default function Home() {
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-slate-700 mb-1">Nomor WhatsApp</label>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1">
+                            Nomor WhatsApp
+                          </label>
                           <input
                             type="text"
                             value={clientWa}
@@ -1447,23 +1407,28 @@ export default function Home() {
                     </div>
                   )}
 
+                  {/* STEP 2: Detail Spesifik Dokumen */}
                   {currentWizardStep === 2 && (
                     <div className="space-y-4">
                       {activeDocTab === 'SPK' && (
                         <div className="space-y-3">
                           <div>
-                            <label className="block text-xs font-semibold text-slate-700 mb-1">Judul Pekerjaan / Proyek</label>
+                            <label className="block text-xs font-semibold text-slate-700 mb-1">
+                              Judul Pekerjaan / Proyek
+                            </label>
                             <input
                               type="text"
                               value={projectTitle}
                               onChange={(e) => setProjectTitle(e.target.value)}
-                              placeholder="cth: Pengembangan Aplikasi Web Dashboard"
+                              placeholder="cth: Pengembangan Aplikasi Web Dashboard & API Integration"
                               className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                             />
                           </div>
                           <div className="grid grid-cols-2 gap-3">
                             <div>
-                              <label className="block text-xs font-semibold text-slate-700 mb-1">Nilai Imbalan (Rp)</label>
+                              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                                Nilai Imbalan (Rp)
+                              </label>
                               <input
                                 type="number"
                                 value={projectAmount}
@@ -1473,7 +1438,9 @@ export default function Home() {
                               />
                             </div>
                             <div>
-                              <label className="block text-xs font-semibold text-slate-700 mb-1">Uang Muka DP (%)</label>
+                              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                                Uang Muka DP (%)
+                              </label>
                               <input
                                 type="number"
                                 value={dpPercent}
@@ -1484,7 +1451,9 @@ export default function Home() {
                             </div>
                           </div>
                           <div>
-                            <label className="block text-xs font-semibold text-slate-700 mb-1">Rekening Tujuan Pelunasan</label>
+                            <label className="block text-xs font-semibold text-slate-700 mb-1">
+                              Rekening Tujuan Pelunasan
+                            </label>
                             <input
                               type="text"
                               value={bankInfo}
@@ -1499,18 +1468,22 @@ export default function Home() {
                       {activeDocTab === 'NDA' && (
                         <div className="space-y-3">
                           <div>
-                            <label className="block text-xs font-semibold text-slate-700 mb-1">Cakupan Informasi Rahasia</label>
+                            <label className="block text-xs font-semibold text-slate-700 mb-1">
+                              Cakupan Informasi Rahasia
+                            </label>
                             <input
                               type="text"
                               value={ndaScope}
                               onChange={(e) => setNdaScope(e.target.value)}
-                              placeholder="cth: Source Code, Skema Database, Aset Desain"
+                              placeholder="cth: Source Code, Skema Database, Aset Desain Figma, & Strategi Bisnis"
                               className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                             />
                           </div>
                           <div className="grid grid-cols-2 gap-3">
                             <div>
-                              <label className="block text-xs font-semibold text-slate-700 mb-1">Masa Kerahasiaan (Tahun)</label>
+                              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                                Masa Kerahasiaan (Tahun)
+                              </label>
                               <input
                                 type="number"
                                 value={ndaYears}
@@ -1520,7 +1493,9 @@ export default function Home() {
                               />
                             </div>
                             <div>
-                              <label className="block text-xs font-semibold text-slate-700 mb-1">Denda Pelanggaran (Rp)</label>
+                              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                                Denda Pelanggaran (Rp)
+                              </label>
                               <input
                                 type="number"
                                 value={ndaPenalty}
@@ -1536,7 +1511,9 @@ export default function Home() {
                       {activeDocTab === 'BAST' && (
                         <div className="space-y-3">
                           <div>
-                            <label className="block text-xs font-semibold text-slate-700 mb-1">Nomor Referensi SPK Utama</label>
+                            <label className="block text-xs font-semibold text-slate-700 mb-1">
+                              Nomor Referensi SPK Utama
+                            </label>
                             <input
                               type="text"
                               value={bastRef}
@@ -1547,7 +1524,9 @@ export default function Home() {
                           </div>
                           <div className="grid grid-cols-2 gap-3">
                             <div>
-                              <label className="block text-xs font-semibold text-slate-700 mb-1">Masa Garansi Bug (Hari)</label>
+                              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                                Masa Garansi Bug (Hari)
+                              </label>
                               <input
                                 type="number"
                                 value={bastWarranty}
@@ -1557,7 +1536,9 @@ export default function Home() {
                               />
                             </div>
                             <div>
-                              <label className="block text-xs font-semibold text-slate-700 mb-1">Tanggal Serah Terima</label>
+                              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                                Tanggal Serah Terima
+                              </label>
                               <input
                                 type="date"
                                 value={bastDate}
@@ -1571,48 +1552,52 @@ export default function Home() {
                     </div>
                   )}
 
+                  {/* STEP 3: MANAJER PASAL DINAMIS */}
                   {currentWizardStep === 3 && (
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
                         <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">
-                          3. Modifikasi Pasal ({activeDocTab})
+                          3. Pengaturan & Modifikasi Pasal ({activeDocTab})
                         </label>
                       </div>
 
+                      {/* Preset Accelerator Pills dengan Respon Warna Aktif */}
                       <div className="p-2 bg-slate-100 rounded-2xl border border-slate-200/80 space-y-1.5">
                         <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider block px-1 flex items-center gap-1">
-                          <Sliders className="w-3 h-3 text-blue-600" /> Preset Akselerator:
+                          <Sliders className="w-3 h-3 text-blue-600" /> Preset Akselerator Cepat ({activeDocTab}):
                         </span>
                         <div className="grid grid-cols-3 gap-1">
                           <button
                             type="button"
                             onClick={() => handleApplyPreset('web')}
-                            className={`py-1.5 px-2 rounded-xl text-[10px] font-bold border transition-all ${
+                            className={`py-1.5 px-2 rounded-xl text-[10px] font-bold border transition-all shadow-2xs ${
                               activePreset === 'web'
-                                ? 'bg-blue-600 text-white border-blue-600'
-                                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                                ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                                : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
                             }`}
                           >
                             Preset Web/App
                           </button>
+
                           <button
                             type="button"
                             onClick={() => handleApplyPreset('design')}
-                            className={`py-1.5 px-2 rounded-xl text-[10px] font-bold border transition-all ${
+                            className={`py-1.5 px-2 rounded-xl text-[10px] font-bold border transition-all shadow-2xs ${
                               activePreset === 'design'
-                                ? 'bg-blue-600 text-white border-blue-600'
-                                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                                ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                                : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
                             }`}
                           >
                             Preset Desain
                           </button>
+
                           <button
                             type="button"
                             onClick={() => handleApplyPreset('all')}
-                            className={`py-1.5 px-2 rounded-xl text-[10px] font-bold border transition-all ${
+                            className={`py-1.5 px-2 rounded-xl text-[10px] font-bold border transition-all shadow-2xs ${
                               activePreset === 'all'
-                                ? 'bg-blue-600 text-white border-blue-600'
-                                : 'bg-white text-blue-600 border-blue-200 hover:bg-slate-50'
+                                ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                                : 'bg-white hover:bg-slate-50 text-blue-600 border-blue-200'
                             }`}
                           >
                             Aktifkan Semua
@@ -1620,6 +1605,7 @@ export default function Home() {
                         </div>
                       </div>
 
+                      {/* Daftar Pasal Dinamis */}
                       <div className="space-y-3 max-h-[360px] overflow-y-auto pr-1">
                         {clauses
                           .filter((c) => c.docType === activeDocTab)
@@ -1644,15 +1630,19 @@ export default function Home() {
                                     {clause.isEnabled ? 'Aktif' : 'Nonaktif'}
                                   </span>
                                 </label>
-                                {clause.isCustom && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleRemoveClause(clause.id)}
-                                    className="text-red-500 hover:text-red-700 p-1"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
-                                )}
+
+                                <div className="flex items-center gap-1">
+                                  {clause.isCustom && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveClause(clause.id)}
+                                      className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded-lg transition-all"
+                                      title="Hapus Pasal Ini"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                </div>
                               </div>
 
                               <input
@@ -1660,24 +1650,25 @@ export default function Home() {
                                 value={clause.title}
                                 onChange={(e) => handleUpdateClauseTitle(clause.id, e.target.value)}
                                 placeholder="Judul Pasal"
-                                className="w-full px-2.5 py-1.5 text-xs font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-lg"
+                                className="w-full px-2.5 py-1.5 text-xs font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
                               />
 
                               <textarea
                                 rows={2}
                                 value={clause.content}
                                 onChange={(e) => handleUpdateClauseContent(clause.id, e.target.value)}
-                                placeholder="Isi pasal..."
-                                className="w-full px-2.5 py-1.5 text-[11px] text-slate-600 bg-slate-50 border border-slate-200 rounded-lg leading-relaxed"
+                                placeholder="Isi kalimat pasal..."
+                                className="w-full px-2.5 py-1.5 text-[11px] text-slate-600 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 leading-relaxed"
                               />
                             </div>
                           ))}
                       </div>
 
+                      {/* Tombol Tambah Pasal Khusus */}
                       <button
                         type="button"
                         onClick={handleAddCustomClause}
-                        className="w-full py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-600 font-bold text-xs rounded-xl border border-blue-200 flex items-center justify-center gap-1.5"
+                        className="w-full py-2.5 bg-blue-50 hover:bg-blue-100/80 text-blue-600 font-bold text-xs rounded-xl border border-blue-200 transition-all flex items-center justify-center gap-1.5"
                       >
                         <Plus className="w-4 h-4" />
                         <span>+ Tambah Pasal Khusus ({activeDocTab})</span>
@@ -1685,25 +1676,34 @@ export default function Home() {
                     </div>
                   )}
 
+                  {/* STEP 4: Legalisasi & Tanda Tangan Terpisah */}
                   {currentWizardStep === 4 && (
                     <div className="space-y-5">
+                      {/* TANDA TANGAN PIHAK PERTAMA */}
                       <div className="space-y-3 p-3.5 bg-slate-50/80 rounded-2xl border border-slate-200">
                         <h4 className="text-xs font-bold uppercase tracking-wider text-blue-600 flex items-center gap-1">
                           <User className="w-3.5 h-3.5" /> Penandatangan Pihak Pertama
                         </h4>
                         <div>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1">
+                            Nama Penandatangan
+                          </label>
                           <input
                             type="text"
                             value={signerFirstParty}
                             onChange={(e) => setSignerFirstParty(e.target.value)}
                             placeholder={freelancerName || 'cth: budi'}
-                            className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl font-medium"
+                            className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                           />
+                          <p className="text-[10px] text-slate-400 mt-1">
+                            Kosongkan jika sama dengan Pihak Pertama ({freelancerName || '-'}).
+                          </p>
                         </div>
 
+                        {/* Pad Coretan & Upload Gambar TTD Pihak Pertama */}
                         <div className="space-y-2 pt-1">
                           <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                            TTD Pihak Pertama
+                            Coretan / Gambar TTD Pihak Pertama
                           </label>
                           <canvas
                             ref={canvasRef1}
@@ -1715,14 +1715,18 @@ export default function Home() {
                             onTouchStart={startDraw1}
                             onTouchMove={draw1}
                             onTouchEnd={stopDraw1}
-                            className="w-full h-24 bg-white rounded-xl border border-slate-200 cursor-crosshair touch-none"
+                            className="w-full h-24 bg-white rounded-xl border border-slate-200 cursor-crosshair touch-none mx-auto"
                           />
-                          <div className="flex items-center justify-between text-xs">
-                            <button type="button" onClick={clearSignature1} className="text-slate-500 hover:text-red-600 flex items-center gap-1 font-semibold text-[11px]">
-                              <RotateCcw className="w-3 h-3" /> Hapus
+                          <div className="flex items-center justify-between text-xs pt-0.5">
+                            <button
+                              type="button"
+                              onClick={clearSignature1}
+                              className="text-slate-500 hover:text-red-600 flex items-center gap-1 font-semibold text-[11px]"
+                            >
+                              <RotateCcw className="w-3 h-3" /> Hapus Coretan
                             </button>
-                            <label className="cursor-pointer text-blue-600 hover:text-blue-800 font-bold text-[11px]">
-                              <span>📁 Upload TTD</span>
+                            <label className="cursor-pointer text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1 text-[11px]">
+                              <span>📁 Upload TTD (PNG/JPG)</span>
                               <input
                                 type="file"
                                 accept="image/*"
@@ -1731,7 +1735,9 @@ export default function Home() {
                                   const file = e.target.files?.[0];
                                   if (file) {
                                     const reader = new FileReader();
-                                    reader.onload = (event) => setSignatureFirstParty(event.target?.result as string);
+                                    reader.onload = (event) => {
+                                      setSignatureFirstParty(event.target?.result as string);
+                                    };
                                     reader.readAsDataURL(file);
                                   }
                                 }}
@@ -1741,23 +1747,31 @@ export default function Home() {
                         </div>
                       </div>
 
+                      {/* TANDA TANGAN PIHAK KEDUA */}
                       <div className="space-y-3 p-3.5 bg-slate-50/80 rounded-2xl border border-slate-200">
                         <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-600 flex items-center gap-1">
                           <Building2 className="w-3.5 h-3.5" /> Penandatangan Pihak Kedua
                         </h4>
                         <div>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1">
+                            Nama Penandatangan
+                          </label>
                           <input
                             type="text"
                             value={signerSecondParty}
                             onChange={(e) => setSignerSecondParty(e.target.value)}
                             placeholder={clientName || 'cth: Nama Direktur'}
-                            className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl font-medium"
+                            className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                           />
+                          <p className="text-[10px] text-slate-400 mt-1">
+                            Kosongkan jika sama dengan Pihak Kedua ({clientName || '-'}).
+                          </p>
                         </div>
 
+                        {/* Pad Coretan & Upload Gambar TTD Pihak Kedua */}
                         <div className="space-y-2 pt-1">
                           <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                            TTD Pihak Kedua
+                            Coretan / Gambar TTD Pihak Kedua
                           </label>
                           <canvas
                             ref={canvasRef2}
@@ -1769,14 +1783,18 @@ export default function Home() {
                             onTouchStart={startDraw2}
                             onTouchMove={draw2}
                             onTouchEnd={stopDraw2}
-                            className="w-full h-24 bg-white rounded-xl border border-slate-200 cursor-crosshair touch-none"
+                            className="w-full h-24 bg-white rounded-xl border border-slate-200 cursor-crosshair touch-none mx-auto"
                           />
-                          <div className="flex items-center justify-between text-xs">
-                            <button type="button" onClick={clearSignature2} className="text-slate-500 hover:text-red-600 flex items-center gap-1 font-semibold text-[11px]">
-                              <RotateCcw className="w-3 h-3" /> Hapus
+                          <div className="flex items-center justify-between text-xs pt-0.5">
+                            <button
+                              type="button"
+                              onClick={clearSignature2}
+                              className="text-slate-500 hover:text-red-600 flex items-center gap-1 font-semibold text-[11px]"
+                            >
+                              <RotateCcw className="w-3 h-3" /> Hapus Coretan
                             </button>
-                            <label className="cursor-pointer text-indigo-600 hover:text-indigo-800 font-bold text-[11px]">
-                              <span>📁 Upload TTD</span>
+                            <label className="cursor-pointer text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1 text-[11px]">
+                              <span>📁 Upload TTD (PNG/JPG)</span>
                               <input
                                 type="file"
                                 accept="image/*"
@@ -1785,7 +1803,9 @@ export default function Home() {
                                   const file = e.target.files?.[0];
                                   if (file) {
                                     const reader = new FileReader();
-                                    reader.onload = (event) => setSignatureSecondParty(event.target?.result as string);
+                                    reader.onload = (event) => {
+                                      setSignatureSecondParty(event.target?.result as string);
+                                    };
                                     reader.readAsDataURL(file);
                                   }
                                 }}
@@ -1794,15 +1814,20 @@ export default function Home() {
                           </div>
                         </div>
                       </div>
+
+                      <p className="text-[11px] text-slate-500 italic">
+                        *Jika kolom TTD tidak diisi/diunggah, area tanda tangan pada dokumen A4 akan dibiarkan bersih untuk ditandatangani fisik.
+                      </p>
                     </div>
                   )}
 
+                  {/* Wizard Controls Navigation */}
                   <div className="flex items-center justify-between pt-4 border-t border-slate-100">
                     <button
                       type="button"
                       disabled={currentWizardStep === 1}
                       onClick={() => setCurrentWizardStep((p) => p - 1)}
-                      className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-40"
+                      className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-all disabled:opacity-40"
                     >
                       Kembali
                     </button>
@@ -1810,7 +1835,7 @@ export default function Home() {
                       <button
                         type="button"
                         onClick={() => setCurrentWizardStep((p) => p + 1)}
-                        className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold"
+                        className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-sm"
                       >
                         Lanjut
                       </button>
@@ -1818,7 +1843,7 @@ export default function Home() {
                       <button
                         type="button"
                         onClick={handleFinishForm}
-                        className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5"
+                        className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
                       >
                         <Download className="w-4 h-4" />
                         <span>Selesai & Unduh Dokumen</span>
@@ -1828,12 +1853,13 @@ export default function Home() {
                 </form>
               </div>
 
-              {/* RIGHT COLUMN: Live Preview A4 */}
+              {/* RIGHT COLUMN: SPKInstan Live Preview A4 */}
               <div
                 className={`lg:col-span-7 space-y-4 ${
                   mobileViewMode === 'form' ? 'hidden lg:block' : 'block'
                 }`}
               >
+                {/* Security Status Bar */}
                 <div className="flex items-center justify-between bg-white px-4 py-2.5 rounded-2xl border border-slate-200 shadow-sm text-xs">
                   <span className="flex items-center gap-1.5 font-bold text-slate-700">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -1841,19 +1867,27 @@ export default function Home() {
                   </span>
                   <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full">
                     <Shield className="w-3 h-3 text-blue-600" />
-                    Proteksi Active
+                    Proteksi Anti-Inspect Active
                   </span>
                 </div>
 
+                {/* Wrapper Responsif UI + Presisi Mutlak saat PDF Canvas */}
                 <div className="w-full bg-slate-300/40 p-2 sm:p-6 rounded-3xl border border-slate-200 flex justify-center items-center overflow-x-auto pb-4">
                   <div
                     id="a4-document-preview"
+                    onContextMenu={(e) => e.preventDefault()}
+                    onCopy={(e) => e.preventDefault()}
+                    onCut={(e) => e.preventDefault()}
+                    onDragStart={(e) => e.preventDefault()}
                     className={`flex flex-col gap-8 items-center w-full max-w-[794px] ${
                       !paidDocs[activeDocTab] ? 'select-none' : ''
                     }`}
                   >
-                    {/* HALAMAN 1 */}
-                    <div className="a4-page w-full max-w-[794px] min-h-[1123px] h-auto bg-white text-slate-900 p-6 sm:p-8 relative flex flex-col justify-between shadow-xl rounded-xl border border-slate-200 shrink-0">
+                    {/* === HALAMAN 1 === */}
+                    <div
+                      className="a4-page w-full max-w-[794px] min-h-[1123px] h-auto bg-white text-slate-900 p-6 sm:p-8 relative flex flex-col justify-between shadow-xl rounded-xl border border-slate-200 shrink-0"
+                    >
+                      {/* Watermark Overlay Halaman 1 */}
                       {!paidDocs[activeDocTab] && (
                         <div className="watermark-layer absolute inset-0 pointer-events-none z-20 flex items-center justify-center overflow-hidden">
                           <span className="text-5xl sm:text-7xl font-black tracking-[0.25em] text-slate-300/25 uppercase select-none -rotate-12 transform">
@@ -1862,21 +1896,26 @@ export default function Home() {
                         </div>
                       )}
 
+                      {/* Konten Halaman 1 */}
                       <div
                         ref={needsPage2 ? page1MainContentRef : page1ContentRef}
                         className="space-y-3 sm:space-y-3.5 text-[12px] sm:text-[13px] leading-[1.5] text-slate-700 relative z-10"
                       >
+                        {/* Header Top Accent Bar */}
                         <div className="h-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 w-full rounded-full shadow-xs mb-3" />
 
+                        {/* Brand Header & Metadata Box */}
                         <div className="flex items-start justify-between pb-2.5 border-b border-slate-200/80 gap-4">
                           <div className="space-y-0.5">
                             <span className="text-[11px] font-bold tracking-widest text-blue-600 uppercase">
                               Pihak Pertama
                             </span>
-                            <h1 className="text-[15px] sm:text-[16px] font-extrabold text-slate-900">
+                            <h1 className="text-[15px] sm:text-[16px] font-extrabold text-slate-900 tracking-tight leading-tight">
                               {freelancerName || 'Nama Pihak Pertama'}
                             </h1>
-                            {freelancerEmail && <p className="text-[11px] text-slate-500">{freelancerEmail}</p>}
+                            {freelancerEmail && (
+                              <p className="text-[11px] text-slate-500">{freelancerEmail}</p>
+                            )}
                           </div>
 
                           <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-2 sm:p-2.5 text-right space-y-0.5 min-w-[140px] sm:min-w-[170px]">
@@ -1890,17 +1929,22 @@ export default function Home() {
                           </div>
                         </div>
 
+                        {/* Document Title Block */}
                         <div className="border-l-4 border-blue-600 pl-3 sm:pl-4 py-0.5">
-                          <h2 className="text-[18px] sm:text-[20px] font-extrabold tracking-wide text-slate-900 uppercase">
+                          <h2 className="text-[18px] sm:text-[20px] font-extrabold tracking-wide text-slate-900 uppercase leading-[1.2]">
                             {activeDocTab === 'SPK' && 'PERJANJIAN KERJA SAMA PEKERJAAN JASA'}
                             {activeDocTab === 'NDA' && 'PERJANJIAN KERAHASIAAN INFORMASI (NDA)'}
                             {activeDocTab === 'BAST' && 'BERITA ACARA SERAH TERIMA PEKERJAAN (BAST)'}
                           </h2>
+                          <p className="text-[11px] font-semibold text-slate-500">
+                            Dokumen Hukum Perikatan Perdata Resmi (KUHPerdata & UU Terkait)
+                          </p>
                         </div>
 
+                        {/* Parties Identification Paragraph */}
                         <div className="bg-slate-50/70 border border-slate-200/80 rounded-xl p-2.5 sm:p-3 space-y-1.5">
-                          <p className="text-slate-700 text-[12px] sm:text-[13px]">
-                            Pada hari ini, <strong>{getTodayFormattedDate()}</strong>, kami yang bertanda tangan di bawah ini secara sadar sepakat mengikatkan diri dalam perikatan hukum:
+                          <p className="text-slate-700 text-[12px] sm:text-[13px] leading-[1.5]">
+                            Pada hari ini, <strong>{getTodayFormattedDate()}</strong>, kami yang bertanda tangan di bawah ini secara sadar dan tanpa paksaan sepakat mengikatkan diri dalam perikatan hukum perdata:
                           </p>
                           <div className="grid grid-cols-2 gap-2 pt-0.5">
                             <div className="bg-white p-2 rounded-lg border border-slate-200/60">
@@ -1914,20 +1958,32 @@ export default function Home() {
                           </div>
                         </div>
 
+                        {/* RENDER PASAL HALAMAN 1 */}
                         <div className="space-y-2 sm:space-y-2.5">
                           {page1Clauses.map((clause, index) => (
                             <div key={clause.id} className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
                               <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
-                                <span className="w-2 h-2 rounded-full bg-blue-600" />
-                                {activeDocTab === 'BAST' ? `Poin ${index + 1} — ${clause.title}` : `Pasal ${index + 1} — ${clause.title}`}
+                                <span
+                                  className={`w-2 h-2 rounded-full ${
+                                    activeDocTab === 'SPK'
+                                      ? 'bg-blue-600'
+                                      : activeDocTab === 'NDA'
+                                      ? 'bg-indigo-600'
+                                      : 'bg-purple-600'
+                                  }`}
+                                />
+                                {activeDocTab === 'BAST'
+                                  ? `Poin ${index + 1} — ${clause.title}`
+                                  : `Pasal ${index + 1} — ${clause.title}`}
                               </h3>
-                              <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5]">
+                              <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
                                 {clause.content}
                               </p>
                             </div>
                           ))}
                         </div>
 
+                        {/* Kolom Tanda Tangan Utama di Halaman 1 (Jika Tidak Butuh Hal 2) */}
                         {!needsPage2 && (
                           <div className="pt-2 sm:pt-3 grid grid-cols-2 gap-3 sm:gap-4 text-center">
                             <div className="bg-slate-50/80 border border-slate-200/80 rounded-xl p-2.5 sm:p-3 space-y-1.5">
@@ -1936,7 +1992,9 @@ export default function Home() {
                               </span>
                               <div className="h-8 sm:h-12 flex items-center justify-center">
                                 {signatureFirstParty ? (
-                                  <img src={signatureFirstParty} alt="TTD Pihak Pertama" className="max-h-8 sm:max-h-12 mx-auto object-contain" />
+                                  <img src={signatureFirstParty} alt="Tanda Tangan Pihak Pertama" className="max-h-8 sm:max-h-12 mx-auto object-contain" />
+                                ) : isExporting ? (
+                                  <div className="h-8 sm:h-12 w-full" />
                                 ) : (
                                   <div className="w-20 sm:w-28 h-6 sm:h-8 border border-dashed border-slate-300/80 rounded-lg flex items-center justify-center text-[10px] text-slate-400">
                                     [Tanda Tangan]
@@ -1954,7 +2012,9 @@ export default function Home() {
                               </span>
                               <div className="h-8 sm:h-12 flex items-center justify-center">
                                 {signatureSecondParty ? (
-                                  <img src={signatureSecondParty} alt="TTD Pihak Kedua" className="max-h-8 sm:max-h-12 mx-auto object-contain" />
+                                  <img src={signatureSecondParty} alt="Tanda Tangan Pihak Kedua" className="max-h-8 sm:max-h-12 mx-auto object-contain" />
+                                ) : isExporting ? (
+                                  <div className="h-8 sm:h-12 w-full" />
                                 ) : (
                                   <div className="w-20 sm:w-28 h-6 sm:h-8 border border-dashed border-slate-300/80 rounded-lg flex items-center justify-center text-[10px] text-slate-400">
                                     [Tanda Tangan]
@@ -1969,15 +2029,23 @@ export default function Home() {
                         )}
                       </div>
 
-                      <div className="pt-2 border-t border-slate-200 flex justify-between items-center text-[10px] sm:text-[11px] text-slate-500 font-mono">
-                        <span>SPKInstan Legal Document</span>
-                        <span>Hal 1 dari {totalPages}</span>
+                      {/* Footer Halaman 1 */}
+                      <div className="pt-2 border-t border-slate-200 flex justify-between items-center text-[10px] sm:text-[11px] text-slate-500 font-normal relative z-10">
+                        <span className="flex items-center gap-1 font-mono">
+                          Paraf I: [ {signatureFirstParty ? <img src={signatureFirstParty} alt="Paraf I" className="h-3 sm:h-4 inline-block object-contain" /> : '___'} ]
+                          &nbsp;|&nbsp;
+                          Paraf II: [ {signatureSecondParty ? <img src={signatureSecondParty} alt="Paraf II" className="h-3 sm:h-4 inline-block object-contain" /> : '___'} ]
+                        </span>
+                        <span className="font-mono">Hal 1 dari {totalPages}</span>
                       </div>
                     </div>
 
-                    {/* HALAMAN 2 */}
+                    {/* === HALAMAN 2 === */}
                     {needsPage2 && (
-                      <div className="a4-page w-full max-w-[794px] min-h-[1123px] h-auto bg-white text-slate-900 p-6 sm:p-8 relative flex flex-col justify-between shadow-xl rounded-xl border border-slate-200 shrink-0">
+                      <div
+                        className="a4-page w-full max-w-[794px] min-h-[1123px] h-auto bg-white text-slate-900 p-6 sm:p-8 relative flex flex-col justify-between shadow-xl rounded-xl border border-slate-200 shrink-0"
+                      >
+                        {/* Watermark Overlay Halaman 2 */}
                         {!paidDocs[activeDocTab] && (
                           <div className="watermark-layer absolute inset-0 pointer-events-none z-20 flex items-center justify-center overflow-hidden">
                             <span className="text-5xl sm:text-7xl font-black tracking-[0.25em] text-slate-300/25 uppercase select-none -rotate-12 transform">
@@ -1986,18 +2054,33 @@ export default function Home() {
                           </div>
                         )}
 
-                        <div ref={page2ContentRef} className="space-y-3 sm:space-y-3.5 text-[12px] sm:text-[13px] leading-[1.5] text-slate-700 relative z-10">
+                        <div
+                          ref={page2ContentRef}
+                          className="space-y-3 sm:space-y-3.5 text-[12px] sm:text-[13px] leading-[1.5] text-slate-700 relative z-10"
+                        >
+                          {/* Header Top Accent Bar */}
                           <div className="h-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 w-full rounded-full shadow-xs mb-4" />
 
+                          {/* RENDER PASAL SISA DI HALAMAN 2 */}
                           {page2Clauses.length > 0 && (
                             <div className="space-y-2 sm:space-y-2.5 mb-4">
                               {page2Clauses.map((clause, index) => (
                                 <div key={clause.id} className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
                                   <h3 className="text-[14px] sm:text-[15px] font-bold text-slate-900 flex items-center gap-1.5">
-                                    <span className="w-2 h-2 rounded-full bg-blue-600" />
-                                    {activeDocTab === 'BAST' ? `Poin ${index + page1Clauses.length + 1} — ${clause.title}` : `Pasal ${index + page1Clauses.length + 1} — ${clause.title}`}
+                                    <span
+                                      className={`w-2 h-2 rounded-full ${
+                                        activeDocTab === 'SPK'
+                                          ? 'bg-blue-600'
+                                          : activeDocTab === 'NDA'
+                                          ? 'bg-indigo-600'
+                                          : 'bg-purple-600'
+                                      }`}
+                                    />
+                                    {activeDocTab === 'BAST'
+                                      ? `Poin ${index + page1Clauses.length + 1} — ${clause.title}`
+                                      : `Pasal ${index + page1Clauses.length + 1} — ${clause.title}`}
                                   </h3>
-                                  <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5]">
+                                  <p className="text-slate-700 pl-3.5 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
                                     {clause.content}
                                   </p>
                                 </div>
@@ -2005,15 +2088,17 @@ export default function Home() {
                             </div>
                           )}
 
+                          {/* Lembar Pengesahan Header */}
                           <div className="bg-slate-50/80 p-3 sm:p-4 rounded-xl border border-slate-200/80 space-y-1">
-                            <h3 className="text-[13px] sm:text-[14px] font-bold text-slate-900 uppercase">
+                            <h3 className="text-[13px] sm:text-[14px] font-bold text-slate-900 uppercase tracking-wide">
                               LEMBAR PENGESAHAN & PENANDATANGANAN
                             </h3>
-                            <p className="text-slate-700 text-[12px] sm:text-[13px]">
-                              Demikian Perjanjian ini dibuat dan disepakati oleh Para Pihak dalam keadaan sadar tanpa paksaan untuk dipergunakan sebagaimana mestinya.
+                            <p className="text-slate-700 text-[12px] sm:text-[13px] leading-[1.5] font-normal">
+                              Demikian Perjanjian ini dibuat dan disepakati oleh Para Pihak dalam keadaan sadar tanpa paksaan dari pihak manapun untuk dipergunakan sebagaimana mestinya.
                             </p>
                           </div>
 
+                          {/* Signature Enclosure Boxes Halaman 2 */}
                           <div className="pt-4 sm:pt-6 grid grid-cols-2 gap-3 sm:gap-4 text-center">
                             <div className="bg-slate-50/80 border border-slate-200/80 rounded-xl p-3 sm:p-4 space-y-2 sm:space-y-3">
                               <span className="text-[11px] font-bold text-blue-600 uppercase tracking-wider block">
@@ -2021,7 +2106,9 @@ export default function Home() {
                               </span>
                               <div className="h-10 sm:h-14 flex items-center justify-center">
                                 {signatureFirstParty ? (
-                                  <img src={signatureFirstParty} alt="TTD Pihak Pertama" className="max-h-10 sm:max-h-14 mx-auto object-contain" />
+                                  <img src={signatureFirstParty} alt="Tanda Tangan Pihak Pertama" className="max-h-10 sm:max-h-14 mx-auto object-contain" />
+                                ) : isExporting ? (
+                                  <div className="h-10 sm:h-14 w-full" />
                                 ) : (
                                   <div className="w-20 sm:w-28 h-7 sm:h-9 border border-dashed border-slate-300/80 rounded-lg flex items-center justify-center text-[10px] text-slate-400">
                                     [Tanda Tangan]
@@ -2039,7 +2126,9 @@ export default function Home() {
                               </span>
                               <div className="h-10 sm:h-14 flex items-center justify-center">
                                 {signatureSecondParty ? (
-                                  <img src={signatureSecondParty} alt="TTD Pihak Kedua" className="max-h-10 sm:max-h-14 mx-auto object-contain" />
+                                  <img src={signatureSecondParty} alt="Tanda Tangan Pihak Kedua" className="max-h-10 sm:max-h-14 mx-auto object-contain" />
+                                ) : isExporting ? (
+                                  <div className="h-10 sm:h-14 w-full" />
                                 ) : (
                                   <div className="w-20 sm:w-28 h-7 sm:h-9 border border-dashed border-slate-300/80 rounded-lg flex items-center justify-center text-[10px] text-slate-400">
                                     [Tanda Tangan]
@@ -2053,19 +2142,26 @@ export default function Home() {
                           </div>
                         </div>
 
-                        <div className="pt-2 border-t border-slate-200 flex justify-between items-center text-[10px] sm:text-[11px] text-slate-500 font-mono">
-                          <span>SPKInstan Legal Document</span>
-                          <span>Hal 2 dari 2</span>
+                        {/* Footer Halaman 2 */}
+                        <div className="pt-2 border-t border-slate-200 flex justify-between items-center text-[10px] sm:text-[11px] text-slate-500 font-normal relative z-10">
+                          <span className="flex items-center gap-1 font-mono">
+                            Paraf I: [ {signatureFirstParty ? <img src={signatureFirstParty} alt="Paraf I" className="h-3 sm:h-4 inline-block object-contain" /> : '___'} ]
+                            &nbsp;|&nbsp;
+                            Paraf II: [ {signatureSecondParty ? <img src={signatureSecondParty} alt="Paraf II" className="h-3 sm:h-4 inline-block object-contain" /> : '___'} ]
+                          </span>
+                          <span className="font-mono">Hal 2 dari 2</span>
                         </div>
                       </div>
                     )}
+
                   </div>
                 </div>
 
+                {/* Sticky Main Action Button Bar */}
                 <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-lg flex flex-col sm:flex-row items-center justify-between gap-3">
                   <div className="w-full sm:w-auto text-center sm:text-left">
                     <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
-                      Status Draf Dokumen
+                      Status Dokumen Draf
                     </span>
                     <span className="text-sm font-extrabold text-slate-900">
                       {paidDocs[activeDocTab] ? (
@@ -2081,8 +2177,8 @@ export default function Home() {
                   <div className="w-full sm:w-auto flex flex-col sm:flex-row items-center gap-2">
                     <button
                       type="button"
-                      onClick={(e) => handleFreeDownload(e)}
-                      className="w-full sm:w-auto px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-full text-xs flex items-center justify-center gap-1.5 border border-slate-300 transition-all"
+                      onClick={handleFreeDownload}
+                      className="w-full sm:w-auto px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-full text-xs transition-all flex items-center justify-center gap-1.5 border border-slate-300"
                     >
                       <Download className="w-4 h-4 text-slate-600" />
                       <span>Download Draf Watermark</span>
@@ -2091,11 +2187,11 @@ export default function Home() {
                     {paidDocs[activeDocTab] ? (
                       <button
                         type="button"
-                        onClick={(e) => handleIndividualDownload(activeDocTab, e)}
-                        className="w-full sm:w-auto px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-full text-xs shadow-md flex items-center justify-center gap-1.5 transition-all"
+                        onClick={() => handleDownloadPDF(activeDocTab)}
+                        className="w-full sm:w-auto px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-full text-xs transition-all shadow-md flex items-center justify-center gap-1.5"
                       >
                         <Download className="w-4 h-4" />
-                        <span>Unduh PDF Clean</span>
+                        <span>Unduh PDF Clean (Tanpa Watermark)</span>
                       </button>
                     ) : (
                       <button
@@ -2104,7 +2200,7 @@ export default function Home() {
                           setModalStep('download_choice');
                           setShowCheckoutModal(true);
                         }}
-                        className="w-full sm:w-auto px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-full text-xs shadow-md flex items-center justify-center gap-1.5 transition-all"
+                        className="w-full sm:w-auto px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-full text-xs transition-all shadow-md flex items-center justify-center gap-1.5"
                       >
                         <Unlock className="w-4 h-4" />
                         <span>Buka PDF HD Tanpa Watermark</span>
@@ -2118,7 +2214,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Testimonials */}
+        {/* Testimonials Section */}
         <section className="py-14 bg-white border-t border-slate-200">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
             <div className="text-center max-w-2xl mx-auto space-y-2">
@@ -2138,12 +2234,15 @@ export default function Home() {
                   </div>
                   <h4 className="text-xs font-bold text-slate-800">Belum Ada Testimoni Pengguna</h4>
                   <p className="text-xs text-slate-500 leading-relaxed">
-                    Jadilah pengguna pertama yang membagikan ulasan setelah mengunduh dokumen legal Anda.
+                    Jadilah pengguna pertama yang membagikan ulasan setelah mengunduh dokumen legal Anda. Ulasan terverifikasi akan ditampilkan di sini.
                   </p>
                 </div>
               ) : (
                 reviews.map((rev) => (
-                  <div key={rev.id} className="bg-slate-50 p-6 rounded-3xl border border-slate-200/80 space-y-3">
+                  <div
+                    key={rev.id}
+                    className="bg-slate-50 p-6 rounded-3xl border border-slate-200/80 space-y-3"
+                  >
                     <div className="flex items-center gap-1 text-amber-400">
                       {[...Array(rev.stars)].map((_, i) => (
                         <Star key={i} className="w-4 h-4 fill-current" />
@@ -2167,11 +2266,12 @@ export default function Home() {
         </section>
       </main>
 
-      {/* INTEGRATED PAYMENT MODAL */}
+      {/* Download Choice & Integrated Payment Modal */}
       {showCheckoutModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white max-w-lg w-full rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-5 my-8 relative">
+          <div className="bg-white max-w-lg w-full rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-5 my-8">
             
+            {/* STEP 1: Main Download Choice Modal */}
             {modalStep === 'download_choice' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -2184,18 +2284,24 @@ export default function Home() {
                   <button
                     type="button"
                     onClick={() => setShowCheckoutModal(false)}
-                    className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition"
+                    className="text-slate-400 hover:text-slate-600"
                   >
                     <X className="w-5 h-5" />
                   </button>
                 </div>
 
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  Silakan bayar melalui Mayar Gateway langsung di dalam modal ini untuk menghapus watermark & membuka PDF HD:
+                  Silakan bayar melalui Mayar Payment Gateway untuk menghapus watermark dan membuka PDF HD legal:
                 </p>
 
                 <div className="space-y-3">
                   <div className="p-4 rounded-2xl border-2 border-emerald-500/80 bg-emerald-50/40 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-emerald-900 flex items-center gap-1">
+                        <ShieldCheck className="w-4 h-4 text-emerald-600" /> Versi PRO Clean (Tanpa Watermark)
+                      </span>
+                    </div>
+
                     <div className="space-y-2 pt-1">
                       <div
                         onClick={() => setSelectedPackage('SINGLE')}
@@ -2246,8 +2352,8 @@ export default function Home() {
                       )}
                       <span>
                         {isLoadingQris
-                          ? 'Menyiapkan Pembayaran...'
-                          : 'Lanjut Pembayaran (Rp 1.000)'}
+                          ? 'Memproses...'
+                          : 'Bayar via Mayar Payment Gateway (Rp 1.000)'}
                       </span>
                     </button>
                   </div>
@@ -2255,7 +2361,7 @@ export default function Home() {
               </div>
             )}
 
-            {/* PAYMENT STEP: Embedded Mayar Frame Inside Modal */}
+            {/* STEP 2: Payment Process View */}
             {modalStep === 'qris' && (
               <div className="space-y-4 text-center">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -2269,51 +2375,88 @@ export default function Home() {
 
                 <div>
                   <h3 className="font-extrabold text-slate-900 text-base">Pembayaran Lisensi Dokumen</h3>
-                  <div className="text-2xl font-black text-slate-900 mt-1">Rp 1.000</div>
+                  <div className="text-2xl font-black text-slate-900 mt-1">
+                    Rp 1.000
+                  </div>
                   <p className="text-[11px] text-slate-500">
                     Paket: <strong>{selectedPackage === 'SINGLE' ? `Single Document (${activeDocTab})` : 'Bundling (SPK + NDA + BAST)'}</strong>
                   </p>
                 </div>
 
-                {/* Banner Peringatan Modal Pembayaran */}
-                <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-3 text-left space-y-1">
-                  <div className="flex items-center gap-1.5 font-extrabold text-amber-900 text-xs">
+                {/* BANNER PERINGATAN KUNING / AMBER TEGAS */}
+                <div className="bg-amber-50 border-2 border-amber-300 text-amber-900 p-3.5 rounded-2xl text-[11px] text-left leading-relaxed font-medium space-y-1 shadow-xs">
+                  <div className="flex items-center gap-1.5 font-bold text-amber-900">
                     <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                    <span>PERINGATAN SANGAT PENTING:</span>
+                    <span className="uppercase tracking-wider text-[10px]">Peringatan Penting Pembayaran</span>
                   </div>
-                  <p className="text-[11px] text-amber-800 leading-relaxed font-medium">
-                    Jangan menutup, memuat ulang (refresh), atau berpindah dari halaman ini saat atau setelah pembayaran. Dokumen Anda akan diproses secara otomatis di layar ini.
+                  <p>
+                    <strong>Mohon jangan menutup atau me-refresh tab ini setelah melakukan pembayaran.</strong> Tunggu beberapa saat hingga sistem memverifikasi transaksi secara otomatis dan menampilkan tombol unduh dokumen Anda di halaman ini.
                   </p>
                 </div>
 
-                {/* CONTAINER IFRAME MAYAR */}
-                <div className="w-full h-[400px] rounded-2xl border border-slate-200 overflow-hidden bg-slate-50 relative shadow-inner">
-                  {paymentUrl ? (
-                    <iframe
-                      src={paymentUrl}
-                      className="w-full h-full border-0"
-                      title="Mayar Embedded Payment"
-                      allow="payment"
-                    />
+                {/* Container Direct Embedded Portal Mayar */}
+                <div className="bg-slate-50 p-2 sm:p-4 rounded-2xl border border-slate-200 overflow-hidden w-full space-y-3">
+                  {isLoadingQris ? (
+                    <div className="w-full h-64 rounded-xl bg-slate-100 flex items-center justify-center text-xs text-slate-500 animate-pulse font-sans font-bold gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
+                      <span>Menyiapkan Payment Gateway Mayar...</span>
+                    </div>
+                  ) : paymentUrl ? (
+                    <div className="w-full h-[380px] rounded-xl overflow-hidden border border-slate-200 bg-white relative">
+                      <iframe
+                        src={paymentUrl}
+                        className="w-full h-full border-0"
+                        title="Mayar Payment Gateway"
+                      />
+                    </div>
                   ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-xs text-slate-500 font-bold">
-                      <Loader2 className="w-6 h-6 animate-spin text-emerald-600" />
-                      <span>Memuat Halaman Pembayaran Mayar...</span>
+                    <div className="w-full h-32 rounded-xl bg-red-50 text-red-500 flex items-center justify-center text-xs p-4 text-center font-sans font-medium">
+                      Gagal memuat metode pembayaran. Silakan klik tombol di bawah untuk membuka tab baru.
                     </div>
                   )}
+
+                  {paymentUrl && (
+                    <a
+                      href={paymentUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] font-bold text-blue-600 hover:text-blue-800 flex items-center justify-center gap-1 pt-1"
+                    >
+                      <span>Buka Portal Mayar di Tab Baru (Jika Iframe Terkendala)</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+
+                  <span className="block text-[10px] font-bold text-slate-400">
+                    Secured by Mayar Payment Gateway (QRIS, VA, E-Wallet)
+                  </span>
                 </div>
 
-                <div className="text-[11px] text-emerald-600 font-semibold flex items-center justify-center gap-2 bg-emerald-50 p-2.5 rounded-xl border border-emerald-200">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-                  <span>Sistem memverifikasi pelunasan secara otomatis...</span>
-                </div>
+                {/* Indikator Status Pelunasan */}
+                {isProcessingSuccess ? (
+                  <div className="bg-emerald-600 text-white p-4 rounded-2xl shadow-lg text-center space-y-1">
+                    <div className="flex items-center justify-center gap-2 font-black text-sm">
+                      <CheckCircle className="w-5 h-5" />
+                      <span>Pembayaran Terdeteksi!</span>
+                    </div>
+                    <p className="text-xs text-emerald-100 font-medium">
+                      Sedang memproses verifikasi & menyiapkan dokumen, mohon tunggu sebentar...
+                    </p>
+                  </div>
+                ) : (
+                  <div className="text-[11px] text-emerald-600 font-semibold flex items-center justify-center gap-2 bg-emerald-50 p-2.5 rounded-xl border border-emerald-200">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                    <span>Sistem memverifikasi pelunasan secara real-time...</span>
+                  </div>
+                )}
 
+                {/* Tombol Verifikasi Server Redis */}
                 <div className="space-y-2 pt-1">
                   <button
                     type="button"
                     disabled={isVerifyingPayment || isProcessingSuccess}
                     onClick={handleManualCheckPayment}
-                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white font-black text-xs rounded-xl shadow-md flex items-center justify-center gap-2 transition"
+                    className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white font-black text-xs rounded-xl shadow-md flex items-center justify-center gap-2 transition"
                   >
                     {isVerifyingPayment ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -2321,7 +2464,7 @@ export default function Home() {
                       <CheckCircle className="w-4 h-4" />
                     )}
                     <span>
-                      {isVerifyingPayment ? 'Mengecek Server...' : 'CEK STATUS PEMBAYARAN MANUAL'}
+                      {isVerifyingPayment ? 'Mengecek Server...' : 'CEK STATUS PEMBAYARAN'}
                     </span>
                   </button>
 
@@ -2342,28 +2485,12 @@ export default function Home() {
         </div>
       )}
 
-      {/* PUSAT UNDUHAN BUNDLING & INDIVIDUAL */}
+      {/* Success & Download Receipt Modal (BERSIH TANPA SPINNER) */}
       {showSuccessModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white max-w-md w-full rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-5 text-center my-8 max-h-[90vh] overflow-y-auto relative">
+          <div className="bg-white max-w-md w-full rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-4 text-center my-8 max-h-[90vh] overflow-y-auto">
 
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 text-left">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-emerald-600" />
-                <span className="text-xs font-extrabold text-slate-900 uppercase">
-                  Pusat Unduhan Dokumen Legal
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={handleCloseSuccessModal}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition"
-                title="Tutup Modal"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
+            {/* Icon & Status Bersih */}
             <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
               <CheckCircle className="w-7 h-7" />
             </div>
@@ -2371,206 +2498,125 @@ export default function Home() {
             <div>
               <h3 className="font-extrabold text-slate-900 text-lg">Pembayaran Terverifikasi Lunas!</h3>
               <p className="text-xs text-slate-500 mt-1">
-                Watermark telah dicabut. Silakan unduh dokumen Anda di bawah ini:
+                Watermark SPKINSTAN telah resmi dicabut. Dokumen PDF Clean Anda siap diunduh.
               </p>
             </div>
 
+            {/* BOX PERINGATAN ZERO DATABASE */}
             <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-3.5 text-left space-y-1">
               <div className="flex items-center gap-1.5 font-extrabold text-amber-900 text-xs">
                 <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
                 <span>PENTING: Segera Unduh & Simpan Dokumen!</span>
               </div>
               <p className="text-[11px] text-amber-800 leading-relaxed font-medium">
-                Platform ini berjalan <strong>tanpa database & tanpa login</strong>. Jika tab ini ditutup, Anda <strong>tidak bisa mengunduh ulang</strong>.
+                Platform ini berjalan <strong>tanpa database & tanpa login</strong>. Jika Tab ini ditutup, Anda <strong>tidak bisa mengunduh ulang</strong> dan Admin juga tidak menyimpan/memiliki riwayat file Anda.
               </p>
             </div>
 
-            {/* RENDER PUSAT UNDUHAN BUNDLING 3-IN-1 */}
-            {isBundlingPackage ? (
+            {/* Tombol Unduh / Kirim WA */}
+            {selectedPackage === 'BUNDLING' ? (
               <div className="space-y-3 pt-1 text-left">
-                {/* Tombol Unduh Sekaligus */}
+                <span className="text-xs font-bold text-slate-700 block text-center uppercase tracking-wider">
+                  Paket Bundling 3 Dokumen (Lunas)
+                </span>
+
                 <button
                   type="button"
-                  disabled={isExporting}
-                  onClick={(e) => handleDownloadAllBundling(e)}
-                  className="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white font-extrabold rounded-2xl text-xs shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 transition"
+                  onClick={() => handleDownloadPDF()}
+                  className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-2xl text-xs shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2"
                 >
-                  {processingDoc === 'ALL' ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>MENGUNDUH PAKET BUNDLING (SPK, NDA, BAST)...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Download className="w-4 h-4" />
-                      <span>UNDUH SEMUA 3 DOKUMEN SEKALIGUS</span>
-                    </>
-                  )}
+                  <Download className="w-4 h-4" />
+                  <span>KLIK UNDUH SEMUA DOKUMEN (SPK + NDA + BAST)</span>
                 </button>
 
-                <div className="relative flex py-1 items-center">
-                  <div className="flex-grow border-t border-slate-200"></div>
-                  <span className="flex-shrink mx-2 text-[10px] text-slate-400 font-bold uppercase">
-                    Atau Unduh File Satu per Satu
-                  </span>
-                  <div className="flex-grow border-t border-slate-200"></div>
-                </div>
-
-                <div className="space-y-2">
-                  {/* Tombol 1 - SPK */}
+                <div className="grid grid-cols-3 gap-1.5 pt-1">
                   <button
                     type="button"
-                    disabled={isExporting}
-                    onClick={(e) => handleIndividualDownload('SPK', e)}
-                    className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold flex items-center justify-between border transition-all ${
-                      downloadedDocs.SPK
-                        ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
-                        : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-800'
-                    }`}
+                    onClick={() => handleDownloadPDF('SPK')}
+                    className="py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-xl text-[11px] text-center border border-slate-200"
                   >
-                    <div className="flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-blue-600" />
-                      <span>1. Perjanjian Kerja Sama (SPK)</span>
-                    </div>
-                    <span className="font-extrabold flex items-center gap-1 text-[11px]">
-                      {processingDoc === 'SPK' ? (
-                        <span className="text-blue-600 flex items-center gap-1">
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Memproses...
-                        </span>
-                      ) : downloadedDocs.SPK ? (
-                        <span className="text-emerald-600 flex items-center gap-1">
-                          <CheckCircle className="w-3.5 h-3.5" /> ✓ Terunduh
-                        </span>
-                      ) : (
-                        <span className="text-blue-600 flex items-center gap-1">
-                          <Download className="w-3.5 h-3.5" /> Unduh PDF
-                        </span>
-                      )}
-                    </span>
+                    1. Unduh SPK
                   </button>
-
-                  {/* Tombol 2 - NDA */}
                   <button
                     type="button"
-                    disabled={isExporting}
-                    onClick={(e) => handleIndividualDownload('NDA', e)}
-                    className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold flex items-center justify-between border transition-all ${
-                      downloadedDocs.NDA
-                        ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
-                        : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-800'
-                    }`}
+                    onClick={() => handleDownloadPDF('NDA')}
+                    className="py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-xl text-[11px] text-center border border-slate-200"
                   >
-                    <div className="flex items-center gap-2">
-                      <Lock className="w-4 h-4 text-indigo-600" />
-                      <span>2. Perjanjian Kerahasiaan (NDA)</span>
-                    </div>
-                    <span className="font-extrabold flex items-center gap-1 text-[11px]">
-                      {processingDoc === 'NDA' ? (
-                        <span className="text-indigo-600 flex items-center gap-1">
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Memproses...
-                        </span>
-                      ) : downloadedDocs.NDA ? (
-                        <span className="text-emerald-600 flex items-center gap-1">
-                          <CheckCircle className="w-3.5 h-3.5" /> ✓ Terunduh
-                        </span>
-                      ) : (
-                        <span className="text-indigo-600 flex items-center gap-1">
-                          <Download className="w-3.5 h-3.5" /> Unduh PDF
-                        </span>
-                      )}
-                    </span>
+                    2. Unduh NDA
                   </button>
-
-                  {/* Tombol 3 - BAST */}
                   <button
                     type="button"
-                    disabled={isExporting}
-                    onClick={(e) => handleIndividualDownload('BAST', e)}
-                    className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold flex items-center justify-between border transition-all ${
-                      downloadedDocs.BAST
-                        ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
-                        : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-800'
-                    }`}
+                    onClick={() => handleDownloadPDF('BAST')}
+                    className="py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-xl text-[11px] text-center border border-slate-200"
                   >
-                    <div className="flex items-center gap-2">
-                      <CheckSquare className="w-4 h-4 text-purple-600" />
-                      <span>3. Berita Acara Serah Terima (BAST)</span>
-                    </div>
-                    <span className="font-extrabold flex items-center gap-1 text-[11px]">
-                      {processingDoc === 'BAST' ? (
-                        <span className="text-purple-600 flex items-center gap-1">
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Memproses...
-                        </span>
-                      ) : downloadedDocs.BAST ? (
-                        <span className="text-emerald-600 flex items-center gap-1">
-                          <CheckCircle className="w-3.5 h-3.5" /> ✓ Terunduh
-                        </span>
-                      ) : (
-                        <span className="text-purple-600 flex items-center gap-1">
-                          <Download className="w-3.5 h-3.5" /> Unduh PDF
-                        </span>
-                      )}
-                    </span>
+                    3. Unduh BAST
                   </button>
                 </div>
-              </div>
-            ) : (
-              /* RENDER UNDUHAN DOKUMEN SATUAN */
-              <div className="space-y-3 pt-1">
+
                 <button
                   type="button"
-                  disabled={isExporting}
-                  onClick={(e) => handleIndividualDownload(paidDocTarget, e)}
-                  className={`w-full py-3.5 rounded-2xl text-xs font-extrabold flex items-center justify-center gap-2 transition border ${
-                    downloadedDocs[paidDocTarget]
-                      ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
-                      : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/30'
-                  }`}
+                  onClick={() => handleShareWhatsApp()}
+                  className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl text-xs shadow-md flex items-center justify-center gap-2"
                 >
-                  {processingDoc === paidDocTarget ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Memproses PDF {paidDocTarget}...</span>
-                    </>
-                  ) : downloadedDocs[paidDocTarget] ? (
-                    <>
-                      <CheckCircle className="w-4 h-4 text-emerald-600" />
-                      <span>✓ TERUNDUH — KLIK UNTUK UNDUH ULANG ({paidDocTarget})</span>
-                    </>
-                  ) : (
-                    <>
-                      <Download className="w-4 h-4" />
-                      <span>UNDUH PDF CLEAN ({paidDocTarget})</span>
-                    </>
-                  )}
+                  <Send className="w-4 h-4" />
+                  <span>Kirim Paket Bundling ke WA Pihak Kedua</span>
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => handleDownloadPDF(paidDocTarget)}
+                  className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-2xl text-xs shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>KLIK UNDUH PDF CLEAN (TANPA WATERMARK)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleShareWhatsApp(paidDocTarget)}
+                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl text-xs shadow-md flex items-center justify-center gap-2"
+                >
+                  <Send className="w-4 h-4" />
+                  <span>Kirim Langsung ke WhatsApp Pihak Kedua</span>
                 </button>
               </div>
             )}
 
-            <div className="pt-2 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => handleShareWhatsApp()}
-                className="w-full py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs rounded-xl transition flex items-center justify-center gap-2"
-              >
-                <Send className="w-4 h-4" />
-                <span>Kirim Draf ke WhatsApp Pihak Kedua</span>
-              </button>
+            {/* Bagian Ulasan WA */}
+            <div className="pt-3 border-t border-slate-100">
+              <div className="bg-emerald-50/80 border border-emerald-200/80 rounded-2xl p-3.5 text-center space-y-2">
+                <div className="text-xs font-extrabold text-slate-900 flex items-center justify-center gap-1.5">
+                  <MessageSquarePlus className="w-4 h-4 text-emerald-600" />
+                  <span>Berikan Ulasan & Kritik via WhatsApp</span>
+                </div>
+                <p className="text-[11px] font-medium text-slate-500 max-w-xs mx-auto">
+                  Pengalaman Anda sangat berharga. Kirim kesan atau masukan Anda langsung ke WhatsApp Admin Business kami.
+                </p>
+                <a
+                  href={`https://wa.me/${adminWaNumber}?text=${encodeURIComponent("Halo Admin SPKInstan, saya baru saja membuat dokumen dan ingin memberikan ulasan/kritik:")}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2 transition"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  <span>Chat WA Admin Business</span>
+                </a>
+              </div>
             </div>
 
             <button
               type="button"
-              onClick={handleCloseSuccessModal}
-              className="w-full py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs rounded-xl transition"
+              onClick={() => setShowSuccessModal(false)}
+              className="text-xs text-slate-400 hover:text-slate-600 pt-1 block mx-auto font-medium"
             >
-              Selesai & Tutup Modal
+              Selesai
             </button>
-
           </div>
         </div>
       )}
 
-      {/* Floating Chat Widget */}
+      {/* Floating WhatsApp Chat Widget */}
       <a
         href={`https://wa.me/${adminWaNumber}?text=${encodeURIComponent("Halo Admin SPKInstan, saya butuh bantuan mengenai pembuatan dokumen.")}`}
         target="_blank"
@@ -2581,27 +2627,27 @@ export default function Home() {
         <MessageCircle className="w-6 h-6" />
       </a>
 
-      {/* Mobile Bottom Bar */}
+      {/* Mobile Floating Sticky Bottom Bar */}
       <div className="lg:hidden fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-slate-200 p-3 z-30 shadow-lg flex gap-2">
         <button
           type="button"
-          onClick={(e) => handleFreeDownload(e)}
-          className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-full text-xs flex items-center justify-center gap-1 border border-slate-300"
+          onClick={handleFreeDownload}
+          className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-full text-xs transition-all flex items-center justify-center gap-1 border border-slate-300"
         >
           <Download className="w-3.5 h-3.5 text-slate-600" />
           <span>Draf Watermark</span>
         </button>
         <button
           type="button"
-          onClick={(e) => {
+          onClick={() => {
             if (paidDocs[activeDocTab]) {
-              handleIndividualDownload(activeDocTab, e);
+              handleDownloadPDF(activeDocTab);
             } else {
               setModalStep('download_choice');
               setShowCheckoutModal(true);
             }
           }}
-          className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-full text-xs shadow-md flex items-center justify-center gap-1"
+          className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-full text-xs transition-all shadow-md flex items-center justify-center gap-1"
         >
           <Unlock className="w-3.5 h-3.5" />
           <span>{paidDocs[activeDocTab] ? 'Unduh PDF Clean' : 'Versi Pro (Clean)'}</span>
@@ -2626,29 +2672,36 @@ export default function Home() {
 
             <div>
               <h4 className="text-xs font-bold uppercase tracking-wider text-white mb-3">
-                Landasan Hukum
+                Landasan Hukum Perikatan
               </h4>
               <ul className="space-y-2 text-xs">
-                <li>Pasal 1320 KUHPerdata</li>
-                <li>Pasal 1338 KUHPerdata</li>
-                <li>Pasal 1464 KUHPerdata</li>
+                <li>Pasal 1320 KUHPerdata (Syarat Sah Perikatan)</li>
+                <li>Pasal 1338 KUHPerdata (Pacta Sunt Servanda)</li>
+                <li>Pasal 1464 KUHPerdata (Ketentuan Uang Muka / DP)</li>
+                <li>UU No. 30 Tahun 2000 (Rahasia Dagang)</li>
+                <li>UU No. 28 Tahun 2014 (Hak Cipta)</li>
               </ul>
             </div>
 
             <div>
               <h4 className="text-xs font-bold uppercase tracking-wider text-white mb-3">
-                Keamanan
+                Keamanan & Keabsahan
               </h4>
               <ul className="space-y-2 text-xs">
                 <li>Zero Database (Strict Local Privacy)</li>
+                <li>Proteksi Anti-Inspect Canvas Watermark</li>
                 <li>Tanda Tangan Digital & Fisik Manual</li>
+                <li>Format Cetak A4 Standar Perdata</li>
               </ul>
             </div>
 
             <div>
               <h4 className="text-xs font-bold uppercase tracking-wider text-white mb-3">
-                Dukungan
+                Dukungan Pengguna
               </h4>
+              <p className="text-xs text-slate-400 leading-relaxed mb-3">
+                Ada kendala teknis atau pertanyaan perikatan legal? CS WhatsApp kami siap membantu.
+              </p>
               <a
                 href={`https://wa.me/${adminWaNumber}?text=${encodeURIComponent("Halo Admin SPKInstan, saya butuh bantuan")}`}
                 target="_blank"
@@ -2656,13 +2709,13 @@ export default function Home() {
                 className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 rounded-xl text-xs font-semibold border border-emerald-500/30 transition-all"
               >
                 <MessageCircle className="w-4 h-4" />
-                <span>Hubungi CS WA</span>
+                <span>Hubungi CS WA SPKInstan</span>
               </a>
             </div>
           </div>
 
           <div className="pt-8 border-t border-slate-800 text-center text-xs text-slate-500">
-            <p>© 2026 SPKInstan Platform.</p>
+            <p>© 2026 SPKInstan Legal Tech Platform. Hak Cipta Dilindungi Undang-Undang.</p>
           </div>
         </div>
       </footer>
