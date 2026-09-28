@@ -676,7 +676,6 @@ export default function Home() {
     });
   };
 
-  // PERBAIKAN GENERATOR PDF: Menggunakan pdf.save() jsPDF secara langsung yang terbukti stabil
   const captureDocumentToPdf = async (
     docType: 'SPK' | 'NDA' | 'BAST',
     shouldConsumeLicense = true
@@ -778,7 +777,6 @@ export default function Home() {
         .replace(/_+/g, '_');
       const fileName = `SPKInstan_${docType}_${cleanName}_${fileSuffix}.pdf`;
 
-      // Eksekusi Save PDF Bawaan jsPDF (Sangat stabil di semua browser)
       pdf.save(fileName);
 
       setDownloadedDocs((prev) => {
@@ -1073,7 +1071,6 @@ export default function Home() {
     }
   };
 
-  // PERBAIKAN FUNGSI HANDLER DOWNLOAD GRATIS (WATERMARK)
   const handleFreeDownload = (e?: React.MouseEvent) => {
     if (e) {
       e.preventDefault();
@@ -2023,7 +2020,6 @@ export default function Home() {
                         </div>
 
                         <div className="pt-2 border-t border-slate-200 flex justify-between items-center text-[10px] sm:text-[11px] text-slate-500 font-mono">
-                          <span>SPKInstan Legal Document</span>
                           <span>Hal 2 dari 2</span>
                         </div>
                       </div>
