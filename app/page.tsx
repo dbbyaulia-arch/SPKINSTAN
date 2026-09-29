@@ -1250,7 +1250,7 @@ export default function Home() {
     }
   };
 
-  // HANDLER PENGIRIMAN WHATSAPP HYBRID (WEB SHARE API DI MOBILE + AUTO-DOWNLOAD & CHAT LINK DI DESKTOP)
+  // HANDLER PENGIRIMAN WHATSAPP HYBRID (WEB SHARE API DI MOBILE + AUTO-DOWNLOAD & WHATSAPP APP PROTOCOL DI DESKTOP)
   const handleShareWhatsApp = async (specificDoc?: DocType) => {
     const targetDoc = specificDoc || activeDocTab;
     const targetDocInfo = docsData[targetDoc];
@@ -1298,9 +1298,9 @@ export default function Home() {
       }
     }
 
-    // 4. Opsi B: Fallback Desktop (Auto-Download PDF + Buka WhatsApp)
+    // 4. Opsi B: Fallback Desktop (Auto-Download PDF + Langsung Buka WhatsApp App Desktop)
     await captureDocumentToPdf(targetDoc); // Unduh file PDF otomatis ke lokal
-    window.open(`https://wa.me/${finalWaNumber}?text=${encodeURIComponent(textMessage)}`, '_blank');
+    window.open(`whatsapp://send?phone=${finalWaNumber}&text=${encodeURIComponent(textMessage)}`);
   };
 
   const wizardTitles = [
