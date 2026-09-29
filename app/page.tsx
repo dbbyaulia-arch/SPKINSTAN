@@ -71,8 +71,7 @@ export default function Home() {
     BAST: false,
   });
 
-  // State untuk menyimpan Fingerprint Hash data proyek saat transaksi lunas
-  const [paidFingerprints, setPaidFingerprints] = useState<Record<string, string>>({});
+  const [paidFingerprints, setPaidFingerprints] = useState<{ SPK?: string; NDA?: string; BAST?: string }>({});
 
   const [downloadedDocs, setDownloadedDocs] = useState<{ SPK: boolean; NDA: boolean; BAST: boolean }>({
     SPK: false,
@@ -81,7 +80,6 @@ export default function Home() {
   });
 
   const [processingDoc, setProcessingDoc] = useState<'SPK' | 'NDA' | 'BAST' | 'ALL' | null>(null);
-
   const [paidDocTarget, setPaidDocTarget] = useState<'SPK' | 'NDA' | 'BAST'>('SPK');
 
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
@@ -301,7 +299,7 @@ export default function Home() {
   ]);
 
   // ---------------------------------------------------------
-  // FINGERPRINT HASHING LOGIC (SOLUSI LOGIC EXPLOIT)
+  // CORE FINGERPRINT HASHING FUNCTIONS
   // ---------------------------------------------------------
   const getDocumentFingerprint = (docType: 'SPK' | 'NDA' | 'BAST') => {
     const p1 = (freelancerName || '').trim().toLowerCase();
@@ -322,9 +320,34 @@ export default function Home() {
 
   const isDocValidAndPaid = (docType: 'SPK' | 'NDA' | 'BAST') => {
     if (!paidDocs[docType]) return false;
+
     const currentFingerprint = getDocumentFingerprint(docType);
     const savedFingerprint = paidFingerprints[docType];
-    return currentFingerprint === savedFingerprint;
+
+    if (savedFingerprint && currentFingerprint === savedFingerprint) return true;
+
+    // Fallback sync untuk render awal saat state React belum pulih
+    if (typeof window !== 'undefined') {
+      try {
+        const savedDraftRaw = localStorage.getItem('spkinstan_form_draft');
+        if (savedDraftRaw) {
+          const draft = JSON.parse(savedDraftRaw);
+          const p1 = (draft.freelancerName || '').trim().toLowerCase();
+          const p2 = (draft.clientName || '').trim().toLowerCase();
+          let detail = '';
+          if (docType === 'SPK') detail = `${(draft.projectTitle || '').trim().toLowerCase()}_${(draft.projectAmount || '').trim()}`;
+          else if (docType === 'NDA') detail = (draft.ndaScope || '').trim().toLowerCase();
+          else if (docType === 'BAST') detail = (draft.bastRef || '').trim().toLowerCase();
+
+          const fallbackHash = btoa(encodeURIComponent(`${docType}|${p1}|${p2}|${detail}`));
+          return fallbackHash === savedFingerprint;
+        }
+      } catch (e) {
+        console.error('Error verifying fallback fingerprint:', e);
+      }
+    }
+
+    return false;
   };
 
   const handleDocNumberChange = (value: string) => {
@@ -650,7 +673,7 @@ export default function Home() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [paidDocs, paidFingerprints, activeDocTab, freelancerName, clientName, projectTitle, projectAmount, ndaScope, bastRef]);
+  }, [paidDocs, paidFingerprints, activeDocTab]);
 
   useEffect(() => {
     if (showCheckoutModal && modalStep === 'qris' && timeLeft > 0) {
@@ -698,14 +721,25 @@ export default function Home() {
       localStorage.setItem('spkinstan_package', selectedPackage);
     }
 
-    setTimeout(() => {
+    setTimeout(async () => {
       setIsProcessingSuccess(false);
       setMobileViewMode('preview');
       setShowCheckoutModal(false);
 
-      // Auto scroll ke kontainer unduhan di tab yang sama
+      // Auto scroll ke area unduhan
       downloadCenterRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 1000);
+
+      // AUTO-DOWNLOAD: Langsung unduh PDF setelah pembayaran berhasil
+      try {
+        if (selectedPackage === 'BUNDLING') {
+          await handleDownloadAllBundling();
+        } else {
+          await captureDocumentToPdf(paidDocTarget, true);
+        }
+      } catch (err) {
+        console.error('Gagal melakukan auto-download:', err);
+      }
+    }, 800);
 
     if (typeof window !== 'undefined' && window.fbq) {
       window.fbq('track', 'Purchase', {
@@ -817,7 +851,7 @@ export default function Home() {
         }
       }
 
-      // Penamaan File Format Sederhana tanpa status: spk_namapihakpertama.pdf
+      // Format Penamaan File Bersih Murni: spk_budi.pdf
       const cleanName = (freelancerName || 'pihak_pertama')
         .trim()
         .toLowerCase()
@@ -837,8 +871,7 @@ export default function Home() {
         return nextState;
       });
 
-      const isPaidDoc = isDocValidAndPaid(docType) || (isDocValidAndPaid('SPK') && isDocValidAndPaid('NDA') && isDocValidAndPaid('BAST'));
-      if (shouldConsumeLicense && isPaidDoc && sessionId) {
+      if (shouldConsumeLicense && (isDocValidAndPaid(docType) || (isDocValidAndPaid('SPK') && isDocValidAndPaid('NDA') && isDocValidAndPaid('BAST'))) && sessionId) {
         await consumePaymentLicense(sessionId);
       }
     } catch (err) {
@@ -1154,6 +1187,7 @@ export default function Home() {
   ];
 
   const isBundlingPackage = selectedPackage === 'BUNDLING' || (isDocValidAndPaid('SPK') && isDocValidAndPaid('NDA') && isDocValidAndPaid('BAST'));
+  const isCurrentDocPaid = isDocValidAndPaid(activeDocTab) || isBundlingPackage;
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col justify-between font-sans antialiased selection:bg-blue-100 selection:text-blue-700 pb-20 md:pb-0">
@@ -1166,7 +1200,7 @@ export default function Home() {
         @media print {
           body { display: none !important; }
         }
-        ${!isDocValidAndPaid(activeDocTab) ? `
+        ${!isCurrentDocPaid ? `
         #a4-document-preview {
           -webkit-touch-callout: none;
           -webkit-user-select: none;
@@ -1369,19 +1403,6 @@ export default function Home() {
                     ))}
                   </div>
                 </div>
-
-                {/* BANNER NOTIFIKASI PERUBAHAN DATA PROYEK */}
-                {paidDocs[activeDocTab] && !isDocValidAndPaid(activeDocTab) && (
-                  <div className="bg-amber-50 border border-amber-300 rounded-2xl p-3.5 text-xs text-amber-900 font-medium space-y-1.5 shadow-xs">
-                    <div className="flex items-center gap-1.5 font-extrabold text-amber-800">
-                      <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                      <span>Perubahan Identitas Proyek Terdeteksi</span>
-                    </div>
-                    <p className="text-[11px] leading-relaxed text-amber-800">
-                      Anda telah mengubah data utama klien atau proyek. Pelunasan sebelumnya terikat pada draf sebelumnya. Silakan lakukan transaksi baru jika ingin menerbitkan PDF Clean untuk data baru ini.
-                    </p>
-                  </div>
-                )}
 
                 {/* Form Steps */}
                 <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
@@ -1855,8 +1876,8 @@ export default function Home() {
                   mobileViewMode === 'form' ? 'hidden lg:block' : 'block'
                 }`}
               >
-                {/* KONTAINER PUSAT UNDUHAN IN-PAGE (MUNCUL APABILA VALID TERVERIFIKASI) */}
-                {(isDocValidAndPaid(activeDocTab) || (isDocValidAndPaid('SPK') && isDocValidAndPaid('NDA') && isDocValidAndPaid('BAST'))) && (
+                {/* KONTAINER PUSAT UNDUHAN IN-PAGE (HANYA MUNCUL APABILA SUDAH LUNAS & HASH COCOK) */}
+                {isCurrentDocPaid && (
                   <div
                     ref={downloadCenterRef}
                     id="download-center"
@@ -1886,7 +1907,6 @@ export default function Home() {
                       </button>
                     </div>
 
-                    {/* BANNER WARN APABILA MODAL CLOSED TANPA LOCAL DB */}
                     <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-3 text-left space-y-1">
                       <div className="flex items-center gap-1.5 font-extrabold text-amber-900 text-xs">
                         <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
@@ -2048,12 +2068,12 @@ export default function Home() {
                   <div
                     id="a4-document-preview"
                     className={`flex flex-col gap-8 items-center w-full max-w-[794px] ${
-                      !isDocValidAndPaid(activeDocTab) ? 'select-none' : ''
+                      !isCurrentDocPaid ? 'select-none' : ''
                     }`}
                   >
                     {/* HALAMAN 1 */}
                     <div className="a4-page w-full max-w-[794px] min-h-[1123px] h-auto bg-white text-slate-900 p-6 sm:p-8 relative flex flex-col justify-between shadow-xl rounded-xl border border-slate-200 shrink-0">
-                      {!isDocValidAndPaid(activeDocTab) && (
+                      {!isCurrentDocPaid && (
                         <div className="watermark-layer absolute inset-0 pointer-events-none z-20 flex items-center justify-center overflow-hidden">
                           <span className="text-5xl sm:text-7xl font-black tracking-[0.25em] text-slate-300/25 uppercase select-none -rotate-12 transform">
                             SPKINSTAN
@@ -2168,7 +2188,7 @@ export default function Home() {
                     {/* HALAMAN 2 */}
                     {needsPage2 && (
                       <div className="a4-page w-full max-w-[794px] min-h-[1123px] h-auto bg-white text-slate-900 p-6 sm:p-8 relative flex flex-col justify-between shadow-xl rounded-xl border border-slate-200 shrink-0">
-                        {!isDocValidAndPaid(activeDocTab) && (
+                        {!isCurrentDocPaid && (
                           <div className="watermark-layer absolute inset-0 pointer-events-none z-20 flex items-center justify-center overflow-hidden">
                             <span className="text-5xl sm:text-7xl font-black tracking-[0.25em] text-slate-300/25 uppercase select-none -rotate-12 transform">
                               SPKINSTAN
@@ -2249,7 +2269,7 @@ export default function Home() {
                       Status Draf Dokumen
                     </span>
                     <span className="text-sm font-extrabold text-slate-900">
-                      {isDocValidAndPaid(activeDocTab) ? (
+                      {isCurrentDocPaid ? (
                         <span className="text-emerald-600 flex items-center gap-1">
                           <CheckCircle className="w-4 h-4 inline" /> Terverifikasi Lunas ({activeDocTab})
                         </span>
@@ -2269,7 +2289,7 @@ export default function Home() {
                       <span>Download Draf Watermark</span>
                     </button>
 
-                    {isDocValidAndPaid(activeDocTab) ? (
+                    {isCurrentDocPaid ? (
                       <button
                         type="button"
                         onClick={(e) => handleIndividualDownload(activeDocTab, e)}
@@ -2477,14 +2497,15 @@ export default function Home() {
                   </p>
                 </div>
 
-                {/* CONTAINER IFRAME MAYAR */}
+                {/* CONTAINER IFRAME MAYAR DENGAN ATRIBUT SANDBOX PERBAIKAN */}
                 <div className="w-full h-[400px] rounded-2xl border border-slate-200 overflow-hidden bg-slate-50 relative shadow-inner">
                   {paymentUrl ? (
                     <iframe
                       src={paymentUrl}
                       className="w-full h-full border-0"
                       title="Mayar Embedded Payment"
-                      allow="payment"
+                      allow="payment; downloads"
+                      sandbox="allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts allow-top-navigation-by-user-activation"
                     />
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-xs text-slate-500 font-bold">
@@ -2557,7 +2578,7 @@ export default function Home() {
         <button
           type="button"
           onClick={(e) => {
-            if (isDocValidAndPaid(activeDocTab)) {
+            if (isCurrentDocPaid) {
               handleIndividualDownload(activeDocTab, e);
             } else {
               setModalStep('download_choice');
@@ -2567,7 +2588,7 @@ export default function Home() {
           className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-full text-xs shadow-md flex items-center justify-center gap-1"
         >
           <Unlock className="w-3.5 h-3.5" />
-          <span>{isDocValidAndPaid(activeDocTab) ? 'Unduh PDF Clean' : 'Versi Pro (Clean)'}</span>
+          <span>{isCurrentDocPaid ? 'Unduh PDF Clean' : 'Versi Pro (Clean)'}</span>
         </button>
       </div>
 
