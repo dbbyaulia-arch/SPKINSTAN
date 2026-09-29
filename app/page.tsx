@@ -37,12 +37,12 @@ declare global {
 
 type DocType = 'SPK' | 'NDA' | 'BAST';
 
-// Data Khusus per Jenis Dokumen (Independen & Isolated)
+// Data Khusus per Jenis Dokumen (Independen & Terisolasi)
 interface SingleDocDetails {
   docNumber: string;
   projectTitle: string;
   
-  // Field Identitas Pihak (Isolasi per Dokumen)
+  // Field Identitas Pihak
   freelancerName: string;
   freelancerEmail: string;
   freelancerWa: string;
@@ -90,7 +90,6 @@ const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffec
 
 export default function Home() {
   const adminWaNumber = process.env.NEXT_PUBLIC_ADMIN_WA_NUMBER || '62881027908462';
-  const downloadCenterRef = useRef<HTMLDivElement | null>(null);
 
   // ---------------------------------------------------------
   // ALL STATES & REFS
@@ -115,8 +114,11 @@ export default function Home() {
   const [processingDoc, setProcessingDoc] = useState<'SPK' | 'NDA' | 'BAST' | 'ALL' | null>(null);
   const [paidDocTarget, setPaidDocTarget] = useState<DocType>('SPK');
 
+  // POPUP & MODAL CONTROL STATES
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [modalStep, setModalStep] = useState<'download_choice' | 'qris'>('download_choice');
+  const [showDownloadPopup, setShowDownloadPopup] = useState(false); // POPUP OVERLAY PASCA-BAYAR
+
   const [mobileViewMode, setMobileViewMode] = useState<'form' | 'preview'>('form');
   const [isExporting, setIsExporting] = useState(false);
 
@@ -128,7 +130,6 @@ export default function Home() {
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
   const [isLoadingQris, setIsLoadingQris] = useState(false);
   const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
-  const [, setIsProcessingSuccess] = useState(false);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
   // ---------------------------------------------------------
@@ -418,7 +419,62 @@ export default function Home() {
     }
   }, [activeDocTab, currentWizardStep, docsData]);
 
-  // KOMUNIKASI ANTAR-TAB PEMBAYARAN & PERSISTENSI LOCAL STORAGE
+  // ---------------------------------------------------------
+  // 1. PERSISTENSI REFRESH & PROTEKSI TOMBOL BACK BROWSER (POPUP OVERLAY)
+  // ---------------------------------------------------------
+  // Restore State dari LocalStorage saat Mount / Refresh
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const savedPaid = localStorage.getItem('spkinstan_paid_docs');
+    const savedDownloaded = localStorage.getItem('spkinstan_downloaded_docs');
+    const savedPackage = localStorage.getItem('spkinstan_package');
+    const popupActive = localStorage.getItem('spkinstan_popup_active');
+
+    if (savedPaid) {
+      try {
+        setPaidDocs(JSON.parse(savedPaid));
+      } catch (e) {
+        console.error('Failed to parse saved paid docs:', e);
+      }
+    }
+
+    if (savedPackage === 'BUNDLING' || savedPackage === 'SINGLE') {
+      setSelectedPackage(savedPackage as 'SINGLE' | 'BUNDLING');
+    }
+
+    if (savedDownloaded) {
+      try {
+        setDownloadedDocs(JSON.parse(savedDownloaded));
+      } catch (e) {
+        console.error('Failed to parse saved downloaded docs:', e);
+      }
+    }
+
+    // PAKSA TAMPILKAN POPUP JIKA STATUS MASIH AKTIF
+    if (popupActive === 'true') {
+      setShowDownloadPopup(true);
+      window.history.pushState({ downloadPopup: true }, '');
+    }
+  }, []);
+
+  // Listener Popstate (Mencegah Tombol Back Browser Menutup Popup)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handlePopState = () => {
+      const isPopupActive = localStorage.getItem('spkinstan_popup_active');
+      if (isPopupActive === 'true') {
+        window.history.pushState({ downloadPopup: true }, '');
+        setShowDownloadPopup(true);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // BroadcastChannel & Cross-Tab Payment Sync
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -445,35 +501,7 @@ export default function Home() {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, [sessionId, selectedPackage, paidDocTarget]);
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedPaid = localStorage.getItem('spkinstan_paid_docs');
-      const savedDownloaded = localStorage.getItem('spkinstan_downloaded_docs');
-      const savedPackage = localStorage.getItem('spkinstan_package');
-
-      if (savedPaid) {
-        try {
-          setPaidDocs(JSON.parse(savedPaid));
-        } catch (e) {
-          console.error('Failed to parse saved paid docs:', e);
-        }
-      }
-
-      if (savedPackage === 'BUNDLING' || savedPackage === 'SINGLE') {
-        setSelectedPackage(savedPackage as 'SINGLE' | 'BUNDLING');
-      }
-
-      if (savedDownloaded) {
-        try {
-          setDownloadedDocs(JSON.parse(savedDownloaded));
-        } catch (e) {
-          console.error('Failed to parse saved downloaded docs:', e);
-        }
-      }
-    }
-  }, []);
-
-  // Menyimpan Draf Form (Keyed Dictionary Architecture per Dokumen)
+  // Menyimpan Draf Form
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const draftData = {
@@ -737,9 +765,11 @@ export default function Home() {
     }
   }, [showCheckoutModal]);
 
+  // ---------------------------------------------------------
+  // TRIGGER PEMBAYARAN SUKSES & AKTIVASI POPUP OVERLAY
+  // ---------------------------------------------------------
   const handlePaymentSuccess = () => {
     stopPolling();
-    setIsProcessingSuccess(false);
 
     const updatedPaid = selectedPackage === 'BUNDLING'
       ? { SPK: true, NDA: true, BAST: true }
@@ -750,15 +780,12 @@ export default function Home() {
     if (typeof window !== 'undefined') {
       localStorage.setItem('spkinstan_paid_docs', JSON.stringify(updatedPaid));
       localStorage.setItem('spkinstan_package', selectedPackage);
+      localStorage.setItem('spkinstan_popup_active', 'true');
+      window.history.pushState({ downloadPopup: true }, '');
     }
 
-    setMobileViewMode('preview');
     setShowCheckoutModal(false);
-
-    // Auto-scroll ke Kontainer Pusat Unduhan (#download-center)
-    setTimeout(() => {
-      downloadCenterRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 300);
+    setShowDownloadPopup(true);
 
     if (typeof window !== 'undefined' && window.fbq) {
       window.fbq('track', 'Purchase', {
@@ -766,6 +793,28 @@ export default function Home() {
         currency: 'IDR',
       });
     }
+  };
+
+  // ---------------------------------------------------------
+  // SAKLAR EKSEKUSI PENUTUPAN MANUAL POPUP (KONSUMSI LISENSI)
+  // ---------------------------------------------------------
+  const handleManualClosePopup = async () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('spkinstan_popup_active');
+    }
+
+    if (sessionId) {
+      await consumePaymentLicense(sessionId);
+    }
+
+    const resetPaid = { SPK: false, NDA: false, BAST: false };
+    setPaidDocs(resetPaid);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('spkinstan_paid_docs', JSON.stringify(resetPaid));
+    }
+
+    setSessionId('');
+    setShowDownloadPopup(false);
   };
 
   const switchTabAndAwaitRender = (targetDoc: DocType) => {
@@ -778,12 +827,11 @@ export default function Home() {
   };
 
   // ---------------------------------------------------------
-  // CAPTURE & EXPORT PDF (SINGLE-USE MODEL IMPLEMENTATION)
+  // CAPTURE & EXPORT PDF (ISOLASI FUNGSI UNDUH - POPUP TETAP AKTIF)
   // FORMAT PENAMAAN BERSIH: <doctype>_<nama_pihak_pertama>.pdf
   // ---------------------------------------------------------
   const captureDocumentToPdf = async (
-    docType: DocType,
-    shouldConsumeLicense = true
+    docType: DocType
   ) => {
     setProcessingDoc(docType);
     setIsExporting(true);
@@ -894,22 +942,6 @@ export default function Home() {
         return nextState;
       });
 
-      // SINGLE-USE LICENSE CONSUMPTION: Reset status paidDocs setelah download
-      if (shouldConsumeLicense && (paidDocs[docType] || (paidDocs.SPK && paidDocs.NDA && paidDocs.BAST))) {
-        if (sessionId) {
-          await consumePaymentLicense(sessionId);
-        }
-
-        setPaidDocs((prev) => {
-          const updated = { ...prev, [docType]: false };
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('spkinstan_paid_docs', JSON.stringify(updated));
-          }
-          return updated;
-        });
-
-        setSessionId('');
-      }
     } catch (err) {
       console.error('Error generating PDF:', err);
       alert('Gagal mengekspor PDF. Pastikan browser memberikan izin unduh file.');
@@ -931,22 +963,9 @@ export default function Home() {
     try {
       for (const doc of docs) {
         await switchTabAndAwaitRender(doc);
-        await captureDocumentToPdf(doc, false);
+        await captureDocumentToPdf(doc);
         await new Promise((res) => setTimeout(res, 800));
       }
-
-      if (sessionId) {
-        await consumePaymentLicense(sessionId);
-      }
-
-      // SINGLE-USE LICENSE CONSUMPTION: Reset SEMUA lisensi bundling setelah 3 dokumen terunduh
-      const resetAll = { SPK: false, NDA: false, BAST: false };
-      setPaidDocs(resetAll);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('spkinstan_paid_docs', JSON.stringify(resetAll));
-      }
-      setSessionId('');
-
     } catch (err) {
       console.error('Gagal mengunduh paket bundling:', err);
       alert('Terjadi kendala saat mengunduh paket bundling.');
@@ -961,7 +980,7 @@ export default function Home() {
       e.preventDefault();
       e.stopPropagation();
     }
-    await captureDocumentToPdf(docType, true);
+    await captureDocumentToPdf(docType);
   };
 
   const handleManualCheckPayment = async () => {
@@ -1194,7 +1213,7 @@ export default function Home() {
       e.stopPropagation();
     }
     setShowCheckoutModal(false);
-    captureDocumentToPdf(activeDocTab, false);
+    captureDocumentToPdf(activeDocTab);
   };
 
   const handleFinishForm = (e?: React.MouseEvent) => {
@@ -1204,7 +1223,7 @@ export default function Home() {
       setModalStep('download_choice');
       setShowCheckoutModal(true);
     } else {
-      downloadCenterRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setShowDownloadPopup(true);
     }
   };
 
@@ -1935,190 +1954,12 @@ export default function Home() {
                 </form>
               </div>
 
-              {/* RIGHT COLUMN: Live Preview A4 & Dynamic In-Page Download Center */}
+              {/* RIGHT COLUMN: Live Preview A4 */}
               <div
                 className={`lg:col-span-7 space-y-4 ${
                   mobileViewMode === 'form' ? 'hidden lg:block' : 'block'
                 }`}
               >
-                {/* KONTAINER PUSAT UNDUHAN IN-PAGE */}
-                {(paidDocs[activeDocTab] || (paidDocs.SPK && paidDocs.NDA && paidDocs.BAST)) && (
-                  <div
-                    ref={downloadCenterRef}
-                    id="download-center"
-                    className="bg-emerald-50 border-2 border-emerald-500 rounded-3xl p-5 sm:p-7 shadow-md space-y-5 transition-all"
-                  >
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-emerald-200/80 pb-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-md shrink-0">
-                          <CheckCircle className="w-6 h-6" />
-                        </div>
-                        <div>
-                          <h3 className="text-base sm:text-lg font-extrabold text-slate-900">
-                            Status Pembayaran: LUNAS
-                          </h3>
-                          <p className="text-xs text-slate-600">
-                            Watermark telah dilepas. Silakan unduh dokumen resmi Anda di bawah ini:
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleShareWhatsApp()}
-                        className="w-full sm:w-auto px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-2 transition"
-                      >
-                        <Send className="w-4 h-4" />
-                        <span>Kirim Draf ke WhatsApp</span>
-                      </button>
-                    </div>
-
-                    {/* BANNER WARNING PENTING */}
-                    <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-3 text-left space-y-1">
-                      <div className="flex items-center gap-1.5 font-extrabold text-amber-900 text-xs">
-                        <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                        <span>PENTING: Segera Unduh & Simpan Dokumen!</span>
-                      </div>
-                      <p className="text-[11px] text-amber-800 leading-relaxed font-medium">
-                        Setiap transaksi berlaku untuk <strong>1x unduh PDF Clean</strong>. Jika Anda mengubah form setelah mengunduh, status lisensi akan di-reset.
-                      </p>
-                    </div>
-
-                    {/* OPSI BUNDLING 3-IN-1 ATAU SATUAN */}
-                    {isBundlingPackage ? (
-                      <div className="space-y-4">
-                        <button
-                          type="button"
-                          disabled={isExporting}
-                          onClick={(e) => handleDownloadAllBundling(e)}
-                          className="w-full py-3.5 px-5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white font-extrabold rounded-2xl text-xs sm:text-sm shadow-md flex items-center justify-center gap-2 transition"
-                        >
-                          {processingDoc === 'ALL' ? (
-                            <>
-                              <Loader2 className="w-5 h-5 animate-spin" />
-                              <span>MENGUNDUH PAKET BUNDLING (SPK, NDA, BAST)...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Download className="w-5 h-5" />
-                              <span>UNDUH SEMUA 3 DOKUMEN SEKALIGUS</span>
-                            </>
-                          )}
-                        </button>
-
-                        <div className="relative flex py-1 items-center">
-                          <div className="flex-grow border-t border-emerald-200/80"></div>
-                          <span className="flex-shrink mx-2 text-[10px] text-emerald-800 font-bold uppercase tracking-wider">
-                            Atau Unduh File Satu per Satu
-                          </span>
-                          <div className="flex-grow border-t border-emerald-200/80"></div>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                          {/* SPK */}
-                          <button
-                            type="button"
-                            disabled={isExporting}
-                            onClick={(e) => handleIndividualDownload('SPK', e)}
-                            className={`p-3.5 rounded-xl text-xs font-bold flex items-center justify-between border transition-all ${
-                              downloadedDocs.SPK
-                                ? 'bg-emerald-100 border-emerald-300 text-emerald-900'
-                                : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-800'
-                            }`}
-                          >
-                            <span className="flex items-center gap-1.5">
-                              <FileText className="w-4 h-4 text-blue-600" /> SPK
-                            </span>
-                            {processingDoc === 'SPK' ? (
-                              <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
-                            ) : downloadedDocs.SPK ? (
-                              <span className="text-emerald-700 font-bold">✓ Terunduh</span>
-                            ) : (
-                              <Download className="w-3.5 h-3.5 text-blue-600" />
-                            )}
-                          </button>
-
-                          {/* NDA */}
-                          <button
-                            type="button"
-                            disabled={isExporting}
-                            onClick={(e) => handleIndividualDownload('NDA', e)}
-                            className={`p-3.5 rounded-xl text-xs font-bold flex items-center justify-between border transition-all ${
-                              downloadedDocs.NDA
-                                ? 'bg-emerald-100 border-emerald-300 text-emerald-900'
-                                : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-800'
-                            }`}
-                          >
-                            <span className="flex items-center gap-1.5">
-                              <Lock className="w-4 h-4 text-indigo-600" /> NDA
-                            </span>
-                            {processingDoc === 'NDA' ? (
-                              <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600" />
-                            ) : downloadedDocs.NDA ? (
-                              <span className="text-emerald-700 font-bold">✓ Terunduh</span>
-                            ) : (
-                              <Download className="w-3.5 h-3.5 text-indigo-600" />
-                            )}
-                          </button>
-
-                          {/* BAST */}
-                          <button
-                            type="button"
-                            disabled={isExporting}
-                            onClick={(e) => handleIndividualDownload('BAST', e)}
-                            className={`p-3.5 rounded-xl text-xs font-bold flex items-center justify-between border transition-all ${
-                              downloadedDocs.BAST
-                                ? 'bg-emerald-100 border-emerald-300 text-emerald-900'
-                                : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-800'
-                            }`}
-                          >
-                            <span className="flex items-center gap-1.5">
-                              <CheckSquare className="w-4 h-4 text-purple-600" /> BAST
-                            </span>
-                            {processingDoc === 'BAST' ? (
-                              <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-600" />
-                            ) : downloadedDocs.BAST ? (
-                              <span className="text-emerald-700 font-bold">✓ Terunduh</span>
-                            ) : (
-                              <Download className="w-3.5 h-3.5 text-purple-600" />
-                            )}
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      /* DOKUMEN SATUAN */
-                      <div>
-                        <button
-                          type="button"
-                          disabled={isExporting}
-                          onClick={(e) => handleIndividualDownload(paidDocTarget, e)}
-                          className={`w-full py-3.5 rounded-2xl text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition border ${
-                            downloadedDocs[paidDocTarget]
-                              ? 'bg-emerald-100 border-emerald-300 text-emerald-900'
-                              : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md'
-                          }`}
-                        >
-                          {processingDoc === paidDocTarget ? (
-                            <>
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              <span>Memproses PDF {paidDocTarget}...</span>
-                            </>
-                          ) : downloadedDocs[paidDocTarget] ? (
-                            <>
-                              <CheckCircle className="w-4 h-4 text-emerald-700" />
-                              <span>✓ TERUNDUH — KLIK UNTUK UNDUH ULANG ({paidDocTarget})</span>
-                            </>
-                          ) : (
-                            <>
-                              <Download className="w-4 h-4" />
-                              <span>UNDUH PDF CLEAN ({paidDocTarget})</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-
                 <div className="flex items-center justify-between bg-white px-4 py-2.5 rounded-2xl border border-slate-200 shadow-sm text-xs">
                   <span className="flex items-center gap-1.5 font-bold text-slate-700">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -2213,7 +2054,7 @@ export default function Home() {
                           ))}
                         </div>
 
-                        {/* RENDER AREA TTD INDEPENDEN */}
+                        {/* RENDER AREA TTD (DITAMPILKAN BERSIH TANPA KOTAK PLACEHOLDER [TANDA TANGAN]) */}
                         {!needsPage2 && (
                           <div className="pt-2 sm:pt-3 grid grid-cols-2 gap-3 sm:gap-4 text-center">
                             <div className="bg-slate-50/80 border border-slate-200/80 rounded-xl p-2.5 sm:p-3 space-y-1.5 min-h-[100px] flex flex-col justify-between">
@@ -2359,11 +2200,11 @@ export default function Home() {
                     {paidDocs[activeDocTab] ? (
                       <button
                         type="button"
-                        onClick={(e) => handleIndividualDownload(activeDocTab, e)}
+                        onClick={() => setShowDownloadPopup(true)}
                         className="w-full sm:w-auto px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-full text-xs shadow-md flex items-center justify-center gap-1.5 transition-all"
                       >
                         <Download className="w-4 h-4" />
-                        <span>Unduh PDF Clean</span>
+                        <span>Buka Pusat Unduhan PRO</span>
                       </button>
                     ) : (
                       <button
@@ -2444,6 +2285,198 @@ export default function Home() {
           </div>
         </section>
       </main>
+
+      {/* --------------------------------------------------------- */}
+      {/* 2. POPUP OVERLAY PUSAT UNDUHAN PERSISTEN PASCA-BAYAR */}
+      {/* --------------------------------------------------------- */}
+      {showDownloadPopup && (
+        <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white max-w-2xl w-full rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-100 space-y-6 my-8 relative animate-in fade-in zoom-in-95 duration-200">
+            
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-lg shrink-0">
+                  <CheckCircle className="w-7 h-7" />
+                </div>
+                <div>
+                  <h3 className="text-lg sm:text-xl font-extrabold text-slate-900">
+                    Status Pembayaran: LUNAS
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    Watermark telah dilepas. Silakan unduh dokumen resmi Anda di bawah ini.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => handleShareWhatsApp()}
+                className="w-full sm:w-auto px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-2 transition"
+              >
+                <Send className="w-4 h-4" />
+                <span>Kirim Draf ke WA</span>
+              </button>
+            </div>
+
+            {/* BANNER CATATAN PERINGATAN PENTING */}
+            <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-4 text-left space-y-1">
+              <div className="flex items-center gap-2 font-extrabold text-amber-900 text-xs sm:text-sm">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>PENTING: Segera Unduh & Simpan Dokumen Anda!</span>
+              </div>
+              <p className="text-xs text-amber-800 leading-relaxed font-medium">
+                Satu sesi transaksi berlaku untuk mengunduh versi PDF Clean. Jangan klik tombol <strong>"Selesai & Tutup Dokumen"</strong> sebelum Anda selesai mengunduh seluruh berkas PDF yang dibutuhkan.
+              </p>
+            </div>
+
+            {/* PUSAT UNDUHAN (BUNDLING / SATUAN) */}
+            {isBundlingPackage ? (
+              <div className="space-y-4">
+                <button
+                  type="button"
+                  disabled={isExporting}
+                  onClick={(e) => handleDownloadAllBundling(e)}
+                  className="w-full py-4 px-5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white font-extrabold rounded-2xl text-xs sm:text-sm shadow-lg flex items-center justify-center gap-2.5 transition active:scale-[0.98]"
+                >
+                  {processingDoc === 'ALL' ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <span>MENGUNDUH PAKET BUNDLING (SPK, NDA, BAST)...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-5 h-5" />
+                      <span>UNDUH SEMUA 3 DOKUMEN SEKALIGUS (BUNDLING)</span>
+                    </>
+                  )}
+                </button>
+
+                <div className="relative flex py-1 items-center">
+                  <div className="flex-grow border-t border-slate-200"></div>
+                  <span className="flex-shrink mx-3 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                    Atau Unduh File Satu per Satu
+                  </span>
+                  <div className="flex-grow border-t border-slate-200"></div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {/* SPK */}
+                  <button
+                    type="button"
+                    disabled={isExporting}
+                    onClick={(e) => handleIndividualDownload('SPK', e)}
+                    className={`p-3.5 rounded-xl text-xs font-bold flex items-center justify-between border transition-all ${
+                      downloadedDocs.SPK
+                        ? 'bg-emerald-100 border-emerald-300 text-emerald-900'
+                        : 'bg-slate-50 hover:bg-white border-slate-200 text-slate-800 shadow-xs'
+                    }`}
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <FileText className="w-4 h-4 text-blue-600" /> SPK
+                    </span>
+                    {processingDoc === 'SPK' ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
+                    ) : downloadedDocs.SPK ? (
+                      <span className="text-emerald-700 font-bold">✓ Terunduh</span>
+                    ) : (
+                      <Download className="w-3.5 h-3.5 text-blue-600" />
+                    )}
+                  </button>
+
+                  {/* NDA */}
+                  <button
+                    type="button"
+                    disabled={isExporting}
+                    onClick={(e) => handleIndividualDownload('NDA', e)}
+                    className={`p-3.5 rounded-xl text-xs font-bold flex items-center justify-between border transition-all ${
+                      downloadedDocs.NDA
+                        ? 'bg-emerald-100 border-emerald-300 text-emerald-900'
+                        : 'bg-slate-50 hover:bg-white border-slate-200 text-slate-800 shadow-xs'
+                    }`}
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <Lock className="w-4 h-4 text-indigo-600" /> NDA
+                    </span>
+                    {processingDoc === 'NDA' ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600" />
+                    ) : downloadedDocs.NDA ? (
+                      <span className="text-emerald-700 font-bold">✓ Terunduh</span>
+                    ) : (
+                      <Download className="w-3.5 h-3.5 text-indigo-600" />
+                    )}
+                  </button>
+
+                  {/* BAST */}
+                  <button
+                    type="button"
+                    disabled={isExporting}
+                    onClick={(e) => handleIndividualDownload('BAST', e)}
+                    className={`p-3.5 rounded-xl text-xs font-bold flex items-center justify-between border transition-all ${
+                      downloadedDocs.BAST
+                        ? 'bg-emerald-100 border-emerald-300 text-emerald-900'
+                        : 'bg-slate-50 hover:bg-white border-slate-200 text-slate-800 shadow-xs'
+                    }`}
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <CheckSquare className="w-4 h-4 text-purple-600" /> BAST
+                    </span>
+                    {processingDoc === 'BAST' ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-600" />
+                    ) : downloadedDocs.BAST ? (
+                      <span className="text-emerald-700 font-bold">✓ Terunduh</span>
+                    ) : (
+                      <Download className="w-3.5 h-3.5 text-purple-600" />
+                    )}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* DOKUMEN SATUAN */
+              <div>
+                <button
+                  type="button"
+                  disabled={isExporting}
+                  onClick={(e) => handleIndividualDownload(paidDocTarget, e)}
+                  className={`w-full py-4 rounded-2xl text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition border ${
+                    downloadedDocs[paidDocTarget]
+                      ? 'bg-emerald-100 border-emerald-300 text-emerald-900'
+                      : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg'
+                  }`}
+                >
+                  {processingDoc === paidDocTarget ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Memproses PDF {paidDocTarget}...</span>
+                    </>
+                  ) : downloadedDocs[paidDocTarget] ? (
+                    <>
+                      <CheckCircle className="w-4 h-4 text-emerald-700" />
+                      <span>✓ TERUNDUH — KLIK UNTUK UNDUH ULANG ({paidDocTarget})</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4" />
+                      <span>UNDUH PDF CLEAN ({paidDocTarget})</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+
+            {/* TOMBOL SATU-SATUNYA UNTUK MENUTUP POPUP (AKSES RESET LISENSI) */}
+            <div className="pt-4 border-t border-slate-100 flex justify-end">
+              <button
+                type="button"
+                onClick={handleManualClosePopup}
+                className="w-full sm:w-auto px-6 py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition shadow-md flex items-center justify-center gap-2"
+              >
+                <span>Selesai & Tutup Dokumen</span>
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
 
       {/* INTEGRATED PAYMENT MODAL WITH EMBEDDED IFRAME */}
       {showCheckoutModal && (
@@ -2636,7 +2669,7 @@ export default function Home() {
           type="button"
           onClick={(e) => {
             if (paidDocs[activeDocTab]) {
-              handleIndividualDownload(activeDocTab, e);
+              setShowDownloadPopup(true);
             } else {
               setModalStep('download_choice');
               setShowCheckoutModal(true);
@@ -2645,7 +2678,7 @@ export default function Home() {
           className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-full text-xs shadow-md flex items-center justify-center gap-1"
         >
           <Unlock className="w-3.5 h-3.5" />
-          <span>{paidDocs[activeDocTab] ? 'Unduh PDF Clean' : 'Versi Pro (Clean)'}</span>
+          <span>{paidDocs[activeDocTab] ? 'Pusat Unduhan PRO' : 'Versi Pro (Clean)'}</span>
         </button>
       </div>
 
