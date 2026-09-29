@@ -35,6 +35,42 @@ declare global {
   }
 }
 
+type DocType = 'SPK' | 'NDA' | 'BAST';
+
+// 1. Data Pihak Umum (Shared Across All Documents)
+interface GlobalPartyData {
+  freelancerName: string;
+  freelancerEmail: string;
+  freelancerWa: string;
+  clientName: string;
+  clientWa: string;
+}
+
+// 2. Data Khusus per Jenis Dokumen (Independen & Isolated)
+interface SingleDocDetails {
+  docNumber: string;
+  projectTitle: string;
+  signerFirstParty: string;
+  signerSecondParty: string;
+  signatureFirstParty: string | null;
+  signatureSecondParty: string | null;
+  
+  // Isian Spesifik SPK
+  projectAmount: string;
+  dpPercent: string;
+  bankInfo: string;
+  
+  // Isian Spesifik NDA
+  ndaScope: string;
+  ndaYears: string;
+  ndaPenalty: string;
+  
+  // Isian Spesifik BAST
+  bastRef: string;
+  bastWarranty: string;
+  bastDate: string;
+}
+
 interface Review {
   id: string;
   name: string;
@@ -44,7 +80,7 @@ interface Review {
 
 interface Clause {
   id: string;
-  docType: 'SPK' | 'NDA' | 'BAST';
+  docType: DocType;
   title: string;
   content: string;
   isEnabled: boolean;
@@ -60,10 +96,9 @@ export default function Home() {
   // ---------------------------------------------------------
   // ALL STATES & REFS
   // ---------------------------------------------------------
-  const [activeDocTab, setActiveDocTab] = useState<'SPK' | 'NDA' | 'BAST'>('SPK');
+  const [activeDocTab, setActiveDocTab] = useState<DocType>('SPK');
   const [selectedPackage, setSelectedPackage] = useState<'SINGLE' | 'BUNDLING'>('SINGLE');
   const [currentWizardStep, setCurrentWizardStep] = useState(1);
-
   const [activePreset, setActivePreset] = useState<'web' | 'design' | 'all' | null>(null);
 
   const [paidDocs, setPaidDocs] = useState<{ SPK: boolean; NDA: boolean; BAST: boolean }>({
@@ -79,8 +114,7 @@ export default function Home() {
   });
 
   const [processingDoc, setProcessingDoc] = useState<'SPK' | 'NDA' | 'BAST' | 'ALL' | null>(null);
-
-  const [paidDocTarget, setPaidDocTarget] = useState<'SPK' | 'NDA' | 'BAST'>('SPK');
+  const [paidDocTarget, setPaidDocTarget] = useState<DocType>('SPK');
 
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [modalStep, setModalStep] = useState<'download_choice' | 'qris'>('download_choice');
@@ -98,43 +132,91 @@ export default function Home() {
   const [, setIsProcessingSuccess] = useState(false);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Form State
-  const [freelancerName, setFreelancerName] = useState('');
-  const [freelancerEmail, setFreelancerEmail] = useState('');
-  const [freelancerWa, setFreelancerWa] = useState('');
-  const [clientName, setClientName] = useState('');
-  const [clientWa, setClientWa] = useState('');
-
-  // Multi-Doc State untuk Nomor Surat Berbasis Objek
-  const [docNumbers, setDocNumbers] = useState({
-    SPK: '001/SPK/IX/2026',
-    NDA: '001/NDA/IX/2026',
-    BAST: '001/BAST/IX/2026',
+  // ---------------------------------------------------------
+  // KEYED DICTIONARY STATE IMPLEMENTATION (TERPISAH PER DOKUMEN)
+  // ---------------------------------------------------------
+  const [globalParty, setGlobalParty] = useState<GlobalPartyData>({
+    freelancerName: '',
+    freelancerEmail: '',
+    freelancerWa: '',
+    clientName: '',
+    clientWa: '',
   });
 
-  const [signerFirstParty, setSignerFirstParty] = useState('');
-  const [signerSecondParty, setSignerSecondParty] = useState('');
+  const [docsData, setDocsData] = useState<Record<DocType, SingleDocDetails>>({
+    SPK: {
+      docNumber: '001/SPK/IX/2026',
+      projectTitle: 'Pengembangan Aplikasi Web Dashboard',
+      signerFirstParty: '',
+      signerSecondParty: '',
+      signatureFirstParty: null,
+      signatureSecondParty: null,
+      projectAmount: '7500000',
+      dpPercent: '50',
+      bankInfo: 'BCA 1234567890 a.n budi',
+      ndaScope: '',
+      ndaYears: '',
+      ndaPenalty: '',
+      bastRef: '',
+      bastWarranty: '',
+      bastDate: '',
+    },
+    NDA: {
+      docNumber: '001/NDA/IX/2026',
+      projectTitle: 'Kerahasiaan Source Code & Database',
+      signerFirstParty: '',
+      signerSecondParty: '',
+      signatureFirstParty: null,
+      signatureSecondParty: null,
+      projectAmount: '',
+      dpPercent: '',
+      bankInfo: '',
+      ndaScope: 'Source Code, Schema Database, Aset Desain Figma, & API Key',
+      ndaYears: '2',
+      ndaPenalty: '25000000',
+      bastRef: '',
+      bastWarranty: '',
+      bastDate: '',
+    },
+    BAST: {
+      docNumber: '001/BAST/IX/2026',
+      projectTitle: 'Serah Terima Pekerjaan Web Dashboard',
+      signerFirstParty: '',
+      signerSecondParty: '',
+      signatureFirstParty: null,
+      signatureSecondParty: null,
+      projectAmount: '',
+      dpPercent: '',
+      bankInfo: '',
+      ndaScope: '',
+      ndaYears: '',
+      ndaPenalty: '',
+      bastRef: '001/SPK/IX/2026',
+      bastWarranty: '14',
+      bastDate: '2026-09-25',
+    },
+  });
+
+  // Handler Pembaruan Input Form Global & Dokumen Spesifik
+  const handleGlobalPartyChange = (field: keyof GlobalPartyData, value: string) => {
+    setGlobalParty((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleDocInputChange = (field: keyof SingleDocDetails, value: string | null) => {
+    setDocsData((prev) => ({
+      ...prev,
+      [activeDocTab]: {
+        ...prev[activeDocTab],
+        [field]: value,
+      },
+    }));
+  };
 
   const canvasRef1 = useRef<HTMLCanvasElement | null>(null);
   const [isDrawing1, setIsDrawing1] = useState(false);
-  const [signatureFirstParty, setSignatureFirstParty] = useState<string | null>(null);
 
   const canvasRef2 = useRef<HTMLCanvasElement | null>(null);
   const [isDrawing2, setIsDrawing2] = useState(false);
-  const [signatureSecondParty, setSignatureSecondParty] = useState<string | null>(null);
-
-  const [projectTitle, setProjectTitle] = useState('');
-  const [projectAmount, setProjectAmount] = useState('');
-  const [dpPercent, setDpPercent] = useState('');
-  const [bankInfo, setBankInfo] = useState('');
-
-  const [ndaScope, setNdaScope] = useState('');
-  const [ndaYears, setNdaYears] = useState('');
-  const [ndaPenalty, setNdaPenalty] = useState('');
-
-  const [bastRef, setBastRef] = useState('');
-  const [bastWarranty, setBastWarranty] = useState('');
-  const [bastDate, setBastDate] = useState('');
 
   const [reviews] = useState<Review[]>([]);
   const page1ContentRef = useRef<HTMLDivElement | null>(null);
@@ -298,21 +380,41 @@ export default function Home() {
     },
   ]);
 
-  const handleDocNumberChange = (value: string) => {
-    setDocNumbers((prev) => ({
-      ...prev,
-      [activeDocTab]: value,
-    }));
-  };
+  // Sync Tanda Tangan Canvas saat Berganti Tab Dokumen
+  useEffect(() => {
+    const currentSignature1 = docsData[activeDocTab].signatureFirstParty;
+    const currentSignature2 = docsData[activeDocTab].signatureSecondParty;
 
-  // ---------------------------------------------------------
-  // 1. KOMUNIKASI ANTAR-TAB PEMBAYARAN (BROADCASTCHANNEL & STORAGE)
-  // ---------------------------------------------------------
+    if (canvasRef1.current) {
+      const ctx = canvasRef1.current.getContext('2d');
+      if (ctx) {
+        ctx.clearRect(0, 0, canvasRef1.current.width, canvasRef1.current.height);
+        if (currentSignature1) {
+          const img = new Image();
+          img.onload = () => ctx.drawImage(img, 0, 0);
+          img.src = currentSignature1;
+        }
+      }
+    }
+
+    if (canvasRef2.current) {
+      const ctx = canvasRef2.current.getContext('2d');
+      if (ctx) {
+        ctx.clearRect(0, 0, canvasRef2.current.width, canvasRef2.current.height);
+        if (currentSignature2) {
+          const img = new Image();
+          img.onload = () => ctx.drawImage(img, 0, 0);
+          img.src = currentSignature2;
+        }
+      }
+    }
+  }, [activeDocTab]);
+
+  // 1. KOMUNIKASI ANTAR-TAB PEMBAYARAN & PERSISTENSI LOCAL STORAGE
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
     const channel = new BroadcastChannel('spkinstan_payment_channel');
-
     channel.onmessage = (event) => {
       if (event.data?.type === 'PAYMENT_SUCCESS') {
         handlePaymentSuccess();
@@ -363,67 +465,28 @@ export default function Home() {
     }
   }, []);
 
+  // Menyimpan Draf Form (Keyed Dictionary Architecture)
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const formData = {
-        freelancerName,
-        freelancerEmail,
-        freelancerWa,
-        clientName,
-        clientWa,
-        docNumbers,
-        signerFirstParty,
-        signerSecondParty,
-        projectTitle,
-        projectAmount,
-        dpPercent,
-        bankInfo,
-        ndaScope,
-        ndaYears,
-        ndaPenalty,
-        bastRef,
-        bastWarranty,
-        bastDate,
-        signatureFirstParty,
-        signatureSecondParty,
+      const draftData = {
+        globalParty,
+        docsData,
         clauses,
       };
-      localStorage.setItem('spkinstan_form_draft', JSON.stringify(formData));
+      localStorage.setItem('spkinstan_form_draft', JSON.stringify(draftData));
     }
-  }, [
-    freelancerName, freelancerEmail, freelancerWa, clientName, clientWa,
-    docNumbers, signerFirstParty, signerSecondParty, projectTitle, projectAmount,
-    dpPercent, bankInfo, ndaScope, ndaYears, ndaPenalty, bastRef, bastWarranty,
-    bastDate, signatureFirstParty, signatureSecondParty, clauses
-  ]);
+  }, [globalParty, docsData, clauses]);
 
+  // Memulihkan Draf Form
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedDraft = localStorage.getItem('spkinstan_form_draft');
       if (savedDraft) {
         try {
-          const data = JSON.parse(savedDraft);
-          if (data.freelancerName) setFreelancerName(data.freelancerName);
-          if (data.freelancerEmail) setFreelancerEmail(data.freelancerEmail);
-          if (data.freelancerWa) setFreelancerWa(data.freelancerWa);
-          if (data.clientName) setClientName(data.clientName);
-          if (data.clientWa) setClientWa(data.clientWa);
-          if (data.docNumbers) setDocNumbers(data.docNumbers);
-          if (data.signerFirstParty) setSignerFirstParty(data.signerFirstParty);
-          if (data.signerSecondParty) setSignerSecondParty(data.signerSecondParty);
-          if (data.projectTitle) setProjectTitle(data.projectTitle);
-          if (data.projectAmount) setProjectAmount(data.projectAmount);
-          if (data.dpPercent) setDpPercent(data.dpPercent);
-          if (data.bankInfo) setBankInfo(data.bankInfo);
-          if (data.ndaScope) setNdaScope(data.ndaScope);
-          if (data.ndaYears) setNdaYears(data.ndaYears);
-          if (data.ndaPenalty) setNdaPenalty(data.ndaPenalty);
-          if (data.bastRef) setBastRef(data.bastRef);
-          if (data.bastWarranty) setBastWarranty(data.bastWarranty);
-          if (data.bastDate) setBastDate(data.bastDate);
-          if (data.signatureFirstParty) setSignatureFirstParty(data.signatureFirstParty);
-          if (data.signatureSecondParty) setSignatureSecondParty(data.signatureSecondParty);
-          if (data.clauses) setClauses(data.clauses);
+          const parsed = JSON.parse(savedDraft);
+          if (parsed.globalParty) setGlobalParty(parsed.globalParty);
+          if (parsed.docsData) setDocsData(parsed.docsData);
+          if (parsed.clauses) setClauses(parsed.clauses);
         } catch (e) {
           console.error('Gagal memulihkan draf form:', e);
         }
@@ -433,60 +496,64 @@ export default function Home() {
 
   // Sync Dinamis Variabel ke Dalam Teks Pasal Terkait
   useEffect(() => {
+    const spkData = docsData.SPK;
+    const ndaData = docsData.NDA;
+    const bastData = docsData.BAST;
+
     setClauses((prev) =>
       prev.map((c) => {
         if (c.id === 'spk-1') {
           return {
             ...c,
-            content: `Sesuai Pasal 17 ayat (2) & Pasal 18A ayat (2) UU No. 1 Tahun 2024 (UU ITE), Para Pihak sepakat melaksanakan pekerjaan "${projectTitle || 'Pengembangan Aplikasi Web & API Integration'}" dengan iktikad baik, transparan, dan jelas sesuai acuan spesifikasi teknis dan deliverables yang disepakati.`,
+            content: `Sesuai Pasal 17 ayat (2) & Pasal 18A ayat (2) UU No. 1 Tahun 2024 (UU ITE), Para Pihak sepakat melaksanakan pekerjaan "${spkData.projectTitle || 'Pengembangan Aplikasi Web & API Integration'}" dengan iktikad baik, transparan, dan jelas sesuai acuan spesifikasi teknis dan deliverables yang disepakati.`,
           };
         }
         if (c.id === 'spk-3') {
           return {
             ...c,
-            content: `Total imbalan jasa yang disepakati sebesar Rp ${formatRupiah(projectAmount || '7500000')}, dengan Uang Muka (DP) sebesar ${dpPercent || '50'}% wajib dibayarkan sebelum pengerjaan dimulai melalui transfer ke ${bankInfo || 'BCA 1234567890 a.n budi'}.`,
+            content: `Total imbalan jasa yang disepakati sebesar Rp ${formatRupiah(spkData.projectAmount || '7500000')}, dengan Uang Muka (DP) sebesar ${spkData.dpPercent || '50'}% wajib dibayarkan sebelum pengerjaan dimulai melalui transfer ke ${spkData.bankInfo || 'BCA 1234567890 a.n budi'}.`,
           };
         }
         if (c.id === 'nda-1') {
           return {
             ...c,
-            content: `Sesuai Pasal 1 angka 1 & Pasal 4 huruf b UU No. 30 Tahun 2000 tentang Rahasia Dagang, Informasi Rahasia mencakup seluruh data teknis, "${ndaScope || 'Source Code, Skema Database, Aset Desain Figma, & Strategi Bisnis'}", kode sumber, strategi pemasaran, serta data finansial yang diberikan oleh Pemilik Informasi.`,
+            content: `Sesuai Pasal 1 angka 1 & Pasal 4 huruf b UU No. 30 Tahun 2000 tentang Rahasia Dagang, Informasi Rahasia mencakup seluruh data teknis, "${ndaData.ndaScope || 'Source Code, Skema Database, Aset Desain Figma, & Strategi Bisnis'}", kode sumber, strategi pemasaran, serta data finansial yang diberikan oleh Pemilik Informasi.`,
           };
         }
         if (c.id === 'nda-4') {
           return {
             ...c,
-            content: `Kewajiban menjaga kerahasiaan ini berlaku efektif sejak tanggal penandatanganan dan tetap mengikat Para Pihak selama ${ndaYears || '2'} (dua) tahun setelah hubungan kerja sama berakhir.`,
+            content: `Kewajiban menjaga kerahasiaan ini berlaku efektif sejak tanggal penandatanganan dan tetap mengikat Para Pihak selama ${ndaData.ndaYears || '2'} (dua) tahun setelah hubungan kerja sama berakhir.`,
           };
         }
         if (c.id === 'nda-6') {
           return {
             ...c,
-            content: `Setiap bentuk kebocoran atau pelanggaran kerahasiaan dikenakan denda penalti finansial sebesar Rp ${formatRupiah(ndaPenalty || '25000000')} serta hak untuk menuntut ganti rugi materiil/immateriil sesuai ketentuan hukum perdata.`,
+            content: `Setiap bentuk kebocoran atau pelanggaran kerahasiaan dikenakan denda penalti finansial sebesar Rp ${formatRupiah(ndaData.ndaPenalty || '25000000')} serta hak untuk menuntut ganti rugi materiil/immateriil sesuai ketentuan hukum perdata.`,
           };
         }
         if (c.id === 'bast-1') {
           return {
             ...c,
-            content: `Berita Acara ini diterbitkan sebagai bukti administratif sah yang merujuk pada kesepakatan Perjanjian Kerja Sama (SPK) Utama dengan Nomor Referensi: "${bastRef || '001/SPK/IX/2026'}".`,
+            content: `Berita Acara ini diterbitkan sebagai bukti administratif sah yang merujuk pada kesepakatan Perjanjian Kerja Sama (SPK) Utama dengan Nomor Referensi: "${bastData.bastRef || '001/SPK/IX/2026'}".`,
           };
         }
         if (c.id === 'bast-2') {
           return {
             ...c,
-            content: `PIHAK PERTAMA menyatakan telah menyerahkan seluruh hasil pengerjaan proyek, dan PIHAK KEDUA menyatakan telah menerima pengerjaan tersebut secara resmi pada tanggal ${bastDate || '25 September 2026'}.`,
+            content: `PIHAK PERTAMA menyatakan telah menyerahkan seluruh hasil pengerjaan proyek, dan PIHAK KEDUA menyatakan telah menerima pengerjaan tersebut secara resmi pada tanggal ${bastData.bastDate || '25 September 2026'}.`,
           };
         }
         if (c.id === 'bast-4') {
           return {
             ...c,
-            content: `PIHAK PERTAMA memberikan garansi pemeliharaan perbaikan kendala teknis / bug secara gratis selama ${bastWarranty || '14'} (empat belas) hari kerja terhitung sejak penandatanganan BAST ini.`,
+            content: `PIHAK PERTAMA memberikan garansi pemeliharaan perbaikan kendala teknis / bug secara gratis selama ${bastData.bastWarranty || '14'} (empat belas) hari kerja terhitung sejak penandatanganan BAST ini.`,
           };
         }
         return c;
       })
     );
-  }, [projectTitle, projectAmount, dpPercent, bankInfo, ndaScope, ndaYears, ndaPenalty, bastRef, bastDate, bastWarranty]);
+  }, [docsData]);
 
   const handleToggleClause = (id: string) => {
     setClauses((prev) =>
@@ -591,22 +658,8 @@ export default function Home() {
     heightNeedsPage2,
     activeDocTab,
     clauses,
-    projectTitle,
-    projectAmount,
-    dpPercent,
-    bankInfo,
-    ndaScope,
-    ndaYears,
-    ndaPenalty,
-    bastRef,
-    bastWarranty,
-    bastDate,
-    signerFirstParty,
-    signerSecondParty,
-    signatureFirstParty,
-    signatureSecondParty,
-    freelancerName,
-    clientName,
+    globalParty,
+    docsData,
     isExporting
   ]);
 
@@ -695,7 +748,7 @@ export default function Home() {
     }
   };
 
-  const switchTabAndAwaitRender = (targetDoc: 'SPK' | 'NDA' | 'BAST') => {
+  const switchTabAndAwaitRender = (targetDoc: DocType) => {
     return new Promise<void>((resolve) => {
       setActiveDocTab(targetDoc);
       setTimeout(() => {
@@ -706,10 +759,10 @@ export default function Home() {
 
   // ---------------------------------------------------------
   // CAPTURE & EXPORT PDF (SINGLE-USE MODEL IMPLEMENTATION)
-  // FORMAT PENAMAAN: <doctype>_<nama_pihak_pertama>.pdf
+  // FORMAT PENAMAAN BERSIH: <doctype>_<nama_pihak_pertama>.pdf
   // ---------------------------------------------------------
   const captureDocumentToPdf = async (
-    docType: 'SPK' | 'NDA' | 'BAST',
+    docType: DocType,
     shouldConsumeLicense = true
   ) => {
     setProcessingDoc(docType);
@@ -802,7 +855,7 @@ export default function Home() {
       }
 
       // Format Penamaan File Bersih Tanpa Tag Status: <doctype>_<nama_pihak_pertama>.pdf
-      const cleanName = (freelancerName || 'pihak_pertama')
+      const cleanName = (globalParty.freelancerName || 'pihak_pertama')
         .trim()
         .toLowerCase()
         .replace(/[^a-z0-9]/g, '_')
@@ -811,7 +864,6 @@ export default function Home() {
 
       const fileName = `${docType.toLowerCase()}_${cleanName || 'pihak_pertama'}.pdf`;
 
-      // Ekspor pdf.save() memicu unduhan langsung di browser tanpa tab baru
       pdf.save(fileName);
 
       setDownloadedDocs((prev) => {
@@ -822,7 +874,7 @@ export default function Home() {
         return nextState;
       });
 
-      // SINGLE-USE LICENSE CONSUMPTION: Reset status paidDocs & Hapus sessionId setelah download
+      // SINGLE-USE LICENSE CONSUMPTION: Reset status paidDocs setelah download
       if (shouldConsumeLicense && (paidDocs[docType] || (paidDocs.SPK && paidDocs.NDA && paidDocs.BAST))) {
         if (sessionId) {
           await consumePaymentLicense(sessionId);
@@ -854,12 +906,12 @@ export default function Home() {
     }
     setProcessingDoc('ALL');
     setIsExporting(true);
-    const docs: ('SPK' | 'NDA' | 'BAST')[] = ['SPK', 'NDA', 'BAST'];
+    const docs: DocType[] = ['SPK', 'NDA', 'BAST'];
 
     try {
       for (const doc of docs) {
         await switchTabAndAwaitRender(doc);
-        await captureDocumentToPdf(doc, false); // false agar tidak langsung me-reset per single doc
+        await captureDocumentToPdf(doc, false);
         await new Promise((res) => setTimeout(res, 800));
       }
 
@@ -884,7 +936,7 @@ export default function Home() {
     }
   };
 
-  const handleIndividualDownload = async (docType: 'SPK' | 'NDA' | 'BAST', e?: React.MouseEvent) => {
+  const handleIndividualDownload = async (docType: DocType, e?: React.MouseEvent) => {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
@@ -933,9 +985,7 @@ export default function Home() {
     }, 2500);
   };
 
-  // ---------------------------------------------------------
   // 2. PEMBAYARAN MAYAR EMBEDDED IFRAME DI DALAM MODAL
-  // ---------------------------------------------------------
   const handleRequestQris = async () => {
     if (isLoadingQris) return;
 
@@ -957,10 +1007,10 @@ export default function Home() {
       });
     }
 
-    const targetName = clientName || freelancerName || 'Pihak Kedua SPKInstan';
+    const targetName = globalParty.clientName || globalParty.freelancerName || 'Pihak Kedua SPKInstan';
     const cleanName = targetName.toLowerCase().replace(/[^a-z0-9]/g, '');
     const targetEmail =
-      freelancerEmail.trim() ||
+      globalParty.freelancerEmail.trim() ||
       (cleanName ? `${cleanName}@spkinstan.com` : `client-${Date.now()}@spkinstan.com`);
 
     try {
@@ -973,7 +1023,7 @@ export default function Home() {
           amount,
           docType: activeDocTab,
           customerName: targetName,
-          customerMobile: clientWa || freelancerWa || '081234567890',
+          customerMobile: globalParty.clientWa || globalParty.freelancerWa || '081234567890',
           customerEmail: targetEmail,
         }),
       });
@@ -985,11 +1035,7 @@ export default function Home() {
 
         if (data.paymentUrl) {
           setPaymentUrl(data.paymentUrl);
-          
-          // Pindah modal ke step 'qris' untuk menampilkan iFrame embedded
           setModalStep('qris');
-
-          // Jalankan polling otomatis langsung di Home.tsx
           startPollingStatus(currentSession);
         }
       } else {
@@ -1004,17 +1050,15 @@ export default function Home() {
   };
 
   const formatRupiah = (val: string) => (val ? parseInt(val, 10).toLocaleString('id-ID') : '0');
-  const formatTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  };
 
   const getTodayFormattedDate = () => {
     const options: Intl.DateTimeFormatOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
     return new Date().toLocaleDateString('id-ID', options);
   };
 
+  // ---------------------------------------------------------
+  // HANDLER TANDA TANGAN DIGITIKAN PADA CANVAS
+  // ---------------------------------------------------------
   const startDraw1 = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef1.current;
     if (!canvas) return;
@@ -1050,7 +1094,7 @@ export default function Home() {
 
   const stopDraw1 = () => {
     if (isDrawing1 && canvasRef1.current) {
-      setSignatureFirstParty(canvasRef1.current.toDataURL());
+      handleDocInputChange('signatureFirstParty', canvasRef1.current.toDataURL());
     }
     setIsDrawing1(false);
   };
@@ -1060,7 +1104,7 @@ export default function Home() {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
-    setSignatureFirstParty(null);
+    handleDocInputChange('signatureFirstParty', null);
   };
 
   const startDraw2 = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
@@ -1098,7 +1142,7 @@ export default function Home() {
 
   const stopDraw2 = () => {
     if (isDrawing2 && canvasRef2.current) {
-      setSignatureSecondParty(canvasRef2.current.toDataURL());
+      handleDocInputChange('signatureSecondParty', canvasRef2.current.toDataURL());
     }
     setIsDrawing2(false);
   };
@@ -1108,7 +1152,7 @@ export default function Home() {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
-    setSignatureSecondParty(null);
+    handleDocInputChange('signatureSecondParty', null);
   };
 
   const consumePaymentLicense = async (currentSessionId: string) => {
@@ -1143,17 +1187,17 @@ export default function Home() {
     }
   };
 
-  const handleShareWhatsApp = (specificDoc?: 'SPK' | 'NDA' | 'BAST') => {
+  const handleShareWhatsApp = (specificDoc?: DocType) => {
     const targetDoc = specificDoc || activeDocTab;
     let text = '';
 
     if (selectedPackage === 'BUNDLING' && !specificDoc) {
-      text = `Halo ${clientName || 'Pihak Kedua'},\n\nBerikut dikirimkan draf resmi *Paket Perjanjian Kerja Sama (SPK, NDA, & BAST)* untuk proyek "${projectTitle || 'Pekerjaan Jasa'}" yang telah diterbitkan secara legal.\n\n*Pihak Pertama:* ${freelancerName || 'budi'}\n*Status Dokumen:* Sah (Terverifikasi Pelunasan PRO)\n\nMohon diperiksa dan ditandatangan kembali. Terima kasih!`;
+      text = `Halo ${globalParty.clientName || 'Pihak Kedua'},\n\nBerikut dikirimkan draf resmi *Paket Perjanjian Kerja Sama (SPK, NDA, & BAST)* untuk proyek "${docsData.SPK.projectTitle || 'Pekerjaan Jasa'}" yang telah diterbitkan secara legal.\n\n*Pihak Pertama:* ${globalParty.freelancerName || 'budi'}\n*Status Dokumen:* Sah (Terverifikasi Pelunasan PRO)\n\nMohon diperiksa dan ditandatangan kembali. Terima kasih!`;
     } else {
-      text = `Halo ${clientName || 'Pihak Kedua'},\n\nBerikut dikirimkan draf resmi *${targetDoc} Perjanjian Kerja Sama* untuk proyek "${projectTitle || 'Pekerjaan Jasa'}" yang telah diterbitkan secara legal.\n\n*Pihak Pertama:* ${freelancerName || 'budi'}\n*Status Dokumen:* Sah (Terverifikasi Pelunasan)\n\nMohon diperiksa dan ditandatangan kembali. Terima kasih!`;
+      text = `Halo ${globalParty.clientName || 'Pihak Kedua'},\n\nBerikut dikirimkan draf resmi *${targetDoc} Perjanjian Kerja Sama* untuk proyek "${docsData[targetDoc].projectTitle || 'Pekerjaan Jasa'}" yang telah diterbitkan secara legal.\n\n*Pihak Pertama:* ${globalParty.freelancerName || 'budi'}\n*Status Dokumen:* Sah (Terverifikasi Pelunasan)\n\nMohon diperiksa dan ditandatangan kembali. Terima kasih!`;
     }
 
-    const waTarget = clientWa || adminWaNumber;
+    const waTarget = globalParty.clientWa || adminWaNumber;
     window.open(`https://wa.me/${waTarget}?text=${encodeURIComponent(text)}`, '_blank');
   };
 
@@ -1391,8 +1435,8 @@ export default function Home() {
                         </label>
                         <input
                           type="text"
-                          value={docNumbers[activeDocTab]}
-                          onChange={(e) => handleDocNumberChange(e.target.value)}
+                          value={docsData[activeDocTab].docNumber}
+                          onChange={(e) => handleDocInputChange('docNumber', e.target.value)}
                           placeholder={`cth: 001/${activeDocTab}/IX/2026`}
                           className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-mono font-medium"
                         />
@@ -1400,7 +1444,7 @@ export default function Home() {
 
                       <div className="space-y-3 pt-2 border-t border-slate-100">
                         <h4 className="text-xs font-bold uppercase tracking-wider text-blue-600 flex items-center gap-1">
-                          <User className="w-3.5 h-3.5" /> Pihak Pertama
+                          <User className="w-3.5 h-3.5" /> Pihak Pertama (Umum)
                         </h4>
                         <div>
                           <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -1408,8 +1452,8 @@ export default function Home() {
                           </label>
                           <input
                             type="text"
-                            value={freelancerName}
-                            onChange={(e) => setFreelancerName(e.target.value)}
+                            value={globalParty.freelancerName}
+                            onChange={(e) => handleGlobalPartyChange('freelancerName', e.target.value)}
                             placeholder="cth: budi"
                             className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                           />
@@ -1418,8 +1462,8 @@ export default function Home() {
                           <label className="block text-xs font-semibold text-slate-700 mb-1">Email</label>
                           <input
                             type="email"
-                            value={freelancerEmail}
-                            onChange={(e) => setFreelancerEmail(e.target.value)}
+                            value={globalParty.freelancerEmail}
+                            onChange={(e) => handleGlobalPartyChange('freelancerEmail', e.target.value)}
                             placeholder="cth: budi@gmail.com"
                             className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                           />
@@ -1428,8 +1472,8 @@ export default function Home() {
                           <label className="block text-xs font-semibold text-slate-700 mb-1">Nomor WhatsApp</label>
                           <input
                             type="text"
-                            value={freelancerWa}
-                            onChange={(e) => setFreelancerWa(e.target.value)}
+                            value={globalParty.freelancerWa}
+                            onChange={(e) => handleGlobalPartyChange('freelancerWa', e.target.value)}
                             placeholder="cth: 081234567890"
                             className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                           />
@@ -1438,7 +1482,7 @@ export default function Home() {
 
                       <div className="space-y-3 pt-2 border-t border-slate-100">
                         <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-600 flex items-center gap-1">
-                          <Building2 className="w-3.5 h-3.5" /> Pihak Kedua
+                          <Building2 className="w-3.5 h-3.5" /> Pihak Kedua (Umum)
                         </h4>
                         <div>
                           <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -1446,8 +1490,8 @@ export default function Home() {
                           </label>
                           <input
                             type="text"
-                            value={clientName}
-                            onChange={(e) => setClientName(e.target.value)}
+                            value={globalParty.clientName}
+                            onChange={(e) => handleGlobalPartyChange('clientName', e.target.value)}
                             placeholder="cth: PT Digital Inovasi Nusantara"
                             className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                           />
@@ -1456,8 +1500,8 @@ export default function Home() {
                           <label className="block text-xs font-semibold text-slate-700 mb-1">Nomor WhatsApp</label>
                           <input
                             type="text"
-                            value={clientWa}
-                            onChange={(e) => setClientWa(e.target.value)}
+                            value={globalParty.clientWa}
+                            onChange={(e) => handleGlobalPartyChange('clientWa', e.target.value)}
                             placeholder="cth: 089876543210"
                             className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                           />
@@ -1471,11 +1515,11 @@ export default function Home() {
                       {activeDocTab === 'SPK' && (
                         <div className="space-y-3">
                           <div>
-                            <label className="block text-xs font-semibold text-slate-700 mb-1">Judul Pekerjaan / Proyek</label>
+                            <label className="block text-xs font-semibold text-slate-700 mb-1">Judul Pekerjaan / Proyek (SPK)</label>
                             <input
                               type="text"
-                              value={projectTitle}
-                              onChange={(e) => setProjectTitle(e.target.value)}
+                              value={docsData.SPK.projectTitle}
+                              onChange={(e) => handleDocInputChange('projectTitle', e.target.value)}
                               placeholder="cth: Pengembangan Aplikasi Web Dashboard"
                               className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                             />
@@ -1485,8 +1529,8 @@ export default function Home() {
                               <label className="block text-xs font-semibold text-slate-700 mb-1">Nilai Imbalan (Rp)</label>
                               <input
                                 type="number"
-                                value={projectAmount}
-                                onChange={(e) => setProjectAmount(e.target.value)}
+                                value={docsData.SPK.projectAmount}
+                                onChange={(e) => handleDocInputChange('projectAmount', e.target.value)}
                                 placeholder="cth: 7500000"
                                 className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                               />
@@ -1495,8 +1539,8 @@ export default function Home() {
                               <label className="block text-xs font-semibold text-slate-700 mb-1">Uang Muka DP (%)</label>
                               <input
                                 type="number"
-                                value={dpPercent}
-                                onChange={(e) => setDpPercent(e.target.value)}
+                                value={docsData.SPK.dpPercent}
+                                onChange={(e) => handleDocInputChange('dpPercent', e.target.value)}
                                 placeholder="cth: 50"
                                 className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                               />
@@ -1506,8 +1550,8 @@ export default function Home() {
                             <label className="block text-xs font-semibold text-slate-700 mb-1">Rekening Tujuan Pelunasan</label>
                             <input
                               type="text"
-                              value={bankInfo}
-                              onChange={(e) => setBankInfo(e.target.value)}
+                              value={docsData.SPK.bankInfo}
+                              onChange={(e) => handleDocInputChange('bankInfo', e.target.value)}
                               placeholder="cth: BCA 1234567890 a.n budi"
                               className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                             />
@@ -1518,11 +1562,21 @@ export default function Home() {
                       {activeDocTab === 'NDA' && (
                         <div className="space-y-3">
                           <div>
+                            <label className="block text-xs font-semibold text-slate-700 mb-1">Judul / Perihal Kerahasiaan (NDA)</label>
+                            <input
+                              type="text"
+                              value={docsData.NDA.projectTitle}
+                              onChange={(e) => handleDocInputChange('projectTitle', e.target.value)}
+                              placeholder="cth: Kerahasiaan Source Code & Database"
+                              className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
+                            />
+                          </div>
+                          <div>
                             <label className="block text-xs font-semibold text-slate-700 mb-1">Cakupan Informasi Rahasia</label>
                             <input
                               type="text"
-                              value={ndaScope}
-                              onChange={(e) => setNdaScope(e.target.value)}
+                              value={docsData.NDA.ndaScope}
+                              onChange={(e) => handleDocInputChange('ndaScope', e.target.value)}
                               placeholder="cth: Source Code, Skema Database, Aset Desain"
                               className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                             />
@@ -1532,8 +1586,8 @@ export default function Home() {
                               <label className="block text-xs font-semibold text-slate-700 mb-1">Masa Kerahasiaan (Tahun)</label>
                               <input
                                 type="number"
-                                value={ndaYears}
-                                onChange={(e) => setNdaYears(e.target.value)}
+                                value={docsData.NDA.ndaYears}
+                                onChange={(e) => handleDocInputChange('ndaYears', e.target.value)}
                                 placeholder="cth: 2"
                                 className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                               />
@@ -1542,8 +1596,8 @@ export default function Home() {
                               <label className="block text-xs font-semibold text-slate-700 mb-1">Denda Pelanggaran (Rp)</label>
                               <input
                                 type="number"
-                                value={ndaPenalty}
-                                onChange={(e) => setNdaPenalty(e.target.value)}
+                                value={docsData.NDA.ndaPenalty}
+                                onChange={(e) => handleDocInputChange('ndaPenalty', e.target.value)}
                                 placeholder="cth: 25000000"
                                 className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                               />
@@ -1555,11 +1609,21 @@ export default function Home() {
                       {activeDocTab === 'BAST' && (
                         <div className="space-y-3">
                           <div>
+                            <label className="block text-xs font-semibold text-slate-700 mb-1">Judul Serah Terima (BAST)</label>
+                            <input
+                              type="text"
+                              value={docsData.BAST.projectTitle}
+                              onChange={(e) => handleDocInputChange('projectTitle', e.target.value)}
+                              placeholder="cth: Serah Terima Pekerjaan Web Dashboard"
+                              className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
+                            />
+                          </div>
+                          <div>
                             <label className="block text-xs font-semibold text-slate-700 mb-1">Nomor Referensi SPK Utama</label>
                             <input
                               type="text"
-                              value={bastRef}
-                              onChange={(e) => setBastRef(e.target.value)}
+                              value={docsData.BAST.bastRef}
+                              onChange={(e) => handleDocInputChange('bastRef', e.target.value)}
                               placeholder="cth: 001/SPK/IX/2026"
                               className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                             />
@@ -1569,8 +1633,8 @@ export default function Home() {
                               <label className="block text-xs font-semibold text-slate-700 mb-1">Masa Garansi Bug (Hari)</label>
                               <input
                                 type="number"
-                                value={bastWarranty}
-                                onChange={(e) => setBastWarranty(e.target.value)}
+                                value={docsData.BAST.bastWarranty}
+                                onChange={(e) => handleDocInputChange('bastWarranty', e.target.value)}
                                 placeholder="cth: 14"
                                 className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                               />
@@ -1579,8 +1643,8 @@ export default function Home() {
                               <label className="block text-xs font-semibold text-slate-700 mb-1">Tanggal Serah Terima</label>
                               <input
                                 type="date"
-                                value={bastDate}
-                                onChange={(e) => setBastDate(e.target.value)}
+                                value={docsData.BAST.bastDate}
+                                onChange={(e) => handleDocInputChange('bastDate', e.target.value)}
                                 className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                               />
                             </div>
@@ -1708,21 +1772,21 @@ export default function Home() {
                     <div className="space-y-5">
                       <div className="space-y-3 p-3.5 bg-slate-50/80 rounded-2xl border border-slate-200">
                         <h4 className="text-xs font-bold uppercase tracking-wider text-blue-600 flex items-center gap-1">
-                          <User className="w-3.5 h-3.5" /> Penandatangan Pihak Pertama
+                          <User className="w-3.5 h-3.5" /> Penandatangan Pihak Pertama ({activeDocTab})
                         </h4>
                         <div>
                           <input
                             type="text"
-                            value={signerFirstParty}
-                            onChange={(e) => setSignerFirstParty(e.target.value)}
-                            placeholder={freelancerName || 'cth: budi'}
+                            value={docsData[activeDocTab].signerFirstParty}
+                            onChange={(e) => handleDocInputChange('signerFirstParty', e.target.value)}
+                            placeholder={globalParty.freelancerName || 'cth: budi'}
                             className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl font-medium"
                           />
                         </div>
 
                         <div className="space-y-2 pt-1">
                           <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                            TTD Pihak Pertama
+                            TTD Pihak Pertama ({activeDocTab})
                           </label>
                           <canvas
                             ref={canvasRef1}
@@ -1750,7 +1814,7 @@ export default function Home() {
                                   const file = e.target.files?.[0];
                                   if (file) {
                                     const reader = new FileReader();
-                                    reader.onload = (event) => setSignatureFirstParty(event.target?.result as string);
+                                    reader.onload = (event) => handleDocInputChange('signatureFirstParty', event.target?.result as string);
                                     reader.readAsDataURL(file);
                                   }
                                 }}
@@ -1762,21 +1826,21 @@ export default function Home() {
 
                       <div className="space-y-3 p-3.5 bg-slate-50/80 rounded-2xl border border-slate-200">
                         <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-600 flex items-center gap-1">
-                          <Building2 className="w-3.5 h-3.5" /> Penandatangan Pihak Kedua
+                          <Building2 className="w-3.5 h-3.5" /> Penandatangan Pihak Kedua ({activeDocTab})
                         </h4>
                         <div>
                           <input
                             type="text"
-                            value={signerSecondParty}
-                            onChange={(e) => setSignerSecondParty(e.target.value)}
-                            placeholder={clientName || 'cth: Nama Direktur'}
+                            value={docsData[activeDocTab].signerSecondParty}
+                            onChange={(e) => handleDocInputChange('signerSecondParty', e.target.value)}
+                            placeholder={globalParty.clientName || 'cth: Nama Direktur'}
                             className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl font-medium"
                           />
                         </div>
 
                         <div className="space-y-2 pt-1">
                           <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                            TTD Pihak Kedua
+                            TTD Pihak Kedua ({activeDocTab})
                           </label>
                           <canvas
                             ref={canvasRef2}
@@ -1804,7 +1868,7 @@ export default function Home() {
                                   const file = e.target.files?.[0];
                                   if (file) {
                                     const reader = new FileReader();
-                                    reader.onload = (event) => setSignatureSecondParty(event.target?.result as string);
+                                    reader.onload = (event) => handleDocInputChange('signatureSecondParty', event.target?.result as string);
                                     reader.readAsDataURL(file);
                                   }
                                 }}
@@ -2071,9 +2135,9 @@ export default function Home() {
                               Pihak Pertama
                             </span>
                             <h1 className="text-[15px] sm:text-[16px] font-extrabold text-slate-900">
-                              {freelancerName || 'Nama Pihak Pertama'}
+                              {globalParty.freelancerName || 'Nama Pihak Pertama'}
                             </h1>
-                            {freelancerEmail && <p className="text-[11px] text-slate-500">{freelancerEmail}</p>}
+                            {globalParty.freelancerEmail && <p className="text-[11px] text-slate-500">{globalParty.freelancerEmail}</p>}
                           </div>
 
                           <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-2 sm:p-2.5 text-right space-y-0.5 min-w-[140px] sm:min-w-[170px]">
@@ -2081,7 +2145,7 @@ export default function Home() {
                               Nomor Dokumen
                             </p>
                             <p className="font-mono text-[12px] sm:text-[13px] font-extrabold text-slate-900">
-                              {docNumbers[activeDocTab] || `001/${activeDocTab}/IX/2026`}
+                              {docsData[activeDocTab].docNumber || `001/${activeDocTab}/IX/2026`}
                             </p>
                             <p className="text-[11px] text-slate-500 pt-0.5">{getTodayFormattedDate()}</p>
                           </div>
@@ -2102,11 +2166,11 @@ export default function Home() {
                           <div className="grid grid-cols-2 gap-2 pt-0.5">
                             <div className="bg-white p-2 rounded-lg border border-slate-200/60">
                               <span className="text-[11px] font-bold text-blue-600 uppercase block">PIHAK PERTAMA</span>
-                              <span className="font-semibold text-slate-900 text-[12px] sm:text-[13px]">{freelancerName || '-'}</span>
+                              <span className="font-semibold text-slate-900 text-[12px] sm:text-[13px]">{globalParty.freelancerName || '-'}</span>
                             </div>
                             <div className="bg-white p-2 rounded-lg border border-slate-200/60">
                               <span className="text-[11px] font-bold text-indigo-600 uppercase block">PIHAK KEDUA</span>
-                              <span className="font-semibold text-slate-900 text-[12px] sm:text-[13px]">{clientName || '-'}</span>
+                              <span className="font-semibold text-slate-900 text-[12px] sm:text-[13px]">{globalParty.clientName || '-'}</span>
                             </div>
                           </div>
                         </div>
@@ -2125,7 +2189,7 @@ export default function Home() {
                           ))}
                         </div>
 
-                        {/* RENDER AREA TTD TANPA KOTAK PLACEHOLDER DASHED */}
+                        {/* RENDER AREA TTD INDEPENDEN TANPA KOTAK DASHED */}
                         {!needsPage2 && (
                           <div className="pt-2 sm:pt-3 grid grid-cols-2 gap-3 sm:gap-4 text-center">
                             <div className="bg-slate-50/80 border border-slate-200/80 rounded-xl p-2.5 sm:p-3 space-y-1.5 min-h-[100px] flex flex-col justify-between">
@@ -2133,12 +2197,12 @@ export default function Home() {
                                 PIHAK PERTAMA
                               </span>
                               <div className="h-10 sm:h-12 flex items-center justify-center">
-                                {signatureFirstParty && (
-                                  <img src={signatureFirstParty} alt="TTD Pihak Pertama" className="max-h-8 sm:max-h-12 mx-auto object-contain" />
+                                {docsData[activeDocTab].signatureFirstParty && (
+                                  <img src={docsData[activeDocTab].signatureFirstParty!} alt="TTD Pihak Pertama" className="max-h-8 sm:max-h-12 mx-auto object-contain" />
                                 )}
                               </div>
                               <p className="font-bold underline text-slate-900 text-[12px] sm:text-[13px]">
-                                {signerFirstParty || freelancerName || 'Pihak Pertama'}
+                                {docsData[activeDocTab].signerFirstParty || globalParty.freelancerName || 'Pihak Pertama'}
                               </p>
                             </div>
 
@@ -2147,12 +2211,12 @@ export default function Home() {
                                 PIHAK KEDUA
                               </span>
                               <div className="h-10 sm:h-12 flex items-center justify-center">
-                                {signatureSecondParty && (
-                                  <img src={signatureSecondParty} alt="TTD Pihak Kedua" className="max-h-8 sm:max-h-12 mx-auto object-contain" />
+                                {docsData[activeDocTab].signatureSecondParty && (
+                                  <img src={docsData[activeDocTab].signatureSecondParty!} alt="TTD Pihak Kedua" className="max-h-8 sm:max-h-12 mx-auto object-contain" />
                                 )}
                               </div>
                               <p className="font-bold underline text-slate-900 text-[12px] sm:text-[13px]">
-                                {signerSecondParty || clientName || 'Pihak Kedua'}
+                                {docsData[activeDocTab].signerSecondParty || globalParty.clientName || 'Pihak Kedua'}
                               </p>
                             </div>
                           </div>
@@ -2209,12 +2273,12 @@ export default function Home() {
                                 PIHAK PERTAMA
                               </span>
                               <div className="h-10 sm:h-14 flex items-center justify-center">
-                                {signatureFirstParty && (
-                                  <img src={signatureFirstParty} alt="TTD Pihak Pertama" className="max-h-10 sm:max-h-14 mx-auto object-contain" />
+                                {docsData[activeDocTab].signatureFirstParty && (
+                                  <img src={docsData[activeDocTab].signatureFirstParty!} alt="TTD Pihak Pertama" className="max-h-10 sm:max-h-14 mx-auto object-contain" />
                                 )}
                               </div>
                               <p className="font-bold underline text-slate-900 text-[12px] sm:text-[13px]">
-                                {signerFirstParty || freelancerName || 'Pihak Pertama'}
+                                {docsData[activeDocTab].signerFirstParty || globalParty.freelancerName || 'Pihak Pertama'}
                               </p>
                             </div>
 
@@ -2223,12 +2287,12 @@ export default function Home() {
                                 PIHAK KEDUA
                               </span>
                               <div className="h-10 sm:h-14 flex items-center justify-center">
-                                {signatureSecondParty && (
-                                  <img src={signatureSecondParty} alt="TTD Pihak Kedua" className="max-h-10 sm:max-h-14 mx-auto object-contain" />
+                                {docsData[activeDocTab].signatureSecondParty && (
+                                  <img src={docsData[activeDocTab].signatureSecondParty!} alt="TTD Pihak Kedua" className="max-h-10 sm:max-h-14 mx-auto object-contain" />
                                 )}
                               </div>
                               <p className="font-bold underline text-slate-900 text-[12px] sm:text-[13px]">
-                                {signerSecondParty || clientName || 'Pihak Kedua'}
+                                {docsData[activeDocTab].signerSecondParty || globalParty.clientName || 'Pihak Kedua'}
                               </p>
                             </div>
                           </div>
