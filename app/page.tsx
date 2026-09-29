@@ -2245,7 +2245,7 @@ export default function Home() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {reviews.length === 0 ? (
                 <a
-                  href={`https://wa.me/${adminWaNumber}?text=${encodeURIComponent("Halo Admin SPKInstan, saya ingin kirim testimoni ulasan penggunaan SPKInstan.")}`}
+                  href={`https://wa.me/${adminWaNumber}?text=${encodeURIComponent("Halo Admin SPKInstan, saya ingin memberikan testimoni/ulasan penggunaan SPKInstan:\n\nNama/Usaha: \nRating (1-5): \nUlasan: ")}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="md:col-span-3 bg-slate-50 hover:bg-blue-50/50 p-8 rounded-3xl border border-dashed border-slate-300 hover:border-blue-400 text-center space-y-2 max-w-xl mx-auto block cursor-pointer transition-all duration-200 group shadow-xs hover:shadow-md"
@@ -2457,6 +2457,51 @@ export default function Home() {
                 </button>
               </div>
             )}
+
+            {/* SEKSI TAMBAHAN: AJAKAN TESTIMONI & BANTUAN CS VIA WA */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+              {/* Kartu Kirim Testimoni */}
+              <a
+                href={`https://wa.me/${adminWaNumber}?text=${encodeURIComponent("Halo Admin SPKInstan, saya ingin memberikan testimoni/ulasan penggunaan SPKInstan:\n\nNama/Usaha: \nRating (1-5): \nUlasan: ")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-3.5 bg-blue-50/70 hover:bg-blue-100/80 border border-blue-200 rounded-2xl flex flex-col justify-between gap-2 transition group"
+              >
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0">
+                    <Star className="w-4 h-4 fill-current" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-900 group-hover:text-blue-700">Puas dengan Hasilnya?</h4>
+                    <p className="text-[11px] text-slate-500">Bantu pengguna lain dengan testimoni singkat</p>
+                  </div>
+                </div>
+                <span className="text-[11px] font-bold text-blue-600 flex items-center gap-1 mt-1">
+                  <MessageCircle className="w-3.5 h-3.5" /> Kirim Ulasan via WA &rarr;
+                </span>
+              </a>
+
+              {/* Kartu Bantuan / Revisi CS */}
+              <a
+                href={`https://wa.me/${adminWaNumber}?text=${encodeURIComponent("Halo Admin SPKInstan, saya butuh bantuan / konsultasi revisi khusus untuk dokumen yang baru saya buat.")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-3.5 bg-emerald-50/70 hover:bg-emerald-100/80 border border-emerald-200 rounded-2xl flex flex-col justify-between gap-2 transition group"
+              >
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                    <MessageCircle className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-900 group-hover:text-emerald-700">Butuh Bantuan / Revisi?</h4>
+                    <p className="text-[11px] text-slate-500">Konsultasikan pasal khusus ke Admin CS</p>
+                  </div>
+                </div>
+                <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1 mt-1">
+                  <MessageCircle className="w-3.5 h-3.5" /> Hubungi CS WA &rarr;
+                </span>
+              </a>
+            </div>
 
             {/* TOMBOL UNTUK MENUTUP POPUP (RESET LISENSI SINGLE-USE) */}
             <div className="pt-4 border-t border-slate-100 flex justify-end">
