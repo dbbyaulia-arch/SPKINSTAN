@@ -1250,8 +1250,11 @@ export default function Home() {
     }
   };
 
-  // HANDLER PENGIRIMAN WHATSAPP HYBRID (WEB SHARE API DI MOBILE + AUTO-DOWNLOAD & WHATSAPP APP PROTOCOL DI DESKTOP)
-  const handleShareWhatsApp = async (specificDoc?: DocType) => {
+  // HANDLER PENGIRIMAN WHATSAPP (MENDUKUNG PILIHAN WEB & APP)
+  const handleShareWhatsApp = async (
+    specificDoc?: DocType,
+    mode: 'web' | 'app' = 'web'
+  ) => {
     const targetDoc = specificDoc || activeDocTab;
     const targetDocInfo = docsData[targetDoc];
 
@@ -1275,7 +1278,7 @@ export default function Home() {
       textMessage = `Halo ${clientName},\n\nBerikut dikirimkan draf resmi *${targetDoc} Perjanjian Kerja Sama* untuk proyek "${projectTitle}".\n\nMohon diperiksa kembali. Terima kasih!`;
     }
 
-    // 3. Opsi A: Web Share API (Mobile Device)
+    // 3. Web Share API (Di HP / Mobile Device)
     if (typeof navigator !== 'undefined' && navigator.canShare && navigator.share) {
       try {
         const pdfRes = await generatePdfBlob(targetDoc);
@@ -1290,17 +1293,25 @@ export default function Home() {
               title: `Dokumen ${targetDoc}`,
               text: textMessage,
             });
-            return; // Selesai via native share
+            return;
           }
         }
       } catch (err) {
-        console.warn('Web Share dibatalkan atau tidak didukung, menggunakan fallback desktop.', err);
+        console.warn('Web Share dibatalkan/tidak didukung, menggunakan link browser.', err);
       }
     }
 
-    // 4. Opsi B: Fallback Desktop (Auto-Download PDF + Langsung Buka WhatsApp App Desktop)
-    await captureDocumentToPdf(targetDoc); // Unduh file PDF otomatis ke lokal
-    window.open(`whatsapp://send?phone=${finalWaNumber}&text=${encodeURIComponent(textMessage)}`);
+    // 4. Unduh PDF otomatis ke lokal
+    await captureDocumentToPdf(targetDoc);
+
+    // 5. Penentuan URL sesuai pilihan user (Web vs App)
+    const encodedText = encodeURIComponent(textMessage);
+    const waUrl =
+      mode === 'app'
+        ? `whatsapp://send?phone=${finalWaNumber}&text=${encodedText}`
+        : `https://web.whatsapp.com/send?phone=${finalWaNumber}&text=${encodedText}`;
+
+    window.open(waUrl, '_blank');
   };
 
   const wizardTitles = [
@@ -2372,14 +2383,26 @@ export default function Home() {
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => handleShareWhatsApp()}
-                className="w-full sm:w-auto px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-2 transition"
-              >
-                <Send className="w-4 h-4" />
-                <span>Kirim Draf ke WA</span>
-              </button>
+              {/* DUA OPSI TOMBOL BERBAHADAN WHATSAPP (WEB & APP) */}
+              <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={() => handleShareWhatsApp(undefined, 'web')}
+                  className="w-full sm:w-auto px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-2 transition"
+                >
+                  <Send className="w-4 h-4" />
+                  <span>Kirim via WA Web</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleShareWhatsApp(undefined, 'app')}
+                  className="w-full sm:w-auto px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-2 transition"
+                >
+                  <MessageCircle className="w-4 h-4 text-emerald-400" />
+                  <span>Kirim via WA App</span>
+                </button>
+              </div>
             </div>
 
             {/* BANNER CATATAN PERINGATAN PENTING */}
