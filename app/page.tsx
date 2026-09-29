@@ -117,7 +117,7 @@ export default function Home() {
   // POPUP & MODAL CONTROL STATES
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [modalStep, setModalStep] = useState<'download_choice' | 'qris'>('download_choice');
-  const [showDownloadPopup, setShowDownloadPopup] = useState(false); // POPUP OVERLAY PASCA-BAYAR
+  const [showDownloadPopup, setShowDownloadPopup] = useState(false); // POPUP OVERLAY PASCA-BAYAR PERSISTEN
 
   const [mobileViewMode, setMobileViewMode] = useState<'form' | 'preview'>('form');
   const [isExporting, setIsExporting] = useState(false);
@@ -134,6 +134,7 @@ export default function Home() {
 
   // ---------------------------------------------------------
   // KEYED DICTIONARY STATE IMPLEMENTATION (TERPISAH PER DOKUMEN)
+  // Memisahkan nomor surat (docNumber) dan identitas per dokumen
   // ---------------------------------------------------------
   const [docsData, setDocsData] = useState<Record<DocType, SingleDocDetails>>({
     SPK: {
@@ -150,7 +151,7 @@ export default function Home() {
       signatureSecondParty: null,
       projectAmount: '7500000',
       dpPercent: '50',
-      bankInfo: 'BCA 1234567890 a.n budi',
+      bankInfo: 'BCA 1234567890 a.n Budi Santoso',
       ndaScope: '',
       ndaYears: '',
       ndaPenalty: '',
@@ -204,7 +205,7 @@ export default function Home() {
     },
   });
 
-  // Handler Pembaruan Input Form Dokumen Spesifik
+  // Handler Pembaruan Input Form Dokumen Spesifik (Menghindari Stale Closure)
   const handleDocInputChange = (
     docTarget: DocType,
     field: keyof SingleDocDetails,
@@ -231,7 +232,7 @@ export default function Home() {
   const page2ContentRef = useRef<HTMLDivElement | null>(null);
   const [heightNeedsPage2, setHeightNeedsPage2] = useState(false);
 
-  // Initial Master Clauses dengan Landasan Hukum Terlengkap
+  // Initial Master Clauses dengan Landasan Hukum Indonesia Terlengkap
   const [clauses, setClauses] = useState<Clause[]>([
     // --- PASAL-PASAL DOKUMEN SPK ---
     {
@@ -419,9 +420,6 @@ export default function Home() {
     }
   }, [activeDocTab, currentWizardStep, docsData]);
 
-  // ---------------------------------------------------------
-  // 1. PERSISTENSI REFRESH & PROTEKSI TOMBOL BACK BROWSER (POPUP OVERLAY)
-  // ---------------------------------------------------------
   // Restore State dari LocalStorage saat Mount / Refresh
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -557,7 +555,7 @@ export default function Home() {
         if (c.id === 'spk-3') {
           return {
             ...c,
-            content: `Total imbalan jasa yang disepakati sebesar Rp ${formatRupiah(spkData.projectAmount || '7500000')}, dengan Uang Muka (DP) sebesar ${spkData.dpPercent || '50'}% wajib dibayarkan sebelum pengerjaan dimulai melalui transfer ke ${spkData.bankInfo || 'BCA 1234567890 a.n budi'}.`,
+            content: `Total imbalan jasa yang disepakati sebesar Rp ${formatRupiah(spkData.projectAmount || '7500000')}, dengan Uang Muka (DP) sebesar ${spkData.dpPercent || '50'}% wajib dibayarkan sebelum pengerjaan dimulai melalui transfer ke ${spkData.bankInfo || 'BCA 1234567890 a.n Budi Santoso'}.`,
           };
         }
         if (c.id === 'nda-1') {
@@ -635,6 +633,7 @@ export default function Home() {
     setClauses((prev) => prev.filter((c) => c.id !== id));
   };
 
+  // State & Indikator Preset Dinamis Sesuai Active Tab
   const handleApplyPreset = (presetType: 'web' | 'design' | 'all') => {
     setActivePreset(presetType);
 
@@ -682,6 +681,7 @@ export default function Home() {
   const page1Clauses = isClauseSplit ? activeClauses.slice(0, SPLIT_LIMIT) : activeClauses;
   const page2Clauses = isClauseSplit ? activeClauses.slice(SPLIT_LIMIT) : [];
 
+  // Pemisahan Layout Fleksibel & Penyesuaian Ambang Batas MAX_PAGE_CONTENT_HEIGHT = 960
   useIsomorphicLayoutEffect(() => {
     if (isExporting) return;
 
@@ -765,9 +765,7 @@ export default function Home() {
     }
   }, [showCheckoutModal]);
 
-  // ---------------------------------------------------------
   // TRIGGER PEMBAYARAN SUKSES & AKTIVASI POPUP OVERLAY
-  // ---------------------------------------------------------
   const handlePaymentSuccess = () => {
     stopPolling();
 
@@ -795,9 +793,7 @@ export default function Home() {
     }
   };
 
-  // ---------------------------------------------------------
   // SAKLAR EKSEKUSI PENUTUPAN MANUAL POPUP (KONSUMSI LISENSI)
-  // ---------------------------------------------------------
   const handleManualClosePopup = async () => {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('spkinstan_popup_active');
@@ -826,10 +822,8 @@ export default function Home() {
     });
   };
 
-  // ---------------------------------------------------------
   // CAPTURE & EXPORT PDF (ISOLASI FUNGSI UNDUH - POPUP TETAP AKTIF)
   // FORMAT PENAMAAN BERSIH: <doctype>_<nama_pihak_pertama>.pdf
-  // ---------------------------------------------------------
   const captureDocumentToPdf = async (
     docType: DocType
   ) => {
@@ -883,6 +877,7 @@ export default function Home() {
         const originalHeight = pageEl.style.height;
         const originalMinHeight = pageEl.style.minHeight;
 
+        // Dynamic Height Penyesuaian Snapshot PDF
         pageEl.style.width = '794px';
         pageEl.style.minHeight = '1123px';
         pageEl.style.height = 'auto';
@@ -1096,9 +1091,7 @@ export default function Home() {
     return new Date().toLocaleDateString('id-ID', options);
   };
 
-  // ---------------------------------------------------------
   // HANDLER TANDA TANGAN DIGITAL PADA CANVAS
-  // ---------------------------------------------------------
   const startDraw1 = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef1.current;
     if (!canvas) return;
@@ -1233,9 +1226,9 @@ export default function Home() {
     let text = '';
 
     if (selectedPackage === 'BUNDLING' && !specificDoc) {
-      text = `Halo ${docsData.SPK.clientName || 'Pihak Kedua'},\n\nBerikut dikirimkan draf resmi *Paket Perjanjian Kerja Sama (SPK, NDA, & BAST)* untuk proyek "${docsData.SPK.projectTitle || 'Pekerjaan Jasa'}" yang telah diterbitkan secara legal.\n\n*Pihak Pertama:* ${docsData.SPK.freelancerName || 'budi'}\n*Status Dokumen:* Sah (Terverifikasi Pelunasan PRO)\n\nMohon diperiksa dan ditandatangan kembali. Terima kasih!`;
+      text = `Halo ${docsData.SPK.clientName || 'Pihak Kedua'},\n\nBerikut dikirimkan draf resmi *Paket Perjanjian Kerja Sama (SPK, NDA, & BAST)* untuk proyek "${docsData.SPK.projectTitle || 'Pekerjaan Jasa'}" yang telah diterbitkan secara legal.\n\n*Pihak Pertama:* ${docsData.SPK.freelancerName || 'Budi Santoso'}\n*Status Dokumen:* Sah (Terverifikasi Pelunasan PRO)\n\nMohon diperiksa dan ditandatangan kembali. Terima kasih!`;
     } else {
-      text = `Halo ${docInfo.clientName || 'Pihak Kedua'},\n\nBerikut dikirimkan draf resmi *${targetDoc} Perjanjian Kerja Sama* untuk proyek "${docInfo.projectTitle || 'Pekerjaan Jasa'}" yang telah diterbitkan secara legal.\n\n*Pihak Pertama:* ${docInfo.freelancerName || 'budi'}\n*Status Dokumen:* Sah (Terverifikasi Pelunasan)\n\nMohon diperiksa dan ditandatangan kembali. Terima kasih!`;
+      text = `Halo ${docInfo.clientName || 'Pihak Kedua'},\n\nBerikut dikirimkan draf resmi *${targetDoc} Perjanjian Kerja Sama* untuk proyek "${docInfo.projectTitle || 'Pekerjaan Jasa'}" yang telah diterbitkan secara legal.\n\n*Pihak Pertama:* ${docInfo.freelancerName || 'Budi Santoso'}\n*Status Dokumen:* Sah (Terverifikasi Pelunasan)\n\nMohon diperiksa dan ditandatangan kembali. Terima kasih!`;
     }
 
     const waTarget = docInfo.clientWa || adminWaNumber;
@@ -1308,8 +1301,9 @@ export default function Home() {
           </div>
 
           <div className="flex items-center gap-4">
+            {/* Kalimat Bantuan CS WA yang Tepat */}
             <a
-              href={`https://wa.me/${adminWaNumber}?text=${encodeURIComponent("Halo Admin SPKInstan, saya ingin Kirim Testimoni")}`}
+              href={`https://wa.me/${adminWaNumber}?text=${encodeURIComponent("Halo Admin SPKInstan, saya butuh bantuan mengenai pembuatan dokumen.")}`}
               target="_blank"
               rel="noreferrer"
               className="hidden md:inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-blue-600 transition-colors"
@@ -1595,7 +1589,7 @@ export default function Home() {
                               type="text"
                               value={docsData.SPK.bankInfo}
                               onChange={(e) => handleDocInputChange('SPK', 'bankInfo', e.target.value)}
-                              placeholder="cth: BCA 1234567890 a.n budi"
+                              placeholder="cth: BCA 1234567890 a.n Budi Santoso"
                               className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                             />
                           </div>
@@ -1954,7 +1948,7 @@ export default function Home() {
                 </form>
               </div>
 
-              {/* RIGHT COLUMN: Live Preview A4 */}
+              {/* RIGHT COLUMN: Live Preview A4 Mutlak (794px x 1123px) Responsif */}
               <div
                 className={`lg:col-span-7 space-y-4 ${
                   mobileViewMode === 'form' ? 'hidden lg:block' : 'block'
@@ -1994,6 +1988,7 @@ export default function Home() {
                       >
                         <div className="h-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 w-full rounded-full shadow-xs mb-3" />
 
+                        {/* Standard Typo Header Metadata (11px - 12px) */}
                         <div className="flex items-start justify-between pb-2.5 border-b border-slate-200/80 gap-4">
                           <div className="space-y-0.5">
                             <span className="text-[11px] font-bold tracking-widest text-blue-600 uppercase">
@@ -2016,6 +2011,7 @@ export default function Home() {
                           </div>
                         </div>
 
+                        {/* Standard Typo Judul Utama Dokumen (18px - 20px) */}
                         <div className="border-l-4 border-blue-600 pl-3 sm:pl-4 py-0.5">
                           <h2 className="text-[18px] sm:text-[20px] font-extrabold tracking-wide text-slate-900 uppercase">
                             {activeDocTab === 'SPK' && 'PERJANJIAN KERJA SAMA PEKERJAAN JASA'}
@@ -2024,6 +2020,7 @@ export default function Home() {
                           </h2>
                         </div>
 
+                        {/* Standard Typo Identitas Pihak (12px - 13px) */}
                         <div className="bg-slate-50/70 border border-slate-200/80 rounded-xl p-2.5 sm:p-3 space-y-1.5">
                           <p className="text-slate-700 text-[12px] sm:text-[13px]">
                             Pada hari ini, <strong>{getTodayFormattedDate()}</strong>, kami yang bertanda tangan di bawah ini secara sadar sepakat mengikatkan diri dalam perikatan hukum:
@@ -2040,6 +2037,7 @@ export default function Home() {
                           </div>
                         </div>
 
+                        {/* Standard Typo Judul Pasal (14px - 15px) & Isi Teks (12px - 13px) */}
                         <div className="space-y-2 sm:space-y-2.5">
                           {page1Clauses.map((clause, index) => (
                             <div key={clause.id} className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
@@ -2054,7 +2052,7 @@ export default function Home() {
                           ))}
                         </div>
 
-                        {/* RENDER AREA TTD (DITAMPILKAN BERSIH TANPA KOTAK PLACEHOLDER [TANDA TANGAN]) */}
+                        {/* RENDER AREA TTD BERSIH (TANPA KOTAK PLACEHOLDER [TANDA TANGAN] & KOTAK PUTUS-PUTUS) */}
                         {!needsPage2 && (
                           <div className="pt-2 sm:pt-3 grid grid-cols-2 gap-3 sm:gap-4 text-center">
                             <div className="bg-slate-50/80 border border-slate-200/80 rounded-xl p-2.5 sm:p-3 space-y-1.5 min-h-[100px] flex flex-col justify-between">
@@ -2132,6 +2130,7 @@ export default function Home() {
                             </p>
                           </div>
 
+                          {/* RENDER AREA TTD BERSIH HALAMAN 2 */}
                           <div className="pt-4 sm:pt-6 grid grid-cols-2 gap-3 sm:gap-4 text-center">
                             <div className="bg-slate-50/80 border border-slate-200/80 rounded-xl p-3 sm:p-4 space-y-2 sm:space-y-3 min-h-[120px] flex flex-col justify-between">
                               <span className="text-[11px] font-bold text-blue-600 uppercase tracking-wider block">
@@ -2227,7 +2226,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Testimonials */}
+        {/* Testimonials Section */}
         <section className="py-14 bg-white border-t border-slate-200">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
             <div className="text-center max-w-2xl mx-auto space-y-2">
@@ -2241,8 +2240,9 @@ export default function Home() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {reviews.length === 0 ? (
+                /* Kalimat Testimoni yang Tepat */
                 <a
-                  href={`https://wa.me/${adminWaNumber}?text=${encodeURIComponent("Halo Admin SPKInstan, saya ingin memberikan testimoni ulasan penggunaan SPKInstan.")}`}
+                  href={`https://wa.me/${adminWaNumber}?text=${encodeURIComponent("Halo Admin SPKInstan, saya ingin kirim testimoni ulasan penggunaan SPKInstan.")}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="md:col-span-3 bg-slate-50 hover:bg-blue-50/50 p-8 rounded-3xl border border-dashed border-slate-300 hover:border-blue-400 text-center space-y-2 max-w-xl mx-auto block cursor-pointer transition-all duration-200 group shadow-xs hover:shadow-md"
@@ -2286,9 +2286,7 @@ export default function Home() {
         </section>
       </main>
 
-      {/* --------------------------------------------------------- */}
-      {/* 2. POPUP OVERLAY PUSAT UNDUHAN PERSISTEN PASCA-BAYAR */}
-      {/* --------------------------------------------------------- */}
+      {/* POPUP OVERLAY PUSAT UNDUHAN PERSISTEN PASCA-BAYAR */}
       {showDownloadPopup && (
         <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white max-w-2xl w-full rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-100 space-y-6 my-8 relative animate-in fade-in zoom-in-95 duration-200">
@@ -2463,7 +2461,7 @@ export default function Home() {
               </div>
             )}
 
-            {/* TOMBOL SATU-SATUNYA UNTUK MENUTUP POPUP (AKSES RESET LISENSI) */}
+            {/* TOMBOL UNTUK MENUTUP POPUP (RESET LISENSI SINGLE-USE) */}
             <div className="pt-4 border-t border-slate-100 flex justify-end">
               <button
                 type="button"
@@ -2586,7 +2584,7 @@ export default function Home() {
                   </button>
                 </div>
 
-                {/* BANNER CATATAN PERINGATAN TEGAS */}
+                {/* BANNER CATATAN PERINGATAN TEGAS (AMBER) */}
                 <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-3 text-left space-y-1">
                   <div className="flex items-center gap-1.5 font-extrabold text-amber-900 text-xs">
                     <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
@@ -2644,7 +2642,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* Floating Chat Widget */}
+      {/* Floating WhatsApp Widget dengan Pesan Minta Bantuan */}
       <a
         href={`https://wa.me/${adminWaNumber}?text=${encodeURIComponent("Halo Admin SPKInstan, saya butuh bantuan mengenai pembuatan dokumen.")}`}
         target="_blank"
@@ -2667,7 +2665,7 @@ export default function Home() {
         </button>
         <button
           type="button"
-          onClick={(e) => {
+          onClick={() => {
             if (paidDocs[activeDocTab]) {
               setShowDownloadPopup(true);
             } else {
@@ -2726,7 +2724,7 @@ export default function Home() {
                 Dukungan
               </h4>
               <a
-                href={`https://wa.me/${adminWaNumber}?text=${encodeURIComponent("Halo Admin SPKInstan, saya butuh bantuan")}`}
+                href={`https://wa.me/${adminWaNumber}?text=${encodeURIComponent("Halo Admin SPKInstan, saya butuh bantuan mengenai pembuatan dokumen.")}`}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 rounded-xl text-xs font-semibold border border-emerald-500/30 transition-all"
