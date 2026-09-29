@@ -65,11 +65,8 @@ export default function Home() {
 
   const [activePreset, setActivePreset] = useState<'web' | 'design' | 'all' | null>(null);
 
-  const [paidDocs, setPaidDocs] = useState<{ SPK: boolean; NDA: boolean; BAST: boolean }>({
-    SPK: false,
-    NDA: false,
-    BAST: false,
-  });
+  // State Fingerprints Pelunasan
+  const [paidFingerprints, setPaidFingerprints] = useState<string[]>([]);
 
   const [downloadedDocs, setDownloadedDocs] = useState<{ SPK: boolean; NDA: boolean; BAST: boolean }>({
     SPK: false,
@@ -141,7 +138,7 @@ export default function Home() {
   const page2ContentRef = useRef<HTMLDivElement | null>(null);
   const [heightNeedsPage2, setHeightNeedsPage2] = useState(false);
 
-  // Initial Master Clauses dengan Dasar Hukum UU Terlampir
+  // Initial Master Clauses dengan Dasar Hukum Lengkap
   const [clauses, setClauses] = useState<Clause[]>([
     // --- PASAL-PASAL DOKUMEN SPK ---
     {
@@ -297,6 +294,30 @@ export default function Home() {
     },
   ]);
 
+  // ---------------------------------------------------------
+  // CORE FINGERPRINT LOGIC
+  // ---------------------------------------------------------
+  const getDocumentFingerprint = (docType: 'SPK' | 'NDA' | 'BAST') => {
+    const p1 = (freelancerName || '').trim().toLowerCase();
+    const p2 = (clientName || '').trim().toLowerCase();
+
+    let objectDetail = '';
+    if (docType === 'SPK') {
+      objectDetail = `${(projectTitle || '').trim().toLowerCase()}_${(projectAmount || '').trim()}`;
+    } else if (docType === 'NDA') {
+      objectDetail = (ndaScope || '').trim().toLowerCase();
+    } else if (docType === 'BAST') {
+      objectDetail = (bastRef || '').trim().toLowerCase();
+    }
+
+    const rawString = `${docType}|${p1}|${p2}|${objectDetail}`;
+    return btoa(encodeURIComponent(rawString));
+  };
+
+  // Cek apakah dokumen aktif telah dilunasi berdasarkan Fingerprint Core
+  const currentDocFingerprint = getDocumentFingerprint(activeDocTab);
+  const isCurrentDocPaid = paidFingerprints.includes(currentDocFingerprint);
+
   const handleDocNumberChange = (value: string) => {
     setDocNumbers((prev) => ({
       ...prev,
@@ -306,15 +327,15 @@ export default function Home() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const savedPaid = localStorage.getItem('spkinstan_paid_docs');
+      const savedPaidFp = localStorage.getItem('spkinstan_paid_fingerprints');
       const savedDownloaded = localStorage.getItem('spkinstan_downloaded_docs');
       const savedPackage = localStorage.getItem('spkinstan_package');
 
-      if (savedPaid) {
+      if (savedPaidFp) {
         try {
-          setPaidDocs(JSON.parse(savedPaid));
+          setPaidFingerprints(JSON.parse(savedPaidFp));
         } catch (e) {
-          console.error('Failed to parse saved paid docs:', e);
+          console.error('Failed to parse saved paid fingerprints:', e);
         }
       }
 
@@ -591,8 +612,7 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    const isPaid = paidDocs[activeDocTab];
-    if (isPaid) return;
+    if (isCurrentDocPaid) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (
@@ -611,7 +631,7 @@ export default function Home() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [paidDocs, activeDocTab]);
+  }, [isCurrentDocPaid, activeDocTab]);
 
   useEffect(() => {
     if (showCheckoutModal && modalStep === 'qris' && timeLeft > 0) {
@@ -637,14 +657,24 @@ export default function Home() {
     stopPolling();
     setIsProcessingSuccess(true);
 
-    const updatedPaid = selectedPackage === 'BUNDLING'
-      ? { SPK: true, NDA: true, BAST: true }
-      : { ...paidDocs, [paidDocTarget]: true };
+    const updatedFingerprints = [...paidFingerprints];
 
-    setPaidDocs(updatedPaid);
+    if (selectedPackage === 'BUNDLING') {
+      const fpSPK = getDocumentFingerprint('SPK');
+      const fpNDA = getDocumentFingerprint('NDA');
+      const fpBAST = getDocumentFingerprint('BAST');
+      if (!updatedFingerprints.includes(fpSPK)) updatedFingerprints.push(fpSPK);
+      if (!updatedFingerprints.includes(fpNDA)) updatedFingerprints.push(fpNDA);
+      if (!updatedFingerprints.includes(fpBAST)) updatedFingerprints.push(fpBAST);
+    } else {
+      const fpTarget = getDocumentFingerprint(paidDocTarget);
+      if (!updatedFingerprints.includes(fpTarget)) updatedFingerprints.push(fpTarget);
+    }
+
+    setPaidFingerprints(updatedFingerprints);
 
     if (typeof window !== 'undefined') {
-      localStorage.setItem('spkinstan_paid_docs', JSON.stringify(updatedPaid));
+      localStorage.setItem('spkinstan_paid_fingerprints', JSON.stringify(updatedFingerprints));
       localStorage.setItem('spkinstan_package', selectedPackage);
     }
 
@@ -655,7 +685,7 @@ export default function Home() {
 
       // Auto scroll ke kontainer unduhan di tab yang sama
       downloadCenterRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 1000);
+    }, 800);
 
     if (typeof window !== 'undefined' && window.fbq) {
       window.fbq('track', 'Purchase', {
@@ -717,7 +747,8 @@ export default function Home() {
 
       for (let i = 0; i < pageElements.length; i++) {
         const pageEl = pageElements[i] as HTMLElement;
-        const isPaidDoc = paidDocs[docType] || (paidDocs.SPK && paidDocs.NDA && paidDocs.BAST);
+        const targetFp = getDocumentFingerprint(docType);
+        const isPaidDoc = paidFingerprints.includes(targetFp);
 
         const watermarkElement = pageEl.querySelector('.watermark-layer') as HTMLElement;
         if (isPaidDoc && watermarkElement) {
@@ -767,7 +798,7 @@ export default function Home() {
         }
       }
 
-      // Penamaan File Format Sederhana tanpa status: spk_namapihakpertama.pdf
+      // Penamaan File Format Sederhana: spk_namapihakpertama.pdf
       const cleanName = (freelancerName || 'pihak_pertama')
         .trim()
         .toLowerCase()
@@ -787,7 +818,7 @@ export default function Home() {
         return nextState;
       });
 
-      if (shouldConsumeLicense && (paidDocs[docType] || (paidDocs.SPK && paidDocs.NDA && paidDocs.BAST)) && sessionId) {
+      if (shouldConsumeLicense && paidFingerprints.includes(getDocumentFingerprint(docType)) && sessionId) {
         await consumePaymentLicense(sessionId);
       }
     } catch (err) {
@@ -1073,7 +1104,7 @@ export default function Home() {
   const handleFinishForm = (e?: React.MouseEvent) => {
     if (e) e.preventDefault();
     setMobileViewMode('preview');
-    if (!paidDocs[activeDocTab]) {
+    if (!isCurrentDocPaid) {
       setModalStep('download_choice');
       setShowCheckoutModal(true);
     } else {
@@ -1102,7 +1133,10 @@ export default function Home() {
     'Legalisasi & Tanda Tangan'
   ];
 
-  const isBundlingPackage = selectedPackage === 'BUNDLING' || (paidDocs.SPK && paidDocs.NDA && paidDocs.BAST);
+  const isBundlingPackage = selectedPackage === 'BUNDLING' || 
+    (paidFingerprints.includes(getDocumentFingerprint('SPK')) && 
+     paidFingerprints.includes(getDocumentFingerprint('NDA')) && 
+     paidFingerprints.includes(getDocumentFingerprint('BAST')));
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col justify-between font-sans antialiased selection:bg-blue-100 selection:text-blue-700 pb-20 md:pb-0">
@@ -1115,7 +1149,7 @@ export default function Home() {
         @media print {
           body { display: none !important; }
         }
-        ${!paidDocs[activeDocTab] ? `
+        ${!isCurrentDocPaid ? `
         #a4-document-preview {
           -webkit-touch-callout: none;
           -webkit-user-select: none;
@@ -1546,7 +1580,7 @@ export default function Home() {
                             onClick={() => handleApplyPreset('web')}
                             className={`py-1.5 px-2 rounded-xl text-[10px] font-bold border transition-all ${
                               activePreset === 'web'
-                                ? 'bg-blue-600 text-white border-blue-600'
+                                ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
                                 : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                             }`}
                           >
@@ -1557,7 +1591,7 @@ export default function Home() {
                             onClick={() => handleApplyPreset('design')}
                             className={`py-1.5 px-2 rounded-xl text-[10px] font-bold border transition-all ${
                               activePreset === 'design'
-                                ? 'bg-blue-600 text-white border-blue-600'
+                                ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
                                 : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                             }`}
                           >
@@ -1568,7 +1602,7 @@ export default function Home() {
                             onClick={() => handleApplyPreset('all')}
                             className={`py-1.5 px-2 rounded-xl text-[10px] font-bold border transition-all ${
                               activePreset === 'all'
-                                ? 'bg-blue-600 text-white border-blue-600'
+                                ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
                                 : 'bg-white text-blue-600 border-blue-200 hover:bg-slate-50'
                             }`}
                           >
@@ -1791,8 +1825,8 @@ export default function Home() {
                   mobileViewMode === 'form' ? 'hidden lg:block' : 'block'
                 }`}
               >
-                {/* KONTAINER PUSAT UNDUHAN IN-PAGE (HANYA MUNCUL APABILA SUDAH LUNAS) */}
-                {(paidDocs[activeDocTab] || (paidDocs.SPK && paidDocs.NDA && paidDocs.BAST)) && (
+                {/* KONTAINER PUSAT UNDUHAN IN-PAGE (HANYA MUNCUL APABILA SUDAH LUNAS FINGERPRINT) */}
+                {isCurrentDocPaid && (
                   <div
                     ref={downloadCenterRef}
                     id="download-center"
@@ -1984,12 +2018,12 @@ export default function Home() {
                   <div
                     id="a4-document-preview"
                     className={`flex flex-col gap-8 items-center w-full max-w-[794px] ${
-                      !paidDocs[activeDocTab] ? 'select-none' : ''
+                      !isCurrentDocPaid ? 'select-none' : ''
                     }`}
                   >
                     {/* HALAMAN 1 */}
                     <div className="a4-page w-full max-w-[794px] min-h-[1123px] h-auto bg-white text-slate-900 p-6 sm:p-8 relative flex flex-col justify-between shadow-xl rounded-xl border border-slate-200 shrink-0">
-                      {!paidDocs[activeDocTab] && (
+                      {!isCurrentDocPaid && (
                         <div className="watermark-layer absolute inset-0 pointer-events-none z-20 flex items-center justify-center overflow-hidden">
                           <span className="text-5xl sm:text-7xl font-black tracking-[0.25em] text-slate-300/25 uppercase select-none -rotate-12 transform">
                             SPKINSTAN
@@ -2104,7 +2138,7 @@ export default function Home() {
                     {/* HALAMAN 2 */}
                     {needsPage2 && (
                       <div className="a4-page w-full max-w-[794px] min-h-[1123px] h-auto bg-white text-slate-900 p-6 sm:p-8 relative flex flex-col justify-between shadow-xl rounded-xl border border-slate-200 shrink-0">
-                        {!paidDocs[activeDocTab] && (
+                        {!isCurrentDocPaid && (
                           <div className="watermark-layer absolute inset-0 pointer-events-none z-20 flex items-center justify-center overflow-hidden">
                             <span className="text-5xl sm:text-7xl font-black tracking-[0.25em] text-slate-300/25 uppercase select-none -rotate-12 transform">
                               SPKINSTAN
@@ -2185,7 +2219,7 @@ export default function Home() {
                       Status Draf Dokumen
                     </span>
                     <span className="text-sm font-extrabold text-slate-900">
-                      {paidDocs[activeDocTab] ? (
+                      {isCurrentDocPaid ? (
                         <span className="text-emerald-600 flex items-center gap-1">
                           <CheckCircle className="w-4 h-4 inline" /> Terverifikasi Lunas ({activeDocTab})
                         </span>
@@ -2205,7 +2239,7 @@ export default function Home() {
                       <span>Download Draf Watermark</span>
                     </button>
 
-                    {paidDocs[activeDocTab] ? (
+                    {isCurrentDocPaid ? (
                       <button
                         type="button"
                         onClick={(e) => handleIndividualDownload(activeDocTab, e)}
@@ -2493,7 +2527,7 @@ export default function Home() {
         <button
           type="button"
           onClick={(e) => {
-            if (paidDocs[activeDocTab]) {
+            if (isCurrentDocPaid) {
               handleIndividualDownload(activeDocTab, e);
             } else {
               setModalStep('download_choice');
@@ -2503,7 +2537,7 @@ export default function Home() {
           className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-full text-xs shadow-md flex items-center justify-center gap-1"
         >
           <Unlock className="w-3.5 h-3.5" />
-          <span>{paidDocs[activeDocTab] ? 'Unduh PDF Clean' : 'Versi Pro (Clean)'}</span>
+          <span>{isCurrentDocPaid ? 'Unduh PDF Clean' : 'Versi Pro (Clean)'}</span>
         </button>
       </div>
 
