@@ -18,7 +18,6 @@ import {
   X,
   CheckCircle,
   Download,
-  Send,
   Star,
   Sparkles,
   Plus,
@@ -87,15 +86,6 @@ interface Clause {
 }
 
 const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
-
-// Helper fungsi sanitasi nomor WhatsApp ke format internasional 628xxx
-const formatWaNumber = (phone: string): string => {
-  let cleaned = phone.replace(/\D/g, ''); // Hapus semua karakter non-angka
-  if (cleaned.startsWith('0')) {
-    cleaned = '62' + cleaned.slice(1);
-  }
-  return cleaned;
-};
 
 export default function Home() {
   const adminWaNumber = process.env.NEXT_PUBLIC_ADMIN_WA_NUMBER || '62881027908462';
@@ -1250,70 +1240,6 @@ export default function Home() {
     }
   };
 
-  // HANDLER PENGIRIMAN WHATSAPP (MENDUKUNG PILIHAN WEB & APP)
-  const handleShareWhatsApp = async (
-    specificDoc?: DocType,
-    mode: 'web' | 'app' = 'web'
-  ) => {
-    const targetDoc = specificDoc || activeDocTab;
-    const targetDocInfo = docsData[targetDoc];
-
-    // 1. Sanitasi Nomor WA Pihak Kedua
-    const rawTargetWa =
-      targetDocInfo.clientWa?.trim() ||
-      docsData.SPK.clientWa?.trim() ||
-      docsData.NDA.clientWa?.trim() ||
-      docsData.BAST.clientWa?.trim() ||
-      '';
-    const finalWaNumber = rawTargetWa ? formatWaNumber(rawTargetWa) : adminWaNumber;
-
-    // 2. Buat Teks Pengantar
-    const clientName = targetDocInfo.clientName || 'Pihak Kedua';
-    const projectTitle = targetDocInfo.projectTitle || 'Pekerjaan Jasa';
-
-    let textMessage = '';
-    if (selectedPackage === 'BUNDLING' && !specificDoc) {
-      textMessage = `Halo ${clientName},\n\nBerikut dikirimkan draf resmi *Paket Perjanjian Kerja Sama (SPK, NDA, & BAST)* untuk proyek "${projectTitle}".\n\nMohon diperiksa kembali. Terima kasih!`;
-    } else {
-      textMessage = `Halo ${clientName},\n\nBerikut dikirimkan draf resmi *${targetDoc} Perjanjian Kerja Sama* untuk proyek "${projectTitle}".\n\nMohon diperiksa kembali. Terima kasih!`;
-    }
-
-    // 3. Web Share API (Di HP / Mobile Device)
-    if (typeof navigator !== 'undefined' && navigator.canShare && navigator.share) {
-      try {
-        const pdfRes = await generatePdfBlob(targetDoc);
-        if (pdfRes) {
-          const file = new File([pdfRes.blob], pdfRes.fileName, {
-            type: 'application/pdf',
-          });
-
-          if (navigator.canShare({ files: [file] })) {
-            await navigator.share({
-              files: [file],
-              title: `Dokumen ${targetDoc}`,
-              text: textMessage,
-            });
-            return;
-          }
-        }
-      } catch (err) {
-        console.warn('Web Share dibatalkan/tidak didukung, menggunakan link browser.', err);
-      }
-    }
-
-    // 4. Unduh PDF otomatis ke lokal
-    await captureDocumentToPdf(targetDoc);
-
-    // 5. Penentuan URL sesuai pilihan user (Web vs App)
-    const encodedText = encodeURIComponent(textMessage);
-    const waUrl =
-      mode === 'app'
-        ? `whatsapp://send?phone=${finalWaNumber}&text=${encodedText}`
-        : `https://web.whatsapp.com/send?phone=${finalWaNumber}&text=${encodedText}`;
-
-    window.open(waUrl, '_blank');
-  };
-
   const wizardTitles = [
     'Identitas Para Pihak',
     'Detail Spesifik Dokumen',
@@ -2363,12 +2289,12 @@ export default function Home() {
         </section>
       </main>
 
-      {/* POPUP OVERLAY PUSAT UNDUHAN PERSISTEN PASCA-BAYAR */}
+      {/* POPUP OVERLAY PUSAT UNDUHAN PERSISTEN PASCA-BAYAR (FOKUS DIRECT DOWNLOAD PDF) */}
       {showDownloadPopup && (
         <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white max-w-2xl w-full rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-100 space-y-6 my-8 relative animate-in fade-in zoom-in-95 duration-200">
             
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-lg shrink-0">
                   <CheckCircle className="w-7 h-7" />
@@ -2381,27 +2307,6 @@ export default function Home() {
                     Watermark telah dilepas. Silakan unduh dokumen resmi Anda di bawah ini.
                   </p>
                 </div>
-              </div>
-
-              {/* DUA OPSI TOMBOL BERBAHADAN WHATSAPP (WEB & APP) */}
-              <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
-                <button
-                  type="button"
-                  onClick={() => handleShareWhatsApp(undefined, 'web')}
-                  className="w-full sm:w-auto px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-2 transition"
-                >
-                  <Send className="w-4 h-4" />
-                  <span>Kirim via WA Web</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleShareWhatsApp(undefined, 'app')}
-                  className="w-full sm:w-auto px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-2 transition"
-                >
-                  <MessageCircle className="w-4 h-4 text-emerald-400" />
-                  <span>Kirim via WA App</span>
-                </button>
               </div>
             </div>
 
@@ -2731,7 +2636,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* Floating WhatsApp Widget dengan Pesan Minta Bantuan */}
+      {/* Floating WhatsApp Widget dengan Pesan Minta Bantuan CS */}
       <a
         href={`https://wa.me/${adminWaNumber}?text=${encodeURIComponent("Halo Admin SPKInstan, saya butuh bantuan mengenai pembuatan dokumen.")}`}
         target="_blank"
