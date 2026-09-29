@@ -831,14 +831,11 @@ export default function Home() {
     });
   };
 
-  // CAPTURE & EXPORT PDF (ISOLASI FUNGSI UNDUH - POPUP TETAP AKTIF)
-  // FORMAT PENAMAAN BERSIH: <doctype>_<nama_pihak_pertama>.pdf
-  const captureDocumentToPdf = async (
+  // FUNGSI HELPER: GENERATE PDF BLOB
+  const generatePdfBlob = async (
     docType: DocType
-  ) => {
-    setProcessingDoc(docType);
+  ): Promise<{ blob: Blob; fileName: string } | null> => {
     setIsExporting(true);
-
     setMobileViewMode('preview');
 
     if (activeDocTab !== docType) {
@@ -854,10 +851,8 @@ export default function Home() {
     const element = document.getElementById('a4-document-preview');
     if (!element) {
       console.error('Elemen #a4-document-preview tidak ditemukan');
-      alert('Pratinjau dokumen tidak ditemukan.');
       setIsExporting(false);
-      setProcessingDoc(null);
-      return;
+      return null;
     }
 
     try {
@@ -935,8 +930,36 @@ export default function Home() {
         .replace(/^_+|_+$/g, '');
 
       const fileName = `${docType.toLowerCase()}_${cleanName || 'pihak_pertama'}.pdf`;
+      const blob = pdf.output('blob');
 
-      pdf.save(fileName);
+      return { blob, fileName };
+    } catch (err) {
+      console.error('Error generating PDF Blob:', err);
+      return null;
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // CAPTURE & EXPORT PDF (MENGGUNAKAN GENERATE PDF BLOB)
+  const captureDocumentToPdf = async (docType: DocType) => {
+    setProcessingDoc(docType);
+    try {
+      const pdfRes = await generatePdfBlob(docType);
+      if (!pdfRes) {
+        alert('Gagal mengekspor PDF. Pastikan browser memberikan izin unduh file.');
+        return;
+      }
+
+      const { blob, fileName } = pdfRes;
+      const downloadUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(downloadUrl);
 
       setDownloadedDocs((prev) => {
         const nextState = { ...prev, [docType]: true };
@@ -945,12 +968,10 @@ export default function Home() {
         }
         return nextState;
       });
-
     } catch (err) {
-      console.error('Error generating PDF:', err);
-      alert('Gagal mengekspor PDF. Pastikan browser memberikan izin unduh file.');
+      console.error('Error downloading PDF:', err);
+      alert('Gagal mengekspor PDF.');
     } finally {
-      setIsExporting(false);
       setProcessingDoc(null);
     }
   };
@@ -1229,40 +1250,57 @@ export default function Home() {
     }
   };
 
-  // HANDLER PENGIRIMAN WHATSAPP TERPERBAIKI DENGAN SANITASI NOMOR 628... DAN CROSS-TAB FALLBACK
-  const handleShareWhatsApp = (specificDoc?: DocType) => {
+  // HANDLER PENGIRIMAN WHATSAPP HYBRID (WEB SHARE API DI MOBILE + AUTO-DOWNLOAD & CHAT LINK DI DESKTOP)
+  const handleShareWhatsApp = async (specificDoc?: DocType) => {
     const targetDoc = specificDoc || activeDocTab;
+    const targetDocInfo = docsData[targetDoc];
 
-    // Cari nomor WA Pihak Kedua: Utamakan tab aktif, jika kosong cari lintas tab (SPK -> NDA -> BAST)
+    // 1. Sanitasi Nomor WA Pihak Kedua
     const rawTargetWa =
-      docsData[targetDoc].clientWa?.trim() ||
+      targetDocInfo.clientWa?.trim() ||
       docsData.SPK.clientWa?.trim() ||
       docsData.NDA.clientWa?.trim() ||
       docsData.BAST.clientWa?.trim() ||
       '';
+    const finalWaNumber = rawTargetWa ? formatWaNumber(rawTargetWa) : adminWaNumber;
 
-    const targetDocInfo = docsData[targetDoc];
-    let text = '';
+    // 2. Buat Teks Pengantar
+    const clientName = targetDocInfo.clientName || 'Pihak Kedua';
+    const projectTitle = targetDocInfo.projectTitle || 'Pekerjaan Jasa';
 
+    let textMessage = '';
     if (selectedPackage === 'BUNDLING' && !specificDoc) {
-      const clientName = docsData.SPK.clientName || targetDocInfo.clientName || 'Pihak Kedua';
-      const projectTitle = docsData.SPK.projectTitle || 'Pekerjaan Jasa';
-      const freelancerName = docsData.SPK.freelancerName || 'Pihak Pertama';
-
-      text = `Halo ${clientName},\n\nBerikut dikirimkan draf resmi *Paket Perjanjian Kerja Sama (SPK, NDA, & BAST)* untuk proyek "${projectTitle}" yang telah diterbitkan secara legal.\n\n*Pihak Pertama:* ${freelancerName}\n*Status Dokumen:* Sah (Terverifikasi Pelunasan PRO)\n\nMohon diperiksa dan ditandatangan kembali. Terima kasih!`;
+      textMessage = `Halo ${clientName},\n\nBerikut dikirimkan draf resmi *Paket Perjanjian Kerja Sama (SPK, NDA, & BAST)* untuk proyek "${projectTitle}".\n\nMohon diperiksa kembali. Terima kasih!`;
     } else {
-      const clientName = targetDocInfo.clientName || 'Pihak Kedua';
-      const projectTitle = targetDocInfo.projectTitle || 'Pekerjaan Jasa';
-      const freelancerName = targetDocInfo.freelancerName || 'Pihak Pertama';
-
-      text = `Halo ${clientName},\n\nBerikut dikirimkan draf resmi *${targetDoc} Perjanjian Kerja Sama* untuk proyek "${projectTitle}" yang telah diterbitkan secara legal.\n\n*Pihak Pertama:* ${freelancerName}\n*Status Dokumen:* Sah (Terverifikasi Pelunasan)\n\nMohon diperiksa dan ditandatangan kembali. Terima kasih!`;
+      textMessage = `Halo ${clientName},\n\nBerikut dikirimkan draf resmi *${targetDoc} Perjanjian Kerja Sama* untuk proyek "${projectTitle}".\n\nMohon diperiksa kembali. Terima kasih!`;
     }
 
-    // Format nomor target ke format 628xxx. Jika tidak ada input sama sekali, baru fallback ke admin
-    const formattedTargetWa = rawTargetWa ? formatWaNumber(rawTargetWa) : '';
-    const finalWaNumber = formattedTargetWa || adminWaNumber;
+    // 3. Opsi A: Web Share API (Mobile Device)
+    if (typeof navigator !== 'undefined' && navigator.canShare && navigator.share) {
+      try {
+        const pdfRes = await generatePdfBlob(targetDoc);
+        if (pdfRes) {
+          const file = new File([pdfRes.blob], pdfRes.fileName, {
+            type: 'application/pdf',
+          });
 
-    window.open(`https://wa.me/${finalWaNumber}?text=${encodeURIComponent(text)}`, '_blank');
+          if (navigator.canShare({ files: [file] })) {
+            await navigator.share({
+              files: [file],
+              title: `Dokumen ${targetDoc}`,
+              text: textMessage,
+            });
+            return; // Selesai via native share
+          }
+        }
+      } catch (err) {
+        console.warn('Web Share dibatalkan atau tidak didukung, menggunakan fallback desktop.', err);
+      }
+    }
+
+    // 4. Opsi B: Fallback Desktop (Auto-Download PDF + Buka WhatsApp)
+    await captureDocumentToPdf(targetDoc); // Unduh file PDF otomatis ke lokal
+    window.open(`https://wa.me/${finalWaNumber}?text=${encodeURIComponent(textMessage)}`, '_blank');
   };
 
   const wizardTitles = [
@@ -1331,7 +1369,6 @@ export default function Home() {
           </div>
 
           <div className="flex items-center gap-4">
-            {/* Kalimat Bantuan CS WA yang Tepat */}
             <a
               href={`https://wa.me/${adminWaNumber}?text=${encodeURIComponent("Halo Admin SPKInstan, saya butuh bantuan mengenai pembuatan dokumen.")}`}
               target="_blank"
@@ -2270,7 +2307,6 @@ export default function Home() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {reviews.length === 0 ? (
-                /* Kalimat Testimoni yang Tepat */
                 <a
                   href={`https://wa.me/${adminWaNumber}?text=${encodeURIComponent("Halo Admin SPKInstan, saya ingin kirim testimoni ulasan penggunaan SPKInstan.")}`}
                   target="_blank"
