@@ -88,6 +88,15 @@ interface Clause {
 
 const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
+// Helper fungsi sanitasi nomor WhatsApp ke format internasional 628xxx
+const formatWaNumber = (phone: string): string => {
+  let cleaned = phone.replace(/\D/g, ''); // Hapus semua karakter non-angka
+  if (cleaned.startsWith('0')) {
+    cleaned = '62' + cleaned.slice(1);
+  }
+  return cleaned;
+};
+
 export default function Home() {
   const adminWaNumber = process.env.NEXT_PUBLIC_ADMIN_WA_NUMBER || '62881027908462';
 
@@ -239,7 +248,7 @@ export default function Home() {
       id: 'spk-1',
       docType: 'SPK',
       title: 'Ruang Lingkup Pekerjaan & Asas Iktikad Baik',
-      content: 'Sesuai Pasal 17 ayat (2) & Pasal 18A ayat (2) UU No. 1 Tahun 2024 (UU ITE), Para Pihak sepakat melaksanakan perjanjian dengan iktikad baik, transparan, dan jelas. PIHAK PERTAMA berkewajiban melaksanakan pengerjaan proyek sesuai dengan acuan spesifikasi teknis dan deliverables yang disepakati.',
+      content: 'Sesuai Pasal 17 ayat (2) & Pasal 18A ayat (2) UU No. 1 Tahun 2024 (UU ITE), Para Pihak sepakat melaksanakan pengerjaan proyek sesuai dengan acuan spesifikasi teknis dan deliverables yang disepakati.',
       isEnabled: true,
     },
     {
@@ -1220,19 +1229,40 @@ export default function Home() {
     }
   };
 
+  // HANDLER PENGIRIMAN WHATSAPP TERPERBAIKI DENGAN SANITASI NOMOR 628... DAN CROSS-TAB FALLBACK
   const handleShareWhatsApp = (specificDoc?: DocType) => {
     const targetDoc = specificDoc || activeDocTab;
-    const docInfo = docsData[targetDoc];
+
+    // Cari nomor WA Pihak Kedua: Utamakan tab aktif, jika kosong cari lintas tab (SPK -> NDA -> BAST)
+    const rawTargetWa =
+      docsData[targetDoc].clientWa?.trim() ||
+      docsData.SPK.clientWa?.trim() ||
+      docsData.NDA.clientWa?.trim() ||
+      docsData.BAST.clientWa?.trim() ||
+      '';
+
+    const targetDocInfo = docsData[targetDoc];
     let text = '';
 
     if (selectedPackage === 'BUNDLING' && !specificDoc) {
-      text = `Halo ${docsData.SPK.clientName || 'Pihak Kedua'},\n\nBerikut dikirimkan draf resmi *Paket Perjanjian Kerja Sama (SPK, NDA, & BAST)* untuk proyek "${docsData.SPK.projectTitle || 'Pekerjaan Jasa'}" yang telah diterbitkan secara legal.\n\n*Pihak Pertama:* ${docsData.SPK.freelancerName || 'Budi Santoso'}\n*Status Dokumen:* Sah (Terverifikasi Pelunasan PRO)\n\nMohon diperiksa dan ditandatangan kembali. Terima kasih!`;
+      const clientName = docsData.SPK.clientName || targetDocInfo.clientName || 'Pihak Kedua';
+      const projectTitle = docsData.SPK.projectTitle || 'Pekerjaan Jasa';
+      const freelancerName = docsData.SPK.freelancerName || 'Pihak Pertama';
+
+      text = `Halo ${clientName},\n\nBerikut dikirimkan draf resmi *Paket Perjanjian Kerja Sama (SPK, NDA, & BAST)* untuk proyek "${projectTitle}" yang telah diterbitkan secara legal.\n\n*Pihak Pertama:* ${freelancerName}\n*Status Dokumen:* Sah (Terverifikasi Pelunasan PRO)\n\nMohon diperiksa dan ditandatangan kembali. Terima kasih!`;
     } else {
-      text = `Halo ${docInfo.clientName || 'Pihak Kedua'},\n\nBerikut dikirimkan draf resmi *${targetDoc} Perjanjian Kerja Sama* untuk proyek "${docInfo.projectTitle || 'Pekerjaan Jasa'}" yang telah diterbitkan secara legal.\n\n*Pihak Pertama:* ${docInfo.freelancerName || 'Budi Santoso'}\n*Status Dokumen:* Sah (Terverifikasi Pelunasan)\n\nMohon diperiksa dan ditandatangan kembali. Terima kasih!`;
+      const clientName = targetDocInfo.clientName || 'Pihak Kedua';
+      const projectTitle = targetDocInfo.projectTitle || 'Pekerjaan Jasa';
+      const freelancerName = targetDocInfo.freelancerName || 'Pihak Pertama';
+
+      text = `Halo ${clientName},\n\nBerikut dikirimkan draf resmi *${targetDoc} Perjanjian Kerja Sama* untuk proyek "${projectTitle}" yang telah diterbitkan secara legal.\n\n*Pihak Pertama:* ${freelancerName}\n*Status Dokumen:* Sah (Terverifikasi Pelunasan)\n\nMohon diperiksa dan ditandatangan kembali. Terima kasih!`;
     }
 
-    const waTarget = docInfo.clientWa || adminWaNumber;
-    window.open(`https://wa.me/${waTarget}?text=${encodeURIComponent(text)}`, '_blank');
+    // Format nomor target ke format 628xxx. Jika tidak ada input sama sekali, baru fallback ke admin
+    const formattedTargetWa = rawTargetWa ? formatWaNumber(rawTargetWa) : '';
+    const finalWaNumber = formattedTargetWa || adminWaNumber;
+
+    window.open(`https://wa.me/${finalWaNumber}?text=${encodeURIComponent(text)}`, '_blank');
   };
 
   const wizardTitles = [
@@ -2052,7 +2082,7 @@ export default function Home() {
                           ))}
                         </div>
 
-                        {/* RENDER AREA TTD BERSIH (TANPA KOTAK PLACEHOLDER [TANDA TANGAN] & KOTAK PUTUS-PUTUS) */}
+                        {/* RENDER AREA TTD BERSIH (TANPA KOTAK PLACEHOLDER & KOTAK PUTUS-PUTUS) */}
                         {!needsPage2 && (
                           <div className="pt-2 sm:pt-3 grid grid-cols-2 gap-3 sm:gap-4 text-center">
                             <div className="bg-slate-50/80 border border-slate-200/80 rounded-xl p-2.5 sm:p-3 space-y-1.5 min-h-[100px] flex flex-col justify-between">
