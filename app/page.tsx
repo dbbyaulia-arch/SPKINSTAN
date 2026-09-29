@@ -304,6 +304,36 @@ export default function Home() {
     }));
   };
 
+  // ---------------------------------------------------------
+  // 1. KOMUNIKASI ANTAR-TAB PEMBAYARAN (BROADCASTCHANNEL & STORAGE)
+  // ---------------------------------------------------------
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const channel = new BroadcastChannel('spkinstan_payment_channel');
+
+    channel.onmessage = (event) => {
+      if (event.data?.type === 'PAYMENT_SUCCESS') {
+        handlePaymentSuccess();
+      }
+    };
+
+    return () => {
+      channel.close();
+    };
+  }, [sessionId, selectedPackage, paidDocTarget]);
+
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'spkinstan_last_paid_session' && e.newValue) {
+        handlePaymentSuccess();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [sessionId, selectedPackage, paidDocTarget]);
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedPaid = localStorage.getItem('spkinstan_paid_docs');
@@ -675,6 +705,7 @@ export default function Home() {
 
   // ---------------------------------------------------------
   // CAPTURE & EXPORT PDF (SINGLE-USE MODEL IMPLEMENTATION)
+  // FORMAT PENAMAAN: <doctype>_<nama_pihak_pertama>.pdf
   // ---------------------------------------------------------
   const captureDocumentToPdf = async (
     docType: 'SPK' | 'NDA' | 'BAST',
@@ -901,11 +932,13 @@ export default function Home() {
     }, 2500);
   };
 
+  // ---------------------------------------------------------
+  // 2. PEMBUKAAN GATEWAY PEMBAYARAN KE TAB BARU (_blank)
+  // ---------------------------------------------------------
   const handleRequestQris = async () => {
     if (isLoadingQris) return;
 
     setIsLoadingQris(true);
-    setModalStep('qris');
     setPaidDocTarget(activeDocTab);
     setQrCodeData(null);
     setPaymentUrl(null);
@@ -951,12 +984,16 @@ export default function Home() {
 
         if (data.paymentUrl) {
           setPaymentUrl(data.paymentUrl);
-        }
-        if (data.qrString) {
-          setQrCodeData(data.qrString);
-        }
+          
+          // Tutup modal checkout di tab utama
+          setShowCheckoutModal(false);
 
-        startPollingStatus(currentSession);
+          // Buka halaman pembayaran Mayar di TAB BARU
+          window.open(data.paymentUrl, '_blank');
+
+          // Jalankan polling otomatis di tab utama
+          startPollingStatus(currentSession);
+        }
       } else {
         console.error('Mayar Payment Error:', data.message);
       }
@@ -2088,7 +2125,7 @@ export default function Home() {
                           ))}
                         </div>
 
-                        {/* RENDER AREA TTD TANPA BOX DASHED PLACEHOLDER */}
+                        {/* RENDER AREA TTD TANPA KOTAK PLACEHOLDER DASHED */}
                         {!needsPage2 && (
                           <div className="pt-2 sm:pt-3 grid grid-cols-2 gap-3 sm:gap-4 text-center">
                             <div className="bg-slate-50/80 border border-slate-200/80 rounded-xl p-2.5 sm:p-3 space-y-1.5 min-h-[100px] flex flex-col justify-between">
@@ -2344,7 +2381,7 @@ export default function Home() {
                 </div>
 
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  Silakan bayar melalui Mayar Gateway langsung di dalam modal ini untuk menghapus watermark & membuka PDF HD:
+                  Silakan bayar melalui Mayar Gateway di Tab Baru untuk menghapus watermark & membuka PDF HD:
                 </p>
 
                 <div className="space-y-3">
@@ -2400,95 +2437,10 @@ export default function Home() {
                       <span>
                         {isLoadingQris
                           ? 'Menyiapkan Pembayaran...'
-                          : 'Lanjut Pembayaran (Rp 1.000)'}
+                          : 'Lanjut Pembayaran di Tab Baru (Rp 1.000)'}
                       </span>
                     </button>
                   </div>
-                </div>
-              </div>
-            )}
-
-            {/* PAYMENT STEP: Embedded Mayar Frame Inside Modal */}
-            {modalStep === 'qris' && (
-              <div className="space-y-4 text-center">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                  <span className="text-xs font-bold text-slate-400">
-                    ID Session: <span className="text-slate-800">{sessionId}</span>
-                  </span>
-                  <span className="text-xs font-extrabold text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">
-                    ⏱️ {formatTime(timeLeft)}
-                  </span>
-                </div>
-
-                <div>
-                  <h3 className="font-extrabold text-slate-900 text-base">Pembayaran Lisensi Dokumen</h3>
-                  <div className="text-2xl font-black text-slate-900 mt-1">Rp 1.000</div>
-                  <p className="text-[11px] text-slate-500">
-                    Paket: <strong>{selectedPackage === 'SINGLE' ? `Single Document (${activeDocTab})` : 'Bundling (SPK + NDA + BAST)'}</strong>
-                  </p>
-                </div>
-
-                {/* Banner Peringatan Modal Pembayaran */}
-                <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-3 text-left space-y-1">
-                  <div className="flex items-center gap-1.5 font-extrabold text-amber-900 text-xs">
-                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                    <span>PERINGATAN SANGAT PENTING:</span>
-                  </div>
-                  <p className="text-[11px] text-amber-800 leading-relaxed font-medium">
-                    Jangan menutup, memuat ulang (refresh), atau berpindah dari halaman ini saat atau setelah pembayaran. Dokumen Anda akan diproses secara otomatis di layar ini.
-                  </p>
-                </div>
-
-                {/* CONTAINER IFRAME MAYAR */}
-                <div className="w-full h-[400px] rounded-2xl border border-slate-200 overflow-hidden bg-slate-50 relative shadow-inner">
-                  {paymentUrl ? (
-                    <iframe
-                      src={paymentUrl}
-                      className="w-full h-full border-0"
-                      title="Mayar Embedded Payment"
-                      allow="payment; downloads"
-                      sandbox="allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts allow-top-navigation-by-user-activation"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-xs text-slate-500 font-bold">
-                      <Loader2 className="w-6 h-6 animate-spin text-emerald-600" />
-                      <span>Memuat Halaman Pembayaran Mayar...</span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="text-[11px] text-emerald-600 font-semibold flex items-center justify-center gap-2 bg-emerald-50 p-2.5 rounded-xl border border-emerald-200">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-                  <span>Sistem memverifikasi pelunasan secara otomatis...</span>
-                </div>
-
-                <div className="space-y-2 pt-1">
-                  <button
-                    type="button"
-                    disabled={isVerifyingPayment || isProcessingSuccess}
-                    onClick={handleManualCheckPayment}
-                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white font-black text-xs rounded-xl shadow-md flex items-center justify-center gap-2 transition"
-                  >
-                    {isVerifyingPayment ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <CheckCircle className="w-4 h-4" />
-                    )}
-                    <span>
-                      {isVerifyingPayment ? 'Mengecek Server...' : 'CEK STATUS PEMBAYARAN MANUAL'}
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      stopPolling();
-                      setModalStep('download_choice');
-                    }}
-                    className="w-full py-2 text-slate-400 hover:text-slate-600 font-medium text-[11px]"
-                  >
-                    Batal Transaksi
-                  </button>
                 </div>
               </div>
             )}

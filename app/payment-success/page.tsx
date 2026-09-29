@@ -1,48 +1,49 @@
 'use client';
 
-import { useEffect, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { Loader2, CheckCircle } from 'lucide-react';
+import React, { useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { CheckCircle2, Loader2 } from 'lucide-react';
 
 function PaymentSuccessContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
+  const sessionId = searchParams.get('sessionId') || searchParams.get('id');
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedPaid = localStorage.getItem('spkinstan_paid_docs');
-      let paidState = { SPK: true, NDA: true, BAST: true };
+    // 1. Kirim sinyal sukses ke Tab Utama via BroadcastChannel
+    const channel = new BroadcastChannel('spkinstan_payment_channel');
+    channel.postMessage({
+      type: 'PAYMENT_SUCCESS',
+      sessionId: sessionId,
+    });
 
-      if (savedPaid) {
-        try {
-          const parsed = JSON.parse(savedPaid);
-          paidState = { ...parsed, SPK: true, NDA: true, BAST: true };
-        } catch (e) {
-          console.error('Gagal membaca data pembayaran dari local storage:', e);
-        }
-      }
-
-      localStorage.setItem('spkinstan_paid_docs', JSON.stringify(paidState));
-      localStorage.setItem('spkinstan_show_success_modal', 'true');
-
-      setTimeout(() => {
-        router.push('/?payment=success');
-      }, 1000);
+    // 2. Simpan ke localStorage sebagai cadangan (fallback)
+    if (sessionId) {
+      localStorage.setItem('spkinstan_last_paid_session', sessionId);
     }
-  }, [router, searchParams]);
+
+    // 3. Tutup tab pembayaran ini secara otomatis setelah 1.5 detik
+    const timer = setTimeout(() => {
+      window.close();
+    }, 1500);
+
+    return () => {
+      clearTimeout(timer);
+      channel.close();
+    };
+  }, [sessionId]);
 
   return (
-    <div className="bg-white p-8 rounded-3xl shadow-xl border border-slate-100 max-w-md w-full space-y-4">
-      <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
-        <CheckCircle className="w-7 h-7" />
+    <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-6 text-center font-sans">
+      <div className="w-16 h-16 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mb-4 animate-bounce">
+        <CheckCircle2 className="w-10 h-10" />
       </div>
-      <h2 className="text-lg font-extrabold text-slate-900">Pembayaran Berhasil!</h2>
-      <p className="text-xs text-slate-500 leading-relaxed">
-        Lisensi dokumen PRO Anda telah aktif. Memindahkan Anda kembali ke editor untuk mengunduh PDF Clean...
+      <h1 className="text-2xl font-extrabold mb-2">Pembayaran Berhasil!</h1>
+      <p className="text-slate-400 text-sm max-w-sm mb-6">
+        Struk transaksi telah terverifikasi. Tab ini akan menutup otomatis dan mengalihkan Anda kembali ke dokumen...
       </p>
-      <div className="flex items-center justify-center gap-2 text-xs font-bold text-emerald-600 pt-2">
-        <Loader2 className="w-4 h-4 animate-spin" />
-        <span>Membuka Editor Dokumen...</span>
+      <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-800 px-4 py-2 rounded-full border border-slate-700">
+        <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
+        <span>Menutup tab pembayaran...</span>
       </div>
     </div>
   );
@@ -50,17 +51,14 @@ function PaymentSuccessContent() {
 
 export default function PaymentSuccessPage() {
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 font-sans text-center">
-      <Suspense
-        fallback={
-          <div className="bg-white p-8 rounded-3xl shadow-xl border border-slate-100 max-w-md w-full flex items-center justify-center gap-2 text-xs font-bold text-slate-600">
-            <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
-            <span>Memuat status pembayaran...</span>
-          </div>
-        }
-      >
-        <PaymentSuccessContent />
-      </Suspense>
-    </div>
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center">
+          <Loader2 className="w-6 h-6 animate-spin text-emerald-400" />
+        </div>
+      }
+    >
+      <PaymentSuccessContent />
+    </Suspense>
   );
 }
