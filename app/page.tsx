@@ -25,7 +25,8 @@ import {
   Trash2,
   Loader2,
   AlertTriangle,
-  Sliders
+  Sliders,
+  RefreshCw
 } from 'lucide-react';
 
 declare global {
@@ -94,7 +95,7 @@ export default function Home() {
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
   const [isLoadingQris, setIsLoadingQris] = useState(false);
   const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
-  const [isProcessingSuccess, setIsProcessingSuccess] = useState(false);
+  const [, setIsProcessingSuccess] = useState(false);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
   // Form State
@@ -933,7 +934,7 @@ export default function Home() {
   };
 
   // ---------------------------------------------------------
-  // 2. PEMBUKAAN GATEWAY PEMBAYARAN KE TAB BARU (_blank)
+  // 2. PEMBAYARAN MAYAR EMBEDDED IFRAME DI DALAM MODAL
   // ---------------------------------------------------------
   const handleRequestQris = async () => {
     if (isLoadingQris) return;
@@ -985,20 +986,19 @@ export default function Home() {
         if (data.paymentUrl) {
           setPaymentUrl(data.paymentUrl);
           
-          // Tutup modal checkout di tab utama
-          setShowCheckoutModal(false);
+          // Pindah modal ke step 'qris' untuk menampilkan iFrame embedded
+          setModalStep('qris');
 
-          // Buka halaman pembayaran Mayar di TAB BARU
-          window.open(data.paymentUrl, '_blank');
-
-          // Jalankan polling otomatis di tab utama
+          // Jalankan polling otomatis langsung di Home.tsx
           startPollingStatus(currentSession);
         }
       } else {
         console.error('Mayar Payment Error:', data.message);
+        alert('Gagal membuat transaksi pembayaran: ' + (data.message || 'Terjadi kesalahan.'));
       }
     } catch (err) {
       console.error('Network error during Mayar payment generation:', err);
+      alert('Gagal terhubung ke gateway pembayaran.');
     }
     setIsLoadingQris(false);
   };
@@ -2357,11 +2357,12 @@ export default function Home() {
         </section>
       </main>
 
-      {/* INTEGRATED PAYMENT MODAL */}
+      {/* INTEGRATED PAYMENT MODAL WITH EMBEDDED IFRAME */}
       {showCheckoutModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white max-w-lg w-full rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-5 my-8 relative">
+          <div className="bg-white max-w-xl w-full rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-5 my-8 relative">
             
+            {/* STEP 1: PEMILIHAN PAKET LISENSI */}
             {modalStep === 'download_choice' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -2381,7 +2382,7 @@ export default function Home() {
                 </div>
 
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  Silakan bayar melalui Mayar Gateway di Tab Baru untuk menghapus watermark & membuka PDF HD:
+                  Silakan selesaikan pembayaran melalui Mayar Gateway di bawah ini untuk menghapus watermark & membuka PDF HD:
                 </p>
 
                 <div className="space-y-3">
@@ -2437,13 +2438,87 @@ export default function Home() {
                       <span>
                         {isLoadingQris
                           ? 'Menyiapkan Pembayaran...'
-                          : 'Lanjut Pembayaran di Tab Baru (Rp 1.000)'}
+                          : 'Buka Tagihan Pembayaran (Rp 1.000)'}
                       </span>
                     </button>
                   </div>
                 </div>
               </div>
             )}
+
+            {/* STEP 2: EMBEDDED MAYAR IFRAME & IN-PAGE VERIFICATION */}
+            {modalStep === 'qris' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-5 h-5 text-emerald-600" />
+                    <span className="text-xs font-extrabold text-slate-900 uppercase">
+                      Pembayaran Mayar Gateway (In-Page)
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowCheckoutModal(false)}
+                    className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* BANNER CATATAN PERINGATAN TEGAS */}
+                <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-3 text-left space-y-1">
+                  <div className="flex items-center gap-1.5 font-extrabold text-amber-900 text-xs">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>PENTING: JANGAN TUTUP / REFRESH MODAL INI</span>
+                  </div>
+                  <p className="text-[11px] text-amber-800 leading-relaxed font-medium">
+                    Selesaikan pembayaran langsung pada tampilan tagihan di bawah ini. Begitu pembayaran terkonfirmasi, modal akan otomatis tertutup dan halaman langsung membuka akses PDF Clean Anda.
+                  </p>
+                </div>
+
+                {/* EMBEDDED IFRAME TAGIHAN MAYAR */}
+                {paymentUrl ? (
+                  <div className="w-full h-[460px] rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 relative">
+                    <iframe
+                      src={paymentUrl}
+                      className="w-full h-full border-0"
+                      title="Pembayaran Mayar Gateway"
+                    />
+                  </div>
+                ) : (
+                  <div className="py-12 flex flex-col items-center justify-center gap-3">
+                    <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+                    <p className="text-xs text-slate-500 font-medium">Memuat Tagihan Mayar...</p>
+                  </div>
+                )}
+
+                {/* CONTROLS VERIFIKASI STATUS */}
+                <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setModalStep('download_choice')}
+                    className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition"
+                  >
+                    &larr; Ganti Paket
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={isVerifyingPayment}
+                    onClick={handleManualCheckPayment}
+                    className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition shadow-sm"
+                  >
+                    {isVerifyingPayment ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-4 h-4" />
+                    )}
+                    <span>Cek Status Pembayaran Manual</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
           </div>
         </div>
       )}
