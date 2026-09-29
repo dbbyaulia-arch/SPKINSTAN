@@ -2310,14 +2310,17 @@ export default function Home() {
               </div>
             </div>
 
-            {/* BANNER CATATAN PERINGATAN PENTING */}
-            <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-4 text-left space-y-1">
+            {/* BANNER CATATAN PERINGATAN PENTING & PENJELASAN HANGUS / TANPA DATABASE */}
+            <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-4 text-left space-y-1.5">
               <div className="flex items-center gap-2 font-extrabold text-amber-900 text-xs sm:text-sm">
                 <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
                 <span>PENTING: Segera Unduh & Simpan Dokumen Anda!</span>
               </div>
               <p className="text-xs text-amber-800 leading-relaxed font-medium">
-                Satu sesi transaksi berlaku untuk mengunduh versi PDF Clean. Jangan klik tombol <strong>"Selesai & Tutup Dokumen"</strong> sebelum Anda selesai mengunduh seluruh berkas PDF yang dibutuhkan.
+                Satu sesi transaksi berlaku khusus untuk mengunduh versi PDF Clean. Jangan klik tombol <strong>"Selesai & Tutup Dokumen"</strong> sebelum Anda selesai mengunduh seluruh berkas PDF yang dibutuhkan.
+              </p>
+              <p className="text-xs text-amber-900 font-semibold leading-relaxed border-t border-amber-200/60 pt-1.5 mt-1">
+                ⚠️ <strong>PERHATIAN:</strong> Apabila Anda menutup jendela ini sebelum mengunduh, file PDF akan <strong>otomatis hangus</strong>. Admin <strong>tidak dapat mengirimkan file secara manual</strong> karena SPKInstan berbasis <em>Zero Database & Tanpa Login</em> sehingga data dokumen Anda tidak disimpan di server demi menjaga privasi penuh.
               </p>
             </div>
 
