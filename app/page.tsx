@@ -141,7 +141,7 @@ export default function Home() {
   const page2ContentRef = useRef<HTMLDivElement | null>(null);
   const [heightNeedsPage2, setHeightNeedsPage2] = useState(false);
 
-  // Initial Master Clauses dengan Landasan Hukum Terlengkap (UU PDP, UU ITE, UU Hak Cipta, UU Rahasia Dagang, UU Paten, KUHPerdata)
+  // Initial Master Clauses dengan Landasan Hukum Terlengkap
   const [clauses, setClauses] = useState<Clause[]>([
     // --- PASAL-PASAL DOKUMEN SPK ---
     {
@@ -673,6 +673,9 @@ export default function Home() {
     });
   };
 
+  // ---------------------------------------------------------
+  // CAPTURE & EXPORT PDF (SINGLE-USE MODEL IMPLEMENTATION)
+  // ---------------------------------------------------------
   const captureDocumentToPdf = async (
     docType: 'SPK' | 'NDA' | 'BAST',
     shouldConsumeLicense = true
@@ -787,8 +790,21 @@ export default function Home() {
         return nextState;
       });
 
-      if (shouldConsumeLicense && (paidDocs[docType] || (paidDocs.SPK && paidDocs.NDA && paidDocs.BAST)) && sessionId) {
-        await consumePaymentLicense(sessionId);
+      // SINGLE-USE LICENSE CONSUMPTION: Reset status paidDocs & Hapus sessionId setelah download
+      if (shouldConsumeLicense && (paidDocs[docType] || (paidDocs.SPK && paidDocs.NDA && paidDocs.BAST))) {
+        if (sessionId) {
+          await consumePaymentLicense(sessionId);
+        }
+
+        setPaidDocs((prev) => {
+          const updated = { ...prev, [docType]: false };
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('spkinstan_paid_docs', JSON.stringify(updated));
+          }
+          return updated;
+        });
+
+        setSessionId('');
       }
     } catch (err) {
       console.error('Error generating PDF:', err);
@@ -811,13 +827,22 @@ export default function Home() {
     try {
       for (const doc of docs) {
         await switchTabAndAwaitRender(doc);
-        await captureDocumentToPdf(doc, false);
+        await captureDocumentToPdf(doc, false); // false agar tidak langsung me-reset per single doc
         await new Promise((res) => setTimeout(res, 800));
       }
 
       if (sessionId) {
         await consumePaymentLicense(sessionId);
       }
+
+      // SINGLE-USE LICENSE CONSUMPTION: Reset SEMUA lisensi bundling setelah 3 dokumen terunduh
+      const resetAll = { SPK: false, NDA: false, BAST: false };
+      setPaidDocs(resetAll);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('spkinstan_paid_docs', JSON.stringify(resetAll));
+      }
+      setSessionId('');
+
     } catch (err) {
       console.error('Gagal mengunduh paket bundling:', err);
       alert('Terjadi kendala saat mengunduh paket bundling.');
@@ -1791,7 +1816,7 @@ export default function Home() {
                   mobileViewMode === 'form' ? 'hidden lg:block' : 'block'
                 }`}
               >
-                {/* KONTAINER PUSAT UNDUHAN IN-PAGE (HANYA MUNCUL DI TAB YANG SAMA SETELAH LUNAS) */}
+                {/* KONTAINER PUSAT UNDUHAN IN-PAGE */}
                 {(paidDocs[activeDocTab] || (paidDocs.SPK && paidDocs.NDA && paidDocs.BAST)) && (
                   <div
                     ref={downloadCenterRef}
@@ -1829,7 +1854,7 @@ export default function Home() {
                         <span>PENTING: Segera Unduh & Simpan Dokumen!</span>
                       </div>
                       <p className="text-[11px] text-amber-800 leading-relaxed font-medium">
-                        Platform ini berjalan <strong>tanpa database & tanpa login</strong>. Jika tab ini ditutup, Anda tidak bisa mengunduh ulang tanpa transaksi baru.
+                        Setiap transaksi berlaku untuk <strong>1x unduh PDF Clean</strong>. Jika Anda mengubah form setelah mengunduh, status lisensi akan di-reset.
                       </p>
                     </div>
 
