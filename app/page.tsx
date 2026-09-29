@@ -202,11 +202,15 @@ export default function Home() {
     setGlobalParty((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleDocInputChange = (field: keyof SingleDocDetails, value: string | null) => {
+  const handleDocInputChange = (
+    docTarget: DocType,
+    field: keyof SingleDocDetails,
+    value: string | null
+  ) => {
     setDocsData((prev) => ({
       ...prev,
-      [activeDocTab]: {
-        ...prev[activeDocTab],
+      [docTarget]: {
+        ...prev[docTarget],
         [field]: value,
       },
     }));
@@ -380,8 +384,10 @@ export default function Home() {
     },
   ]);
 
-  // Sync Tanda Tangan Canvas saat Berganti Tab Dokumen
+  // Sync Tanda Tangan Canvas saat Berganti Tab Dokumen maupun Step Wizard
   useEffect(() => {
+    if (currentWizardStep !== 4) return;
+
     const currentSignature1 = docsData[activeDocTab].signatureFirstParty;
     const currentSignature2 = docsData[activeDocTab].signatureSecondParty;
 
@@ -408,7 +414,7 @@ export default function Home() {
         }
       }
     }
-  }, [activeDocTab]);
+  }, [activeDocTab, currentWizardStep, docsData]);
 
   // 1. KOMUNIKASI ANTAR-TAB PEMBAYARAN & PERSISTENSI LOCAL STORAGE
   useEffect(() => {
@@ -477,18 +483,27 @@ export default function Home() {
     }
   }, [globalParty, docsData, clauses]);
 
-  // Memulihkan Draf Form
+  // Memulihkan Draf Form (Dengan Pembersihan Otomatis Jika Terdeteksi Format Lama)
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedDraft = localStorage.getItem('spkinstan_form_draft');
       if (savedDraft) {
         try {
           const parsed = JSON.parse(savedDraft);
-          if (parsed.globalParty) setGlobalParty(parsed.globalParty);
-          if (parsed.docsData) setDocsData(parsed.docsData);
-          if (parsed.clauses) setClauses(parsed.clauses);
+          // Validasi bahwa struktur data terisolasi secara tepat
+          if (parsed.globalParty && parsed.docsData && parsed.docsData.SPK && parsed.docsData.NDA && parsed.docsData.BAST) {
+            setGlobalParty(parsed.globalParty);
+            setDocsData(parsed.docsData);
+            if (parsed.clauses && Array.isArray(parsed.clauses)) {
+              setClauses(parsed.clauses);
+            }
+          } else {
+            // Hapus cache versi lama yang menyebabkan data overwriting
+            localStorage.removeItem('spkinstan_form_draft');
+          }
         } catch (e) {
-          console.error('Gagal memulihkan draf form:', e);
+          console.error('Gagal memulihkan draf form, menghapus cache lama:', e);
+          localStorage.removeItem('spkinstan_form_draft');
         }
       }
     }
@@ -594,7 +609,10 @@ export default function Home() {
 
     setClauses((prev) =>
       prev.map((c) => {
-        if (presetType === 'all') return { ...c, isEnabled: true };
+        if (presetType === 'all') {
+          return c.docType === activeDocTab ? { ...c, isEnabled: true } : c;
+        }
+        
         if (c.docType !== activeDocTab) return c;
 
         if (c.docType === 'SPK') {
@@ -893,10 +911,12 @@ export default function Home() {
     } catch (err) {
       console.error('Error generating PDF:', err);
       alert('Gagal mengekspor PDF. Pastikan browser memberikan izin unduh file.');
-    } finally {
-      setIsExporting(false);
-      setProcessingDoc(null);
-    }
+    } fontNameFinally();
+  };
+
+  const fontNameFinally = () => {
+    setIsExporting(false);
+    setProcessingDoc(null);
   };
 
   const handleDownloadAllBundling = async (e?: React.MouseEvent) => {
@@ -1094,7 +1114,7 @@ export default function Home() {
 
   const stopDraw1 = () => {
     if (isDrawing1 && canvasRef1.current) {
-      handleDocInputChange('signatureFirstParty', canvasRef1.current.toDataURL());
+      handleDocInputChange(activeDocTab, 'signatureFirstParty', canvasRef1.current.toDataURL());
     }
     setIsDrawing1(false);
   };
@@ -1104,7 +1124,7 @@ export default function Home() {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
-    handleDocInputChange('signatureFirstParty', null);
+    handleDocInputChange(activeDocTab, 'signatureFirstParty', null);
   };
 
   const startDraw2 = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
@@ -1142,7 +1162,7 @@ export default function Home() {
 
   const stopDraw2 = () => {
     if (isDrawing2 && canvasRef2.current) {
-      handleDocInputChange('signatureSecondParty', canvasRef2.current.toDataURL());
+      handleDocInputChange(activeDocTab, 'signatureSecondParty', canvasRef2.current.toDataURL());
     }
     setIsDrawing2(false);
   };
@@ -1152,7 +1172,7 @@ export default function Home() {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
-    handleDocInputChange('signatureSecondParty', null);
+    handleDocInputChange(activeDocTab, 'signatureSecondParty', null);
   };
 
   const consumePaymentLicense = async (currentSessionId: string) => {
@@ -1436,7 +1456,7 @@ export default function Home() {
                         <input
                           type="text"
                           value={docsData[activeDocTab].docNumber}
-                          onChange={(e) => handleDocInputChange('docNumber', e.target.value)}
+                          onChange={(e) => handleDocInputChange(activeDocTab, 'docNumber', e.target.value)}
                           placeholder={`cth: 001/${activeDocTab}/IX/2026`}
                           className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-mono font-medium"
                         />
@@ -1519,7 +1539,7 @@ export default function Home() {
                             <input
                               type="text"
                               value={docsData.SPK.projectTitle}
-                              onChange={(e) => handleDocInputChange('projectTitle', e.target.value)}
+                              onChange={(e) => handleDocInputChange('SPK', 'projectTitle', e.target.value)}
                               placeholder="cth: Pengembangan Aplikasi Web Dashboard"
                               className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                             />
@@ -1530,7 +1550,7 @@ export default function Home() {
                               <input
                                 type="number"
                                 value={docsData.SPK.projectAmount}
-                                onChange={(e) => handleDocInputChange('projectAmount', e.target.value)}
+                                onChange={(e) => handleDocInputChange('SPK', 'projectAmount', e.target.value)}
                                 placeholder="cth: 7500000"
                                 className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                               />
@@ -1540,7 +1560,7 @@ export default function Home() {
                               <input
                                 type="number"
                                 value={docsData.SPK.dpPercent}
-                                onChange={(e) => handleDocInputChange('dpPercent', e.target.value)}
+                                onChange={(e) => handleDocInputChange('SPK', 'dpPercent', e.target.value)}
                                 placeholder="cth: 50"
                                 className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                               />
@@ -1551,7 +1571,7 @@ export default function Home() {
                             <input
                               type="text"
                               value={docsData.SPK.bankInfo}
-                              onChange={(e) => handleDocInputChange('bankInfo', e.target.value)}
+                              onChange={(e) => handleDocInputChange('SPK', 'bankInfo', e.target.value)}
                               placeholder="cth: BCA 1234567890 a.n budi"
                               className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                             />
@@ -1566,7 +1586,7 @@ export default function Home() {
                             <input
                               type="text"
                               value={docsData.NDA.projectTitle}
-                              onChange={(e) => handleDocInputChange('projectTitle', e.target.value)}
+                              onChange={(e) => handleDocInputChange('NDA', 'projectTitle', e.target.value)}
                               placeholder="cth: Kerahasiaan Source Code & Database"
                               className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                             />
@@ -1576,7 +1596,7 @@ export default function Home() {
                             <input
                               type="text"
                               value={docsData.NDA.ndaScope}
-                              onChange={(e) => handleDocInputChange('ndaScope', e.target.value)}
+                              onChange={(e) => handleDocInputChange('NDA', 'ndaScope', e.target.value)}
                               placeholder="cth: Source Code, Skema Database, Aset Desain"
                               className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                             />
@@ -1587,7 +1607,7 @@ export default function Home() {
                               <input
                                 type="number"
                                 value={docsData.NDA.ndaYears}
-                                onChange={(e) => handleDocInputChange('ndaYears', e.target.value)}
+                                onChange={(e) => handleDocInputChange('NDA', 'ndaYears', e.target.value)}
                                 placeholder="cth: 2"
                                 className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                               />
@@ -1597,7 +1617,7 @@ export default function Home() {
                               <input
                                 type="number"
                                 value={docsData.NDA.ndaPenalty}
-                                onChange={(e) => handleDocInputChange('ndaPenalty', e.target.value)}
+                                onChange={(e) => handleDocInputChange('NDA', 'ndaPenalty', e.target.value)}
                                 placeholder="cth: 25000000"
                                 className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                               />
@@ -1613,7 +1633,7 @@ export default function Home() {
                             <input
                               type="text"
                               value={docsData.BAST.projectTitle}
-                              onChange={(e) => handleDocInputChange('projectTitle', e.target.value)}
+                              onChange={(e) => handleDocInputChange('BAST', 'projectTitle', e.target.value)}
                               placeholder="cth: Serah Terima Pekerjaan Web Dashboard"
                               className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                             />
@@ -1623,7 +1643,7 @@ export default function Home() {
                             <input
                               type="text"
                               value={docsData.BAST.bastRef}
-                              onChange={(e) => handleDocInputChange('bastRef', e.target.value)}
+                              onChange={(e) => handleDocInputChange('BAST', 'bastRef', e.target.value)}
                               placeholder="cth: 001/SPK/IX/2026"
                               className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                             />
@@ -1634,7 +1654,7 @@ export default function Home() {
                               <input
                                 type="number"
                                 value={docsData.BAST.bastWarranty}
-                                onChange={(e) => handleDocInputChange('bastWarranty', e.target.value)}
+                                onChange={(e) => handleDocInputChange('BAST', 'bastWarranty', e.target.value)}
                                 placeholder="cth: 14"
                                 className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                               />
@@ -1644,7 +1664,7 @@ export default function Home() {
                               <input
                                 type="date"
                                 value={docsData.BAST.bastDate}
-                                onChange={(e) => handleDocInputChange('bastDate', e.target.value)}
+                                onChange={(e) => handleDocInputChange('BAST', 'bastDate', e.target.value)}
                                 className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
                               />
                             </div>
@@ -1778,7 +1798,7 @@ export default function Home() {
                           <input
                             type="text"
                             value={docsData[activeDocTab].signerFirstParty}
-                            onChange={(e) => handleDocInputChange('signerFirstParty', e.target.value)}
+                            onChange={(e) => handleDocInputChange(activeDocTab, 'signerFirstParty', e.target.value)}
                             placeholder={globalParty.freelancerName || 'cth: budi'}
                             className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl font-medium"
                           />
@@ -1814,7 +1834,7 @@ export default function Home() {
                                   const file = e.target.files?.[0];
                                   if (file) {
                                     const reader = new FileReader();
-                                    reader.onload = (event) => handleDocInputChange('signatureFirstParty', event.target?.result as string);
+                                    reader.onload = (event) => handleDocInputChange(activeDocTab, 'signatureFirstParty', event.target?.result as string);
                                     reader.readAsDataURL(file);
                                   }
                                 }}
@@ -1832,7 +1852,7 @@ export default function Home() {
                           <input
                             type="text"
                             value={docsData[activeDocTab].signerSecondParty}
-                            onChange={(e) => handleDocInputChange('signerSecondParty', e.target.value)}
+                            onChange={(e) => handleDocInputChange(activeDocTab, 'signerSecondParty', e.target.value)}
                             placeholder={globalParty.clientName || 'cth: Nama Direktur'}
                             className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl font-medium"
                           />
@@ -1868,7 +1888,7 @@ export default function Home() {
                                   const file = e.target.files?.[0];
                                   if (file) {
                                     const reader = new FileReader();
-                                    reader.onload = (event) => handleDocInputChange('signatureSecondParty', event.target?.result as string);
+                                    reader.onload = (event) => handleDocInputChange(activeDocTab, 'signatureSecondParty', event.target?.result as string);
                                     reader.readAsDataURL(file);
                                   }
                                 }}
