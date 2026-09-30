@@ -1274,7 +1274,7 @@ export default function Home() {
         .a4-page.export-pdf-mode {
           display: flex !important;
           flex-direction: column !important;
-          justify-content: space-between !important;
+          justify-between: space-between !important;
           padding: 40px !important;
           box-sizing: border-box !important;
         }
@@ -2059,7 +2059,7 @@ export default function Home() {
                         {/* RENDER AREA TTD BERSIH (TANPA KOTAK PLACEHOLDER & KOTAK PUTUS-PUTUS) */}
                         {!needsPage2 && (
                           <div className="pt-2 sm:pt-3 grid grid-cols-2 gap-3 sm:gap-4 text-center">
-                            <div className="bg-slate-50/80 border border-slate-200/80 rounded-xl p-2.5 sm:p-3 space-y-1.5 min-h-[100px] flex flex-col justify-between">
+                            <div className="p-2.5 sm:p-3 space-y-1.5 min-h-[100px] flex flex-col justify-between">
                               <span className="text-[11px] font-bold text-blue-600 uppercase tracking-wider block">
                                 PIHAK PERTAMA
                               </span>
@@ -2073,7 +2073,7 @@ export default function Home() {
                               </p>
                             </div>
 
-                            <div className="bg-slate-50/80 border border-slate-200/80 rounded-xl p-2.5 sm:p-3 space-y-1.5 min-h-[100px] flex flex-col justify-between">
+                            <div className="p-2.5 sm:p-3 space-y-1.5 min-h-[100px] flex flex-col justify-between">
                               <span className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider block">
                                 PIHAK KEDUA
                               </span>
@@ -2136,7 +2136,7 @@ export default function Home() {
 
                           {/* RENDER AREA TTD BERSIH HALAMAN 2 */}
                           <div className="pt-4 sm:pt-6 grid grid-cols-2 gap-3 sm:gap-4 text-center">
-                            <div className="bg-slate-50/80 border border-slate-200/80 rounded-xl p-3 sm:p-4 space-y-2 sm:space-y-3 min-h-[120px] flex flex-col justify-between">
+                            <div className="p-3 sm:p-4 space-y-2 sm:space-y-3 min-h-[120px] flex flex-col justify-between">
                               <span className="text-[11px] font-bold text-blue-600 uppercase tracking-wider block">
                                 PIHAK PERTAMA
                               </span>
@@ -2150,7 +2150,7 @@ export default function Home() {
                               </p>
                             </div>
 
-                            <div className="bg-slate-50/80 border border-slate-200/80 rounded-xl p-3 sm:p-4 space-y-2 sm:space-y-3 min-h-[120px] flex flex-col justify-between">
+                            <div className="p-3 sm:p-4 space-y-2 sm:space-y-3 min-h-[120px] flex flex-col justify-between">
                               <span className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider block">
                                 PIHAK KEDUA
                               </span>
@@ -2458,47 +2458,25 @@ export default function Home() {
               </div>
             )}
 
-            {/* SEKSI TAMBAHAN: AJAKAN TESTIMONI & BANTUAN CS VIA WA */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-              {/* Kartu Kirim Testimoni */}
+            {/* SEKSI TAMBAHAN: HANYA AJAKAN TESTIMONI VIA WA */}
+            <div className="pt-2">
               <a
                 href={`https://wa.me/${adminWaNumber}?text=${encodeURIComponent("Halo Admin SPKInstan, saya ingin memberikan testimoni/ulasan penggunaan SPKInstan:\n\nNama/Usaha: \nRating (1-5): \nUlasan: ")}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="p-3.5 bg-blue-50/70 hover:bg-blue-100/80 border border-blue-200 rounded-2xl flex flex-col justify-between gap-2 transition group"
+                className="p-4 bg-blue-50/70 hover:bg-blue-100/80 border border-blue-200 rounded-2xl flex items-center justify-between gap-3 transition group"
               >
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0">
-                    <Star className="w-4 h-4 fill-current" />
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                    <Star className="w-5 h-5 fill-current" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-slate-900 group-hover:text-blue-700">Puas dengan Hasilnya?</h4>
-                    <p className="text-[11px] text-slate-500">Bantu pengguna lain dengan testimoni singkat</p>
+                    <h4 className="text-xs sm:text-sm font-bold text-slate-900 group-hover:text-blue-700">Puas dengan Hasilnya?</h4>
+                    <p className="text-xs text-slate-500">Bantu pengguna lain dengan memberikan testimoni singkat via WhatsApp</p>
                   </div>
                 </div>
-                <span className="text-[11px] font-bold text-blue-600 flex items-center gap-1 mt-1">
-                  <MessageCircle className="w-3.5 h-3.5" /> Kirim Ulasan via WA &rarr;
-                </span>
-              </a>
-
-              {/* Kartu Bantuan / Revisi CS */}
-              <a
-                href={`https://wa.me/${adminWaNumber}?text=${encodeURIComponent("Halo Admin SPKInstan, saya butuh bantuan / konsultasi revisi khusus untuk dokumen yang baru saya buat.")}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-3.5 bg-emerald-50/70 hover:bg-emerald-100/80 border border-emerald-200 rounded-2xl flex flex-col justify-between gap-2 transition group"
-              >
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0">
-                    <MessageCircle className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-900 group-hover:text-emerald-700">Butuh Bantuan / Revisi?</h4>
-                    <p className="text-[11px] text-slate-500">Konsultasikan pasal khusus ke Admin CS</p>
-                  </div>
-                </div>
-                <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1 mt-1">
-                  <MessageCircle className="w-3.5 h-3.5" /> Hubungi CS WA &rarr;
+                <span className="text-xs font-bold text-blue-600 flex items-center gap-1 shrink-0 bg-white px-3 py-1.5 rounded-xl border border-blue-200 shadow-xs">
+                  <MessageCircle className="w-4 h-4" /> Kirim Ulasan via WA &rarr;
                 </span>
               </a>
             </div>
