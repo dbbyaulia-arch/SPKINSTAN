@@ -40,7 +40,7 @@ type DocType = 'SPK' | 'NDA' | 'BAST';
 interface SingleDocDetails {
   docNumber: string;
   projectTitle: string;
-  
+
   // Field Identitas Pihak
   freelancerName: string;
   freelancerEmail: string;
@@ -52,17 +52,17 @@ interface SingleDocDetails {
   signerSecondParty: string;
   signatureFirstParty: string | null;
   signatureSecondParty: string | null;
-  
+
   // Isian Spesifik SPK
   projectAmount: string;
   dpPercent: string;
   bankInfo: string;
-  
+
   // Isian Spesifik NDA
   ndaScope: string;
   ndaYears: string;
   ndaPenalty: string;
-  
+
   // Isian Spesifik BAST
   bastRef: string;
   bastWarranty: string;
@@ -641,7 +641,7 @@ export default function Home() {
         if (presetType === 'all') {
           return c.docType === activeDocTab ? { ...c, isEnabled: true } : c;
         }
-        
+
         if (c.docType !== activeDocTab) return c;
 
         if (c.docType === 'SPK') {
@@ -786,7 +786,7 @@ export default function Home() {
 
     if (typeof window !== 'undefined' && window.fbq) {
       window.fbq('track', 'Purchase', {
-        value: 1000,
+        value: selectedPackage === 'BUNDLING' ? 39999 : 19999,
         currency: 'IDR',
       });
     }
@@ -1052,7 +1052,7 @@ export default function Home() {
     setSessionId(currentSession);
     setTimeLeft(899);
 
-    const amount = 1000;
+    const amount = selectedPackage === 'BUNDLING' ? 39999 : 19999;
 
     if (typeof window !== 'undefined' && window.fbq) {
       window.fbq('track', 'InitiateCheckout', {
@@ -1251,7 +1251,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col justify-between font-sans antialiased selection:bg-blue-100 selection:text-blue-700 pb-20 md:pb-0">
-      
+
       <style>{`
         #a4-document-preview, .a4-page {
           font-family: 'Calibri', 'Carlito', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
@@ -1353,7 +1353,7 @@ export default function Home() {
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    Dokumen Satuan — Rp 1.000
+                    Dokumen Satuan — Rp 19.999
                   </button>
                   <button
                     type="button"
@@ -1364,7 +1364,7 @@ export default function Home() {
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    <span>Paket Bundling Proteksi (3-in-1) — Rp 1.000</span>
+                    <span>Paket Bundling Proteksi (3-in-1) — Rp 39.999</span>
                     <span className="bg-amber-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider whitespace-nowrap">
                       Hemat 60%
                     </span>
@@ -1378,7 +1378,7 @@ export default function Home() {
         {/* Editor Workspace Section */}
         <section id="editor" className="py-8 sm:py-10 bg-slate-100/70 border-t border-slate-200">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            
+
             <div className="lg:hidden flex bg-white rounded-2xl border border-slate-200 p-1 mb-6 shadow-sm text-xs font-bold">
               <button
                 type="button"
@@ -1401,7 +1401,7 @@ export default function Home() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-              
+
               {/* LEFT COLUMN: Dynamic Form Wizard */}
               <div
                 className={`lg:col-span-5 bg-white rounded-3xl p-5 sm:p-7 shadow-sm border border-slate-200/80 space-y-6 ${
@@ -2293,7 +2293,7 @@ export default function Home() {
       {showDownloadPopup && (
         <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white max-w-2xl w-full rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-100 space-y-6 my-8 relative animate-in fade-in zoom-in-95 duration-200">
-            
+
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-lg shrink-0">
@@ -2500,7 +2500,7 @@ export default function Home() {
       {showCheckoutModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white max-w-xl w-full rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-5 my-8 relative">
-            
+
             {/* STEP 1: PEMILIHAN PAKET LISENSI */}
             {modalStep === 'download_choice' && (
               <div className="space-y-4">
@@ -2539,7 +2539,7 @@ export default function Home() {
                           <span className="block font-bold">Dokumen Satuan ({activeDocTab})</span>
                           <span className="text-[10px] text-slate-500 font-normal">Unduh 1 dokumen PDF pilihan</span>
                         </div>
-                        <span className="font-extrabold text-slate-900 text-sm">Rp 1.000</span>
+                        <span className="font-extrabold text-slate-900 text-sm">Rp 19.999</span>
                       </div>
 
                       <div
@@ -2559,7 +2559,7 @@ export default function Home() {
                           </div>
                           <span className="text-[10px] text-slate-500 font-normal">Unduh sekaligus 3 Dokumen (SPK + NDA + BAST)</span>
                         </div>
-                        <span className="font-extrabold text-emerald-700 text-sm">Rp 1.000</span>
+                        <span className="font-extrabold text-emerald-700 text-sm">Rp 39.999</span>
                       </div>
                     </div>
 
@@ -2577,7 +2577,7 @@ export default function Home() {
                       <span>
                         {isLoadingQris
                           ? 'Menyiapkan Pembayaran...'
-                          : 'Buka Tagihan Pembayaran (Rp 1.000)'}
+                          : `Buka Tagihan Pembayaran (${selectedPackage === 'BUNDLING' ? 'Rp 39.999' : 'Rp 19.999'})`}
                       </span>
                     </button>
                   </div>
