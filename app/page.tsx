@@ -1366,7 +1366,7 @@ export default function Home() {
                   >
                     <span>Paket Bundling Proteksi (3-in-1) — Rp 39.999</span>
                     <span className="bg-amber-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider whitespace-nowrap">
-                      Hemat 60%
+                      HEMAT 33%
                     </span>
                   </button>
                 </div>
