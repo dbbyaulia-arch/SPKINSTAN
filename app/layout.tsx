@@ -6,7 +6,7 @@ import './globals.css';
 const plusJakartaSans = Plus_Jakarta_Sans({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'SPKInstan — Generator Perjanjian Kerja Sama Legal',
+  title: 'SPKINSTAN',
   description: 'Hasilkan SPK, NDA, & BAST sah perdata dalam 2 menit.',
 };
 
