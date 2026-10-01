@@ -1,12 +1,13 @@
 import type { Metadata } from 'next';
 import { Plus_Jakarta_Sans } from 'next/font/google';
 import Script from 'next/script';
+import { Analytics } from '@vercel/analytics/next'; // 👈 Impor Vercel Analytics
 import './globals.css';
 
 const plusJakartaSans = Plus_Jakarta_Sans({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'SPKINSTAN',
+  title: 'SPKInstan',
   description: 'Hasilkan SPK, NDA, & BAST sah perdata dalam 2 menit.',
 };
 
@@ -41,7 +42,10 @@ export default function RootLayout({
           />
         )}
       </head>
-      <body className={plusJakartaSans.className}>{children}</body>
+      <body className={plusJakartaSans.className}>
+        {children}
+        <Analytics /> {/* 👈 Komponen Vercel Analytics */}
+      </body>
     </html>
   );
 }
