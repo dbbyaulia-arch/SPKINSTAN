@@ -7,26 +7,29 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { sessionId, packageType, amount, docType } = body;
 
-    // 1. Tangkap nama dinamis dari form (Mendukung properti 'name' atau 'customerName')
+    // 1. Ekstraksi & sanitasi nama pembayar (Mendukung properti 'name' atau 'customerName')
     const rawName = body.name || body.customerName;
-    const finalCustomerName = rawName && typeof rawName === 'string' && rawName.trim() !== ''
-      ? rawName.trim()
-      : 'Penerima Kuitansi SPKInstan';
+    const finalCustomerName =
+      rawName && typeof rawName === 'string' && rawName.trim() !== ''
+        ? rawName.trim()
+        : 'Penerima Kuitansi SPKInstan';
 
-    // 2. Tangkap email & nomor HP dengan sanitize & fallback
+    // 2. Ekstraksi & sanitasi email serta nomor WhatsApp
     const rawEmail = body.email || body.customerEmail;
-    const finalCustomerEmail = rawEmail && typeof rawEmail === 'string' && rawEmail.trim() !== ''
-      ? rawEmail.trim()
-      : `client-${Date.now()}@spkinstan.com`;
+    const finalCustomerEmail =
+      rawEmail && typeof rawEmail === 'string' && rawEmail.trim() !== ''
+        ? rawEmail.trim()
+        : `client-${Date.now()}@spkinstan.com`;
 
     const rawMobile = body.mobile || body.customerMobile;
-    const finalCustomerMobile = rawMobile && typeof rawMobile === 'string' && rawMobile.trim() !== ''
-      ? rawMobile.trim()
-      : '081234567890';
+    const finalCustomerMobile =
+      rawMobile && typeof rawMobile === 'string' && rawMobile.trim() !== ''
+        ? rawMobile.trim()
+        : '081234567890';
 
     const MAYAR_API_KEY = process.env.MAYAR_API_KEY || '';
 
-    // 3. Panggil API Mayar untuk membuat link pembayaran
+    // 3. Panggil API Mayar untuk membuat link pembayaran dengan identitas dinamis
     const mayarRes = await fetch('https://api.mayar.id/hl/v1/payment/create', {
       method: 'POST',
       headers: {
@@ -39,21 +42,21 @@ export async function POST(request: Request) {
         mobile: finalCustomerMobile,
         amount: Number(amount) || 1000,
         description: `Lisensi Dokumen ${docType || 'SPKInstan'} - ${packageType || 'Dokumen'}`,
-        redirectUrl: process.env.NEXT_PUBLIC_BASE_URL 
-          ? `${process.env.NEXT_PUBLIC_BASE_URL}/payment-success` 
+        redirectUrl: process.env.NEXT_PUBLIC_BASE_URL
+          ? `${process.env.NEXT_PUBLIC_BASE_URL}/payment-success`
           : 'https://spkinstan.vercel.app/payment-success',
       }),
     });
 
     const mayarData = await mayarRes.json();
 
-    // Validasi penanganan error dari respon Mayar
+    // Validasi penanganan error dari respon API Mayar
     if (!mayarRes.ok) {
       console.error('Mayar API Error:', mayarData);
       return NextResponse.json(
-        { 
-          success: false, 
-          message: mayarData.message || 'Gagal membuat transaksi pembayaran di Mayar' 
+        {
+          success: false,
+          message: mayarData.message || 'Gagal membuat transaksi pembayaran di Mayar',
         },
         { status: mayarRes.status }
       );
@@ -62,7 +65,7 @@ export async function POST(request: Request) {
     const paymentId = mayarData?.data?.id || mayarData?.id || mayarData?.data?.paymentId;
     const paymentUrl = mayarData?.data?.link || mayarData?.link || mayarData?.data?.url;
 
-    // 4. SIMPAN KE REDIS dengan status 'PENDING'
+    // 4. Simpan status transaksi awal ke Redis
     const transactionData = {
       sessionId,
       mayarPaymentId: paymentId,
@@ -75,7 +78,6 @@ export async function POST(request: Request) {
       createdAt: new Date().toISOString(),
     };
 
-    // Simpan key berdasarkan Session ID dan Mayar ID agar dapat dicari oleh Webhook
     if (sessionId) {
       await redis.set(`txn:${sessionId}`, JSON.stringify(transactionData), { ex: 86400 });
     }
