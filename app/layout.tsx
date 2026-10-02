@@ -21,12 +21,13 @@ export const metadata: Metadata = {
   verification: {
     google: 'E7yGOswW_pAZnFjX0NHo85CLGSiRKKFXaM_qDSSbax4',
   },
-icons: {
+  icons: {
     icon: [
-      { url: '/logo.svg', type: 'image/svg+xml' }, // Untuk browser biasa (Chrome, Firefox, Edge)
+      { url: '/icon.svg', type: 'image/svg+xml' },
     ],
     apple: [
-      { url: '/apple-icon.png?v=2', sizes: '180x180', type: 'image/png' }, // Wajib PNG untuk Apple Ecosystem
+      // Tambahkan ?v=2 di akhir URL untuk memutus cache Apple
+      { url: '/apple-icon.png?v=2', sizes: '180x180', type: 'image/png' },
     ],
   },
 };
