@@ -1980,8 +1980,8 @@ export default function Home() {
                     <div className="a4-page w-full max-w-[794px] min-h-[1123px] h-auto bg-white text-slate-900 p-6 sm:p-8 relative flex flex-col justify-between shadow-xl rounded-xl border border-slate-200 shrink-0">
                       {!paidDocs[activeDocTab] && (
                         <div className="watermark-layer absolute inset-0 pointer-events-none z-20 flex items-center justify-center overflow-hidden">
-                          <span className="text-5xl sm:text-7xl font-black tracking-[0.25em] text-slate-300/25 uppercase select-none -rotate-12 transform">
-                            SPKINSTAN
+                          <span className="text-4xl sm:text-6xl font-black tracking-[0.15em] text-slate-300/25 select-none -rotate-12 transform">
+                            spkinstan.my.id
                           </span>
                         </div>
                       )}
@@ -2100,8 +2100,8 @@ export default function Home() {
                       <div className="a4-page w-full max-w-[794px] min-h-[1123px] h-auto bg-white text-slate-900 p-6 sm:p-8 relative flex flex-col justify-between shadow-xl rounded-xl border border-slate-200 shrink-0">
                         {!paidDocs[activeDocTab] && (
                           <div className="watermark-layer absolute inset-0 pointer-events-none z-20 flex items-center justify-center overflow-hidden">
-                            <span className="text-5xl sm:text-7xl font-black tracking-[0.25em] text-slate-300/25 uppercase select-none -rotate-12 transform">
-                              SPKINSTAN
+                            <span className="text-4xl sm:text-6xl font-black tracking-[0.15em] text-slate-300/25 select-none -rotate-12 transform">
+                              spkinstan.my.id
                             </span>
                           </div>
                         )}
