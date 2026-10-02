@@ -25,7 +25,9 @@ import {
   Loader2,
   AlertTriangle,
   Sliders,
-  RefreshCw
+  RefreshCw,
+  Mail,
+  Phone
 } from 'lucide-react';
 
 declare global {
@@ -118,6 +120,10 @@ export default function Home() {
   const [modalStep, setModalStep] = useState<'download_choice' | 'qris'>('download_choice');
   const [showDownloadPopup, setShowDownloadPopup] = useState(false); // POPUP OVERLAY PASCA-BAYAR PERSISTEN
 
+  // STATE BARU: KONFIRMASI RECEIPT EMAIL & WA UNTUK NOTA MAYAR
+  const [receiptEmail, setReceiptEmail] = useState('');
+  const [receiptMobile, setReceiptMobile] = useState('');
+
   const [mobileViewMode, setMobileViewMode] = useState<'form' | 'preview'>('form');
   const [isExporting, setIsExporting] = useState(false);
 
@@ -133,7 +139,6 @@ export default function Home() {
 
   // ---------------------------------------------------------
   // KEYED DICTIONARY STATE IMPLEMENTATION (TERPISAH PER DOKUMEN)
-  // Memisahkan nomor surat (docNumber) dan identitas per dokumen
   // ---------------------------------------------------------
   const [docsData, setDocsData] = useState<Record<DocType, SingleDocDetails>>({
     SPK: {
@@ -204,7 +209,7 @@ export default function Home() {
     },
   });
 
-  // Handler Pembaruan Input Form Dokumen Spesifik (Menghindari Stale Closure)
+  // Handler Pembaruan Input Form Dokumen Spesifik & Invalidate Payment Link
   const handleDocInputChange = (
     docTarget: DocType,
     field: keyof SingleDocDetails,
@@ -217,6 +222,10 @@ export default function Home() {
         [field]: value,
       },
     }));
+
+    // RESET LINK PEMBAYARAN LAMA (INVALIDATE INVOICE EXPIRED)
+    setPaymentUrl(null);
+    setMayarPaymentId(null);
   };
 
   const canvasRef1 = useRef<HTMLCanvasElement | null>(null);
@@ -231,7 +240,7 @@ export default function Home() {
   const page2ContentRef = useRef<HTMLDivElement | null>(null);
   const [heightNeedsPage2, setHeightNeedsPage2] = useState(false);
 
-  // Initial Master Clauses dengan Landasan Hukum Indonesia Terlengkap & Presisi Legally Sound
+  // Master Clauses dengan Landasan Hukum Indonesia Terlengkap & Presisi
   const [clauses, setClauses] = useState<Clause[]>([
     // --- PASAL-PASAL DOKUMEN SPK ---
     {
@@ -387,6 +396,20 @@ export default function Home() {
     },
   ]);
 
+  // Autofill Default Email & WA Penerima Kuitansi saat Checkout Modal Dibuka
+  useEffect(() => {
+    if (showCheckoutModal) {
+      const currentDocDetails = docsData[activeDocTab];
+      const defaultEmail = currentDocDetails.freelancerEmail.trim() || currentDocDetails.clientName
+        ? `${currentDocDetails.clientName.toLowerCase().replace(/[^a-z0-9]/g, '')}@spkinstan.com`
+        : '';
+      const defaultMobile = currentDocDetails.freelancerWa.trim() || currentDocDetails.clientWa.trim() || '';
+
+      if (!receiptEmail) setReceiptEmail(defaultEmail);
+      if (!receiptMobile) setReceiptMobile(defaultMobile);
+    }
+  }, [showCheckoutModal, activeDocTab, docsData]);
+
   // Sync Tanda Tangan Canvas saat Berganti Tab Dokumen maupun Step Wizard
   useEffect(() => {
     if (currentWizardStep !== 4) return;
@@ -448,7 +471,6 @@ export default function Home() {
       }
     }
 
-    // PAKSA TAMPILKAN POPUP JIKA STATUS MASIH AKTIF
     if (popupActive === 'true') {
       setShowDownloadPopup(true);
       window.history.pushState({ downloadPopup: true }, '');
@@ -501,10 +523,7 @@ export default function Home() {
   // Menyimpan Draf Form
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const draftData = {
-        docsData,
-        clauses,
-      };
+      const draftData = { docsData, clauses };
       localStorage.setItem('spkinstan_form_draft', JSON.stringify(draftData));
     }
   }, [docsData, clauses]);
@@ -516,12 +535,7 @@ export default function Home() {
       if (savedDraft) {
         try {
           const parsed = JSON.parse(savedDraft);
-          if (
-            parsed.docsData &&
-            parsed.docsData.SPK &&
-            parsed.docsData.NDA &&
-            parsed.docsData.BAST
-          ) {
+          if (parsed.docsData && parsed.docsData.SPK && parsed.docsData.NDA && parsed.docsData.BAST) {
             setDocsData(parsed.docsData);
             if (parsed.clauses && Array.isArray(parsed.clauses)) {
               setClauses(parsed.clauses);
@@ -632,7 +646,7 @@ export default function Home() {
     setClauses((prev) => prev.filter((c) => c.id !== id));
   };
 
-  // State & Indikator Preset Dinamis Sesuai Active Tab
+  // Preset Dinamis Sesuai Active Tab
   const handleApplyPreset = (presetType: 'web' | 'design' | 'all') => {
     setActivePreset(presetType);
 
@@ -714,13 +728,14 @@ export default function Home() {
   const totalPages = needsPage2 ? 2 : 1;
 
   const generateNewSessionId = () => {
-    return 'SPK-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+    return 'SPK-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
   };
 
   useEffect(() => {
     setSessionId(generateNewSessionId());
   }, []);
 
+  // Fitur Proteksi Keamanan Draf
   useEffect(() => {
     const isPaid = paidDocs[activeDocTab];
     if (isPaid) return;
@@ -763,6 +778,15 @@ export default function Home() {
       stopPolling();
     }
   }, [showCheckoutModal]);
+
+  // FUNGSI BERSIH-BERSIH MODAL DITUTUP MANUAL
+  const handleCloseModal = () => {
+    setShowCheckoutModal(false);
+    setPaymentUrl(null);
+    setMayarPaymentId(null);
+    setModalStep('download_choice');
+    stopPolling();
+  };
 
   // TRIGGER PEMBAYARAN SUKSES & AKTIVASI POPUP OVERLAY
   const handlePaymentSuccess = () => {
@@ -821,7 +845,7 @@ export default function Home() {
     });
   };
 
-  // FUNGSI HELPER: GENERATE PDF BLOB
+  // FUNGSI HELPER: GENERATE PDF BLOB WITH CLEAN FILE NAMING
   const generatePdfBlob = async (
     docType: DocType
   ): Promise<{ blob: Blob; fileName: string } | null> => {
@@ -871,7 +895,6 @@ export default function Home() {
         const originalHeight = pageEl.style.height;
         const originalMinHeight = pageEl.style.minHeight;
 
-        // Dynamic Height Penyesuaian Snapshot PDF
         pageEl.style.width = '794px';
         pageEl.style.minHeight = '1123px';
         pageEl.style.height = 'auto';
@@ -911,7 +934,7 @@ export default function Home() {
         }
       }
 
-      // Format Penamaan File Bersih Tanpa Tag Status: <doctype>_<nama_pihak_pertama>.pdf
+      // Format Penamaan File Bersih: <doctype>_<nama_pihak_pertama>.pdf
       const cleanName = (docsData[docType].freelancerName || 'pihak_pertama')
         .trim()
         .toLowerCase()
@@ -931,7 +954,7 @@ export default function Home() {
     }
   };
 
-  // CAPTURE & EXPORT PDF (MENGGUNAKAN GENERATE PDF BLOB)
+  // CAPTURE & EXPORT PDF
   const captureDocumentToPdf = async (docType: DocType) => {
     setProcessingDoc(docType);
     try {
@@ -1039,17 +1062,20 @@ export default function Home() {
     }, 2500);
   };
 
-  // PEMBAYARAN MAYAR EMBEDDED IFRAME DI DALAM MODAL
+  // PEMBAYARAN MAYAR EMBEDDED IFRAME DENGAN FRESH SESSION ID
   const handleRequestQris = async () => {
     if (isLoadingQris) return;
 
     setIsLoadingQris(true);
     setPaidDocTarget(activeDocTab);
+
+    // 1. Reset state pembayaran sebelumnya
     setQrCodeData(null);
     setPaymentUrl(null);
 
-    const currentSession = generateNewSessionId();
-    setSessionId(currentSession);
+    // 2. Generate Session ID baru unik per klik
+    const freshSessionId = generateNewSessionId();
+    setSessionId(freshSessionId);
     setTimeLeft(899);
 
     const amount = selectedPackage === 'BUNDLING' ? 39999 : 19999;
@@ -1064,34 +1090,43 @@ export default function Home() {
     const currentDocDetails = docsData[activeDocTab];
     const targetName = currentDocDetails.clientName || currentDocDetails.freelancerName || 'Pihak Kedua SPKInstan';
     const cleanName = targetName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    
+    // Gunakan receiptEmail & receiptMobile jika diisi di Modal Checkout, atau Fallback
     const targetEmail =
+      receiptEmail.trim() ||
       currentDocDetails.freelancerEmail.trim() ||
       (cleanName ? `${cleanName}@spkinstan.com` : `client-${Date.now()}@spkinstan.com`);
+
+    const targetMobile =
+      receiptMobile.trim() ||
+      currentDocDetails.clientWa.trim() ||
+      currentDocDetails.freelancerWa.trim() ||
+      '081234567890';
 
     try {
       const res = await fetch('/api/qris/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sessionId: currentSession,
+          sessionId: freshSessionId,
           packageType: selectedPackage,
           amount,
           docType: activeDocTab,
           customerName: targetName,
-          customerMobile: currentDocDetails.clientWa || currentDocDetails.freelancerWa || '081234567890',
+          customerMobile: targetMobile,
           customerEmail: targetEmail,
         }),
       });
 
       const data = await res.json();
       if (res.ok && data.success) {
-        const realMayarId = data.mayarPaymentId || data.paymentId || data.id || currentSession;
+        const realMayarId = data.mayarPaymentId || data.paymentId || data.id || freshSessionId;
         setMayarPaymentId(realMayarId);
 
         if (data.paymentUrl) {
           setPaymentUrl(data.paymentUrl);
           setModalStep('qris');
-          startPollingStatus(currentSession);
+          startPollingStatus(freshSessionId);
         }
       } else {
         console.error('Mayar Payment Error:', data.message);
@@ -1481,7 +1516,7 @@ export default function Home() {
                         />
                       </div>
 
-                      {/* PIHAK PERTAMA ISOLATED */}
+                      {/* PIHAK PERTAMA */}
                       <div className="space-y-3 pt-2 border-t border-slate-100">
                         <h4 className="text-xs font-bold uppercase tracking-wider text-blue-600 flex items-center gap-1">
                           <User className="w-3.5 h-3.5" /> Pihak Pertama ({activeDocTab})
@@ -1520,7 +1555,7 @@ export default function Home() {
                         </div>
                       </div>
 
-                      {/* PIHAK KEDUA ISOLATED */}
+                      {/* PIHAK KEDUA */}
                       <div className="space-y-3 pt-2 border-t border-slate-100">
                         <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-600 flex items-center gap-1">
                           <Building2 className="w-3.5 h-3.5" /> Pihak Kedua ({activeDocTab})
@@ -1952,7 +1987,7 @@ export default function Home() {
                 </form>
               </div>
 
-              {/* RIGHT COLUMN: Live Preview A4 Mutlak (794px x 1123px) Responsif */}
+              {/* RIGHT COLUMN: Live Preview A4 Mutlak (794px x 1123px) */}
               <div
                 className={`lg:col-span-7 space-y-4 ${
                   mobileViewMode === 'form' ? 'hidden lg:block' : 'block'
@@ -2056,7 +2091,7 @@ export default function Home() {
                           ))}
                         </div>
 
-                        {/* RENDER AREA TTD BERSIH (TANPA KOTAK PLACEHOLDER & KOTAK PUTUS-PUTUS) */}
+                        {/* RENDER AREA TTD BERSIH (TANPA KOTAK PLACEHOLDER) */}
                         {!needsPage2 && (
                           <div className="pt-2 sm:pt-3 grid grid-cols-2 gap-3 sm:gap-4 text-center">
                             <div className="p-2.5 sm:p-3 space-y-1.5 min-h-[100px] flex flex-col justify-between">
@@ -2289,7 +2324,7 @@ export default function Home() {
         </section>
       </main>
 
-      {/* POPUP OVERLAY PUSAT UNDUHAN PERSISTEN PASCA-BAYAR (FOKUS DIRECT DOWNLOAD PDF) */}
+      {/* POPUP OVERLAY PUSAT UNDUHAN PERSISTEN PASCA-BAYAR */}
       {showDownloadPopup && (
         <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white max-w-2xl w-full rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-100 space-y-6 my-8 relative animate-in fade-in zoom-in-95 duration-200">
@@ -2458,7 +2493,7 @@ export default function Home() {
               </div>
             )}
 
-            {/* SEKSI TAMBAHAN: HANYA AJAKAN TESTIMONI VIA WA */}
+            {/* KARTU AJAKAN TESTIMONI VIA WA */}
             <div className="pt-2">
               <a
                 href={`https://wa.me/${adminWaNumber}?text=${encodeURIComponent("Halo Admin SPKInstan, saya ingin memberikan testimoni/ulasan penggunaan SPKInstan:\n\nNama/Usaha: \nRating (1-5): \nUlasan: ")}`}
@@ -2481,7 +2516,7 @@ export default function Home() {
               </a>
             </div>
 
-            {/* TOMBOL UNTUK MENUTUP POPUP (RESET LISENSI SINGLE-USE) */}
+            {/* TOMBOL UNTUK MENUTUP POPUP */}
             <div className="pt-4 border-t border-slate-100 flex justify-end">
               <button
                 type="button"
@@ -2501,28 +2536,57 @@ export default function Home() {
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white max-w-xl w-full rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-5 my-8 relative">
 
-            {/* STEP 1: PEMILIHAN PAKET LISENSI */}
+            {/* STEP 1: PEMILIHAN PAKET LISENSI & KONFIRMASI PEMBAYAR */}
             {modalStep === 'download_choice' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                   <div className="flex items-center gap-2">
                     <Sparkles className="w-5 h-5 text-amber-500" />
                     <span className="text-xs font-extrabold text-slate-900 uppercase">
-                      Pilih Paket Lisensi Dokumen
+                      Pilih Paket & Konfirmasi Pembayar
                     </span>
                   </div>
                   <button
                     type="button"
-                    onClick={() => setShowCheckoutModal(false)}
+                    onClick={handleCloseModal}
                     className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition"
                   >
                     <X className="w-5 h-5" />
                   </button>
                 </div>
 
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  Silakan selesaikan pembayaran melalui Mayar Gateway di bawah ini untuk menghapus watermark & membuka PDF HD:
-                </p>
+                {/* FORM KONFIRMASI EMAIL & WA PENERIMA KUITANSI */}
+                <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-3 text-left">
+                  <span className="text-xs font-bold text-slate-800 uppercase tracking-wider block">
+                    Konfirmasi Penerima Nota/Kuitansi Pembayaran
+                  </span>
+                  
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1 flex items-center gap-1">
+                      <Mail className="w-3 h-3 text-blue-600" /> Email Penerima Kuitansi Mayar
+                    </label>
+                    <input
+                      type="email"
+                      value={receiptEmail}
+                      onChange={(e) => setReceiptEmail(e.target.value)}
+                      placeholder="cth: emailpembayar@gmail.com"
+                      className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1 flex items-center gap-1">
+                      <Phone className="w-3 h-3 text-emerald-600" /> WhatsApp Penerima Nota
+                    </label>
+                    <input
+                      type="text"
+                      value={receiptMobile}
+                      onChange={(e) => setReceiptMobile(e.target.value)}
+                      placeholder="cth: 081234567890"
+                      className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition"
+                    />
+                  </div>
+                </div>
 
                 <div className="space-y-3">
                   <div className="p-4 rounded-2xl border-2 border-emerald-500/80 bg-emerald-50/40 space-y-3">
@@ -2554,7 +2618,7 @@ export default function Home() {
                           <div className="flex items-center gap-1.5">
                             <span className="font-bold">Paket Bundling Proteksi 3-in-1</span>
                             <span className="bg-amber-500 text-white text-[9px] px-1 py-0.5 rounded font-black uppercase">
-                              -60%
+                              HEMAT 33%
                             </span>
                           </div>
                           <span className="text-[10px] text-slate-500 font-normal">Unduh sekaligus 3 Dokumen (SPK + NDA + BAST)</span>
@@ -2597,7 +2661,7 @@ export default function Home() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => setShowCheckoutModal(false)}
+                    onClick={handleCloseModal}
                     className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition"
                   >
                     <X className="w-5 h-5" />
