@@ -121,9 +121,10 @@ export default function Home() {
   const [modalStep, setModalStep] = useState<'download_choice' | 'qris'>('download_choice');
   const [showDownloadPopup, setShowDownloadPopup] = useState(false);
 
-  // STATE RECEIPT EMAIL, NAMA (MANUAL TANPA AUTOFILL), & VALIDASI ERROR
+  // STATE RECEIPT EMAIL, NAMA, WA, & VALIDASI ERROR
   const [receiptEmail, setReceiptEmail] = useState('');
   const [receiptName, setReceiptName] = useState(''); // Default Kosong Manual Input
+  const [receiptWa, setReceiptWa] = useState(''); // State Nomor WA Penerima Nota Mayar
   const [emailError, setEmailError] = useState('');
 
   const [mobileViewMode, setMobileViewMode] = useState<'form' | 'preview'>('form');
@@ -515,6 +516,7 @@ export default function Home() {
 
       setReceiptEmail('');
       setReceiptName('');
+      setReceiptWa('');
       window.history.replaceState({}, document.title, window.location.pathname);
       setIsLoaded(true);
       alert('Cache draf dan pembayaran berhasil dibersihkan otomatis!');
@@ -575,11 +577,12 @@ export default function Home() {
           paidDocTarget,
           receiptEmail,
           receiptName,
+          receiptWa,
           createdAt: Date.now(),
         })
       );
     }
-  }, [showCheckoutModal, modalStep, paymentUrl, sessionId, paidDocTarget, receiptEmail, receiptName]);
+  }, [showCheckoutModal, modalStep, paymentUrl, sessionId, paidDocTarget, receiptEmail, receiptName, receiptWa]);
 
   // 5. Auto-Restore Sesi Pembayaran dengan Auto-Expire 15 Menit
   useEffect(() => {
@@ -604,6 +607,7 @@ export default function Home() {
           setPaidDocTarget(data.paidDocTarget || 'SPK');
           if (data.receiptEmail) setReceiptEmail(data.receiptEmail);
           if (data.receiptName) setReceiptName(data.receiptName);
+          if (data.receiptWa) setReceiptWa(data.receiptWa);
 
           setModalStep('qris');
           setShowCheckoutModal(true);
@@ -617,7 +621,7 @@ export default function Home() {
     }
   }, []);
 
-  // Autofill Email Penerima Kuitansi (Tetap Kosongkan Nama Penerima Kuitansi untuk Input Manual)
+  // Autofill Email & WA Penerima Kuitansi (Tetap Kosongkan Nama Penerima Kuitansi untuk Input Manual)
   useEffect(() => {
     if (showCheckoutModal) {
       const currentDocDetails = docsData[activeDocTab];
@@ -626,6 +630,9 @@ export default function Home() {
         : '');
 
       if (!receiptEmail) setReceiptEmail(defaultEmail);
+
+      const defaultWa = currentDocDetails.freelancerWa.trim() || currentDocDetails.clientWa.trim() || '';
+      if (!receiptWa) setReceiptWa(defaultWa);
     }
   }, [showCheckoutModal, activeDocTab, docsData]);
 
@@ -1163,7 +1170,7 @@ export default function Home() {
         }
       }
 
-      // Format Penamaan File Bersih: <doctype>_<nama_pihak_pertama>.pdf
+      // Format Penamaan File Bersih: <doctype>_<nama_pihak_pertama>.pdf (tanpa status)
       const cleanName = (docsData[docType].freelancerName || 'pihak_pertama')
         .trim()
         .toLowerCase()
@@ -1291,7 +1298,7 @@ export default function Home() {
     }, 2500);
   };
 
-  // PEMBAYARAN MAYAR EMBEDDED IFRAME
+  // PEMBAYARAN MAYAR EMBEDDED IFRAME WITH WHATSAPP LINKING
   const handleRequestQris = async () => {
     if (isLoadingQris) return;
 
@@ -1329,9 +1336,11 @@ export default function Home() {
     const targetName = receiptName.trim() || currentDocDetails.clientName || currentDocDetails.freelancerName || 'Pihak Kedua SPKInstan';
     const targetEmail = receiptEmail.trim();
 
+    // Sesuai Spesifikasi: targetMobile Mengambil receiptWa -> freelancerWa -> clientWa -> fallback
     const targetMobile =
-      currentDocDetails.clientWa.trim() ||
+      receiptWa.trim() ||
       currentDocDetails.freelancerWa.trim() ||
+      currentDocDetails.clientWa.trim() ||
       '081234567890';
 
     try {
@@ -1754,6 +1763,8 @@ export default function Home() {
                           </label>
                           <input
                             type="text"
+                            readOnly
+                            onFocus={(e) => e.target.removeAttribute('readonly')}
                             autoComplete="off"
                             value={docsData[activeDocTab].docNumber}
                             onChange={(e) => handleDocInputChange(activeDocTab, 'docNumber', e.target.value)}
@@ -1768,6 +1779,8 @@ export default function Home() {
                           </label>
                           <input
                             type="date"
+                            readOnly
+                            onFocus={(e) => e.target.removeAttribute('readonly')}
                             autoComplete="off"
                             value={docsData[activeDocTab].docDate}
                             onChange={(e) => handleDocInputChange(activeDocTab, 'docDate', e.target.value)}
@@ -1787,6 +1800,8 @@ export default function Home() {
                           </label>
                           <input
                             type="text"
+                            readOnly
+                            onFocus={(e) => e.target.removeAttribute('readonly')}
                             autoComplete="off"
                             value={docsData[activeDocTab].freelancerName}
                             onChange={(e) => handleDocInputChange(activeDocTab, 'freelancerName', e.target.value)}
@@ -1798,6 +1813,8 @@ export default function Home() {
                           <label className="block text-xs font-semibold text-slate-700 mb-1">Email</label>
                           <input
                             type="email"
+                            readOnly
+                            onFocus={(e) => e.target.removeAttribute('readonly')}
                             autoComplete="off"
                             value={docsData[activeDocTab].freelancerEmail}
                             onChange={(e) => handleDocInputChange(activeDocTab, 'freelancerEmail', e.target.value)}
@@ -1809,6 +1826,8 @@ export default function Home() {
                           <label className="block text-xs font-semibold text-slate-700 mb-1">Nomor WhatsApp</label>
                           <input
                             type="text"
+                            readOnly
+                            onFocus={(e) => e.target.removeAttribute('readonly')}
                             autoComplete="off"
                             value={docsData[activeDocTab].freelancerWa}
                             onChange={(e) => handleDocInputChange(activeDocTab, 'freelancerWa', e.target.value)}
@@ -1829,6 +1848,8 @@ export default function Home() {
                           </label>
                           <input
                             type="text"
+                            readOnly
+                            onFocus={(e) => e.target.removeAttribute('readonly')}
                             autoComplete="off"
                             value={docsData[activeDocTab].clientName}
                             onChange={(e) => handleDocInputChange(activeDocTab, 'clientName', e.target.value)}
@@ -1840,6 +1861,8 @@ export default function Home() {
                           <label className="block text-xs font-semibold text-slate-700 mb-1">Nomor WhatsApp</label>
                           <input
                             type="text"
+                            readOnly
+                            onFocus={(e) => e.target.removeAttribute('readonly')}
                             autoComplete="off"
                             value={docsData[activeDocTab].clientWa}
                             onChange={(e) => handleDocInputChange(activeDocTab, 'clientWa', e.target.value)}
@@ -1859,6 +1882,8 @@ export default function Home() {
                             <label className="block text-xs font-semibold text-slate-700 mb-1">Judul Pekerjaan / Proyek (SPK)</label>
                             <input
                               type="text"
+                              readOnly
+                              onFocus={(e) => e.target.removeAttribute('readonly')}
                               autoComplete="off"
                               value={docsData.SPK.projectTitle}
                               onChange={(e) => handleDocInputChange('SPK', 'projectTitle', e.target.value)}
@@ -1871,6 +1896,8 @@ export default function Home() {
                               <label className="block text-xs font-semibold text-slate-700 mb-1">Nilai Imbalan (Rp)</label>
                               <input
                                 type="number"
+                                readOnly
+                                onFocus={(e) => e.target.removeAttribute('readonly')}
                                 autoComplete="off"
                                 value={docsData.SPK.projectAmount}
                                 onChange={(e) => handleDocInputChange('SPK', 'projectAmount', e.target.value)}
@@ -1882,6 +1909,8 @@ export default function Home() {
                               <label className="block text-xs font-semibold text-slate-700 mb-1">Uang Muka DP (%)</label>
                               <input
                                 type="number"
+                                readOnly
+                                onFocus={(e) => e.target.removeAttribute('readonly')}
                                 autoComplete="off"
                                 value={docsData.SPK.dpPercent}
                                 onChange={(e) => handleDocInputChange('SPK', 'dpPercent', e.target.value)}
@@ -1894,6 +1923,8 @@ export default function Home() {
                             <label className="block text-xs font-semibold text-slate-700 mb-1">Rekening Tujuan Pelunasan</label>
                             <input
                               type="text"
+                              readOnly
+                              onFocus={(e) => e.target.removeAttribute('readonly')}
                               autoComplete="off"
                               value={docsData.SPK.bankInfo}
                               onChange={(e) => handleDocInputChange('SPK', 'bankInfo', e.target.value)}
@@ -1910,6 +1941,8 @@ export default function Home() {
                             <label className="block text-xs font-semibold text-slate-700 mb-1">Judul / Perihal Kerahasiaan (NDA)</label>
                             <input
                               type="text"
+                              readOnly
+                              onFocus={(e) => e.target.removeAttribute('readonly')}
                               autoComplete="off"
                               value={docsData.NDA.projectTitle}
                               onChange={(e) => handleDocInputChange('NDA', 'projectTitle', e.target.value)}
@@ -1921,6 +1954,8 @@ export default function Home() {
                             <label className="block text-xs font-semibold text-slate-700 mb-1">Cakupan Informasi Rahasia</label>
                             <input
                               type="text"
+                              readOnly
+                              onFocus={(e) => e.target.removeAttribute('readonly')}
                               autoComplete="off"
                               value={docsData.NDA.ndaScope}
                               onChange={(e) => handleDocInputChange('NDA', 'ndaScope', e.target.value)}
@@ -1933,6 +1968,8 @@ export default function Home() {
                               <label className="block text-xs font-semibold text-slate-700 mb-1">Masa Kerahasiaan (Tahun)</label>
                               <input
                                 type="number"
+                                readOnly
+                                onFocus={(e) => e.target.removeAttribute('readonly')}
                                 autoComplete="off"
                                 value={docsData.NDA.ndaYears}
                                 onChange={(e) => handleDocInputChange('NDA', 'ndaYears', e.target.value)}
@@ -1944,6 +1981,8 @@ export default function Home() {
                               <label className="block text-xs font-semibold text-slate-700 mb-1">Denda Pelanggaran (Rp)</label>
                               <input
                                 type="number"
+                                readOnly
+                                onFocus={(e) => e.target.removeAttribute('readonly')}
                                 autoComplete="off"
                                 value={docsData.NDA.ndaPenalty}
                                 onChange={(e) => handleDocInputChange('NDA', 'ndaPenalty', e.target.value)}
@@ -1961,6 +2000,8 @@ export default function Home() {
                             <label className="block text-xs font-semibold text-slate-700 mb-1">Judul Serah Terima (BAST)</label>
                             <input
                               type="text"
+                              readOnly
+                              onFocus={(e) => e.target.removeAttribute('readonly')}
                               autoComplete="off"
                               value={docsData.BAST.projectTitle}
                               onChange={(e) => handleDocInputChange('BAST', 'projectTitle', e.target.value)}
@@ -1972,6 +2013,8 @@ export default function Home() {
                             <label className="block text-xs font-semibold text-slate-700 mb-1">Nomor Referensi SPK Utama</label>
                             <input
                               type="text"
+                              readOnly
+                              onFocus={(e) => e.target.removeAttribute('readonly')}
                               autoComplete="off"
                               value={docsData.BAST.bastRef}
                               onChange={(e) => handleDocInputChange('BAST', 'bastRef', e.target.value)}
@@ -1984,6 +2027,8 @@ export default function Home() {
                               <label className="block text-xs font-semibold text-slate-700 mb-1">Masa Garansi Bug (Hari)</label>
                               <input
                                 type="number"
+                                readOnly
+                                onFocus={(e) => e.target.removeAttribute('readonly')}
                                 autoComplete="off"
                                 value={docsData.BAST.bastWarranty}
                                 onChange={(e) => handleDocInputChange('BAST', 'bastWarranty', e.target.value)}
@@ -1995,6 +2040,8 @@ export default function Home() {
                               <label className="block text-xs font-semibold text-slate-700 mb-1">Tanggal Serah Terima</label>
                               <input
                                 type="date"
+                                readOnly
+                                onFocus={(e) => e.target.removeAttribute('readonly')}
                                 autoComplete="off"
                                 value={docsData.BAST.bastDate}
                                 onChange={(e) => handleDocInputChange('BAST', 'bastDate', e.target.value)}
@@ -2093,6 +2140,8 @@ export default function Home() {
 
                               <input
                                 type="text"
+                                readOnly
+                                onFocus={(e) => e.target.removeAttribute('readonly')}
                                 autoComplete="off"
                                 value={clause.title}
                                 onChange={(e) => handleUpdateClauseTitle(clause.id, e.target.value)}
@@ -2131,6 +2180,8 @@ export default function Home() {
                         <div>
                           <input
                             type="text"
+                            readOnly
+                            onFocus={(e) => e.target.removeAttribute('readonly')}
                             autoComplete="off"
                             value={docsData[activeDocTab].signerFirstParty}
                             onChange={(e) => handleDocInputChange(activeDocTab, 'signerFirstParty', e.target.value)}
@@ -2186,6 +2237,8 @@ export default function Home() {
                         <div>
                           <input
                             type="text"
+                            readOnly
+                            onFocus={(e) => e.target.removeAttribute('readonly')}
                             autoComplete="off"
                             value={docsData[activeDocTab].signerSecondParty}
                             onChange={(e) => handleDocInputChange(activeDocTab, 'signerSecondParty', e.target.value)}
@@ -2373,7 +2426,7 @@ export default function Home() {
                           ))}
                         </div>
 
-                        {/* RENDER AREA TTD BERSIH */}
+                        {/* RENDER AREA TTD BERSIH (Tanpa Placeholder Kotak/Dashed, Menjaga Tinggi) */}
                         {!needsPage2 && (
                           <div className="pt-2 sm:pt-3 grid grid-cols-2 gap-3 sm:gap-4 text-center">
                             <div className="p-2.5 sm:p-3 space-y-1.5 min-h-[100px] flex flex-col justify-between">
@@ -2837,7 +2890,7 @@ export default function Home() {
                   </button>
                 </div>
 
-                {/* FORM KONFIRMASI EMAIL & NAMA PENERIMA KUITANSI */}
+                {/* FORM KONFIRMASI EMAIL, NAMA, & WA PENERIMA KUITANSI */}
                 <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-3 text-left">
                   <span className="text-xs font-bold text-slate-800 uppercase tracking-wider block">
                     Konfirmasi Penerima Nota/Kuitansi Pembayaran
@@ -2849,6 +2902,8 @@ export default function Home() {
                     </label>
                     <input
                       type="email"
+                      readOnly
+                      onFocus={(e) => e.target.removeAttribute('readonly')}
                       autoComplete="off"
                       value={receiptEmail}
                       onChange={(e) => {
@@ -2878,6 +2933,8 @@ export default function Home() {
                     </label>
                     <input
                       type="text"
+                      readOnly
+                      onFocus={(e) => e.target.removeAttribute('readonly')}
                       autoComplete="off"
                       value={receiptName}
                       onChange={(e) => {
@@ -2889,6 +2946,29 @@ export default function Home() {
                         }
                       }}
                       placeholder="cth: Budi Santoso / PT Digital Inovasi"
+                      className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1 flex items-center gap-1">
+                      <MessageCircle className="w-3 h-3 text-emerald-600" /> Nomor WhatsApp Penerima Nota / Kuitansi
+                    </label>
+                    <input
+                      type="text"
+                      readOnly
+                      onFocus={(e) => e.target.removeAttribute('readonly')}
+                      autoComplete="off"
+                      value={receiptWa}
+                      onChange={(e) => {
+                        setReceiptWa(e.target.value);
+                        setPaymentUrl(null);
+                        setMayarPaymentId(null);
+                        if (typeof window !== 'undefined') {
+                          localStorage.removeItem('spkinstan_active_payment');
+                        }
+                      }}
+                      placeholder="cth: 081234567890"
                       className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition"
                     />
                   </div>
