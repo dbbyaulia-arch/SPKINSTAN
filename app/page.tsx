@@ -621,18 +621,38 @@ export default function Home() {
     }
   }, []);
 
-  // Autofill Email & WA Penerima Kuitansi (Tetap Kosongkan Nama Penerima Kuitansi untuk Input Manual)
+  // Autofill Email, Nama, & WA Penerima Kuitansi
   useEffect(() => {
     if (showCheckoutModal) {
       const currentDocDetails = docsData[activeDocTab];
-      const defaultEmail = currentDocDetails.freelancerEmail.trim() || (currentDocDetails.clientName
-        ? `${currentDocDetails.clientName.toLowerCase().replace(/[^a-z0-9]/g, '')}@spkinstan.com`
-        : '');
 
-      if (!receiptEmail) setReceiptEmail(defaultEmail);
+      // Auto-fill nama penerima kuitansi jika masih kosong
+      if (!receiptName) {
+        const defaultName =
+          currentDocDetails.clientName.trim() ||
+          currentDocDetails.freelancerName.trim() ||
+          '';
+        if (defaultName) setReceiptName(defaultName);
+      }
 
-      const defaultWa = currentDocDetails.freelancerWa.trim() || currentDocDetails.clientWa.trim() || '';
-      if (!receiptWa) setReceiptWa(defaultWa);
+      // Auto-fill email penerima kuitansi jika masih kosong
+      if (!receiptEmail) {
+        const defaultEmail =
+          currentDocDetails.freelancerEmail.trim() ||
+          (currentDocDetails.clientName
+            ? `${currentDocDetails.clientName.toLowerCase().replace(/[^a-z0-9]/g, '')}@spkinstan.com`
+            : '');
+        if (defaultEmail) setReceiptEmail(defaultEmail);
+      }
+
+      // Auto-fill nomor WA jika masih kosong
+      if (!receiptWa) {
+        const defaultWa =
+          currentDocDetails.freelancerWa.trim() ||
+          currentDocDetails.clientWa.trim() ||
+          '';
+        if (defaultWa) setReceiptWa(defaultWa);
+      }
     }
   }, [showCheckoutModal, activeDocTab, docsData]);
 
@@ -1298,7 +1318,7 @@ export default function Home() {
     }, 2500);
   };
 
-  // PEMBAYARAN MAYAR EMBEDDED IFRAME WITH WHATSAPP LINKING
+  // Handler Request Payment Ke Mayar Gateway
   const handleRequestQris = async () => {
     if (isLoadingQris) return;
 
@@ -1317,8 +1337,6 @@ export default function Home() {
     setIsLoadingQris(true);
     setPaidDocTarget(activeDocTab);
 
-    setQrCodeData(null);
-
     const freshSessionId = generateNewSessionId();
     setSessionId(freshSessionId);
     setTimeLeft(899);
@@ -1333,10 +1351,16 @@ export default function Home() {
     }
 
     const currentDocDetails = docsData[activeDocTab];
-    const targetName = receiptName.trim() || currentDocDetails.clientName || currentDocDetails.freelancerName || 'Pihak Kedua SPKInstan';
+
+    // Prioritaskan Nama Penerima dari input modal -> Nama Pihak Kedua -> Nama Pihak Pertama
+    const targetName =
+      receiptName.trim() ||
+      currentDocDetails.clientName.trim() ||
+      currentDocDetails.freelancerName.trim() ||
+      'Pihak Kedua';
+
     const targetEmail = receiptEmail.trim();
 
-    // Sesuai Spesifikasi: targetMobile Mengambil receiptWa -> freelancerWa -> clientWa -> fallback
     const targetMobile =
       receiptWa.trim() ||
       currentDocDetails.freelancerWa.trim() ||

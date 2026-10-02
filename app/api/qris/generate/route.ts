@@ -1,4 +1,3 @@
-// app/api/qris/generate/route.ts
 import { NextResponse } from 'next/server';
 import { redis } from '@/lib/redis';
 
@@ -7,20 +6,21 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { sessionId, packageType, amount, docType } = body;
 
-    // 1. Sanitasi Nama Pembayar (Cegah nama kosong/statis)
+    // 1. Sanitasi Nama Pembayar (Ambil dari form konfirmasi / nama asli)
     const rawName = body.name || body.customerName;
     const customerName =
       rawName && typeof rawName === 'string' && rawName.trim() !== ''
         ? rawName.trim()
         : 'Pihak Kedua';
 
-    // 2. Sanitasi Email (Jika kosong, buat email acak unik agar Mayar TIDAK menyimpan profil terpusat)
+    // 2. Sanitasi Email Pembayar
     const rawEmail = body.email || body.customerEmail;
     const customerEmail =
       rawEmail && typeof rawEmail === 'string' && rawEmail.trim() !== ''
         ? rawEmail.trim()
-        : `trx-${Date.now()}@spkinstan.com`; // Email unik per transaksi
+        : `trx-${Date.now()}@spkinstan.com`;
 
+    // 3. Sanitasi Nomor WhatsApp
     const rawMobile = body.mobile || body.customerMobile;
     const customerMobile =
       rawMobile && typeof rawMobile === 'string' && rawMobile.trim() !== ''
@@ -28,20 +28,28 @@ export async function POST(request: Request) {
         : '081234567890';
 
     const MAYAR_API_KEY = process.env.MAYAR_API_KEY || '';
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://spkinstan.vercel.app';
 
-    // 3. Payload ke Mayar API
+    // 4. Hitung nominal harga yang valid (Default Rp 19.999 / Rp 39.999, cegah fallback ke Rp 1.000)
+    const validAmount =
+      Number(amount) && Number(amount) > 0
+        ? Number(amount)
+        : packageType === 'BUNDLING'
+        ? 39999
+        : 19999;
+
+    // 5. Payload Resmi ke Mayar API
     const mayarPayload = {
       name: customerName,
       email: customerEmail,
       mobile: customerMobile,
-      amount: Number(amount) || 1000,
+      amount: validAmount,
       description: `Lisensi Dokumen ${docType || 'SPKInstan'} - ${packageType || 'Dokumen'}`,
-      redirectUrl: process.env.NEXT_PUBLIC_BASE_URL
-        ? `${process.env.NEXT_PUBLIC_BASE_URL}/payment-success`
-        : 'https://spkinstan.vercel.app/payment-success',
+      redirectUrl: `${baseUrl}/payment-success`,
+      redirectURL: `${baseUrl}/payment-success`,
     };
 
-    // 4. Panggil API Mayar
+    // 6. Panggil API Mayar Payment Request
     const mayarRes = await fetch('https://api.mayar.id/hl/v1/payment/create', {
       method: 'POST',
       headers: {
@@ -67,14 +75,14 @@ export async function POST(request: Request) {
     const paymentId = mayarData?.data?.id || mayarData?.id || mayarData?.data?.paymentId;
     const paymentUrl = mayarData?.data?.link || mayarData?.link || mayarData?.data?.url;
 
-    // 5. Simpan transaksi ke Redis
+    // 7. Simpan detail transaksi ke Redis
     const transactionData = {
       sessionId,
       mayarPaymentId: paymentId,
       status: 'PENDING',
       docType,
       packageType,
-      amount,
+      amount: validAmount,
       customerName,
       customerEmail,
       createdAt: new Date().toISOString(),
