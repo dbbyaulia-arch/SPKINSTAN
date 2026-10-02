@@ -7,16 +7,17 @@ import './globals.css';
 const plusJakartaSans = Plus_Jakarta_Sans({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'SPKInstan - Generator Perjanjian Kerja Sama Digital Resmi',
+  // Tambahkan metadataBase agar resolusi URL Next.js konsisten
+  metadataBase: new URL('https://www.spkinstan.my.id'),
+  title: 'SPKInstan',
   description: 'Buat dokumen SPK, NDA, dan BAST hukum perdata Indonesia secara instan tanpa registrasi.',
   openGraph: {
     title: 'SPKInstan - LegalTech Platform',
     description: 'Buat dokumen SPK, NDA, dan BAST hukum perdata Indonesia secara instan.',
-    url: 'https://spkinstan.my.id',
+    url: 'https://www.spkinstan.my.id',
     siteName: 'SPKInstan',
     type: 'website',
   },
-  // TAMBAHKAN BAGIAN INI:
   verification: {
     google: 'E7yGOswW_pAZnFjX0NHo85CLGSiRKKFXaM_qDSSbax4',
   },
@@ -31,7 +32,8 @@ export default function RootLayout({
 
   return (
     <html lang="id">
-      <head>
+      {/* Tag <head> manual dihapus agar Next.js mengelola metadata secara bersih */}
+      <body className={plusJakartaSans.className}>
         {pixelId && (
           <Script
             id="meta-pixel-script"
@@ -52,8 +54,6 @@ export default function RootLayout({
             }}
           />
         )}
-      </head>
-      <body className={plusJakartaSans.className}>
         {children}
         <Analytics />
       </body>
