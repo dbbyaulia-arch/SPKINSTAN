@@ -251,6 +251,9 @@ export default function Home() {
     // RESET LINK PEMBAYARAN LAMA (INVALIDATE INVOICE EXPIRED)
     setPaymentUrl(null);
     setMayarPaymentId(null);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('spkinstan_active_payment');
+    }
   };
 
   const canvasRef1 = useRef<HTMLCanvasElement | null>(null);
@@ -421,6 +424,70 @@ export default function Home() {
     },
   ]);
 
+  // ---------------------------------------------------------
+  // SOLUSI PENCEGAHAN REFRESH & PERSISTENSI STATE PEMBAYARAN
+  // ---------------------------------------------------------
+
+  // 1. Peringatan Browser Saat Refresh / Tutup Tab ketika Modal/Popup Aktif
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (showCheckoutModal || showDownloadPopup) {
+        e.preventDefault();
+        e.returnValue = ''; // Memicu konfirmasi dialog bawaan browser
+        return '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [showCheckoutModal, showDownloadPopup]);
+
+  // 2. Simpan State Pembayaran Aktif ke localStorage Secara Real-Time
+  useEffect(() => {
+    if (showCheckoutModal && modalStep === 'qris' && paymentUrl && sessionId) {
+      localStorage.setItem(
+        'spkinstan_active_payment',
+        JSON.stringify({
+          sessionId,
+          paymentUrl,
+          paidDocTarget,
+          receiptEmail,
+          receiptName,
+        })
+      );
+    }
+  }, [showCheckoutModal, modalStep, paymentUrl, sessionId, paidDocTarget, receiptEmail, receiptName]);
+
+  // 3. Auto-Restore Modal saat Halaman Ditinggal / Di-refresh
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const savedActivePayment = localStorage.getItem('spkinstan_active_payment');
+    if (savedActivePayment) {
+      try {
+        const data = JSON.parse(savedActivePayment);
+        if (data.sessionId && data.paymentUrl) {
+          setSessionId(data.sessionId);
+          setPaymentUrl(data.paymentUrl);
+          setPaidDocTarget(data.paidDocTarget || 'SPK');
+          if (data.receiptEmail) setReceiptEmail(data.receiptEmail);
+          if (data.receiptName) setReceiptName(data.receiptName);
+
+          // Buka kembali modal otomatis
+          setModalStep('qris');
+          setShowCheckoutModal(true);
+
+          // Jalankan kembali polling status pembayaran
+          startPollingStatus(data.sessionId);
+        }
+      } catch (e) {
+        console.error('Gagal memulihkan sesi pembayaran:', e);
+      }
+    }
+  }, []);
+
   // Autofill Email Penerima Kuitansi (Tetap Kosongkan Nama Penerima Kuitansi untuk Input Manual)
   useEffect(() => {
     if (showCheckoutModal) {
@@ -430,7 +497,6 @@ export default function Home() {
         : '');
 
       if (!receiptEmail) setReceiptEmail(defaultEmail);
-      // receiptName dibiarkan kosong secara default untuk diisi pengguna
     }
   }, [showCheckoutModal, activeDocTab, docsData]);
 
@@ -647,6 +713,9 @@ export default function Home() {
     );
     setPaymentUrl(null);
     setMayarPaymentId(null);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('spkinstan_active_payment');
+    }
   };
 
   const handleUpdateClauseTitle = (id: string, title: string) => {
@@ -655,6 +724,9 @@ export default function Home() {
     );
     setPaymentUrl(null);
     setMayarPaymentId(null);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('spkinstan_active_payment');
+    }
   };
 
   const handleUpdateClauseContent = (id: string, content: string) => {
@@ -663,6 +735,9 @@ export default function Home() {
     );
     setPaymentUrl(null);
     setMayarPaymentId(null);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('spkinstan_active_payment');
+    }
   };
 
   const handleAddCustomClause = () => {
@@ -677,12 +752,18 @@ export default function Home() {
     setClauses((prev) => [...prev, newClause]);
     setPaymentUrl(null);
     setMayarPaymentId(null);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('spkinstan_active_payment');
+    }
   };
 
   const handleRemoveClause = (id: string) => {
     setClauses((prev) => prev.filter((c) => c.id !== id));
     setPaymentUrl(null);
     setMayarPaymentId(null);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('spkinstan_active_payment');
+    }
   };
 
   // Preset Dinamis Sesuai Active Tab
@@ -690,6 +771,9 @@ export default function Home() {
     setActivePreset(presetType);
     setPaymentUrl(null);
     setMayarPaymentId(null);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('spkinstan_active_payment');
+    }
 
     setClauses((prev) =>
       prev.map((c) => {
@@ -820,7 +904,7 @@ export default function Home() {
     }
   }, [showCheckoutModal]);
 
-  // FUNGSI BERSIH-BERSIH MODAL DITUTUP MANUAL (HANGUSKAN LINK PAYMENT TERKAIT)
+  // FUNGSI BERSIH-BERSIH MODAL DITUTUP MANUAL (HANGUSKAN LINK PAYMENT TERKAIT & REMOVE ACTIVE PAYMENT CACHE)
   const handleCloseModal = () => {
     setShowCheckoutModal(false);
     setPaymentUrl(null);
@@ -828,11 +912,20 @@ export default function Home() {
     setModalStep('download_choice');
     setEmailError('');
     stopPolling();
+
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('spkinstan_active_payment');
+    }
   };
 
   // TRIGGER PEMBAYARAN SUKSES & AKTIVASI POPUP OVERLAY
   const handlePaymentSuccess = () => {
     stopPolling();
+
+    // Hapus cache pembayaran aktif setelah berhasil lunas
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('spkinstan_active_payment');
+    }
 
     const updatedPaid = selectedPackage === 'BUNDLING'
       ? { SPK: true, NDA: true, BAST: true }
@@ -1138,7 +1231,6 @@ export default function Home() {
     }
 
     const currentDocDetails = docsData[activeDocTab];
-    // Menggunakan receiptName jika diisi manual oleh pengguna, fallback ke identitas form
     const targetName = receiptName.trim() || currentDocDetails.clientName || currentDocDetails.freelancerName || 'Pihak Kedua SPKInstan';
     const targetEmail = receiptEmail.trim();
 
@@ -1156,7 +1248,6 @@ export default function Home() {
           packageType: selectedPackage,
           amount,
           docType: activeDocTab,
-          // Kirim kunci 'name' dan 'customerName' secara bersamaan untuk mencegah nilai "auto"
           name: targetName,
           customerName: targetName,
           email: targetEmail,
@@ -1428,6 +1519,9 @@ export default function Home() {
                       setSelectedPackage('SINGLE');
                       setPaymentUrl(null);
                       setMayarPaymentId(null);
+                      if (typeof window !== 'undefined') {
+                        localStorage.removeItem('spkinstan_active_payment');
+                      }
                     }}
                     className={`w-full sm:w-auto px-4 py-2.5 rounded-xl sm:rounded-full text-xs sm:text-sm font-semibold transition-all duration-200 text-center ${
                       selectedPackage === 'SINGLE'
@@ -1443,6 +1537,9 @@ export default function Home() {
                       setSelectedPackage('BUNDLING');
                       setPaymentUrl(null);
                       setMayarPaymentId(null);
+                      if (typeof window !== 'undefined') {
+                        localStorage.removeItem('spkinstan_active_payment');
+                      }
                     }}
                     className={`w-full sm:w-auto px-4 py-2.5 rounded-xl sm:rounded-full text-xs sm:text-sm font-semibold transition-all duration-200 flex items-center justify-center gap-1.5 ${
                       selectedPackage === 'BUNDLING'
@@ -2640,6 +2737,9 @@ export default function Home() {
                         setReceiptEmail(e.target.value);
                         setPaymentUrl(null); // Invalidate URL saat email kuitansi diubah
                         setMayarPaymentId(null);
+                        if (typeof window !== 'undefined') {
+                          localStorage.removeItem('spkinstan_active_payment');
+                        }
                         if (emailError) setEmailError('');
                       }}
                       placeholder="cth: emailpembayar@gmail.com"
@@ -2665,6 +2765,9 @@ export default function Home() {
                         setReceiptName(e.target.value);
                         setPaymentUrl(null); // Invalidate URL saat nama kuitansi diubah
                         setMayarPaymentId(null);
+                        if (typeof window !== 'undefined') {
+                          localStorage.removeItem('spkinstan_active_payment');
+                        }
                       }}
                       placeholder="cth: Budi Santoso / PT Digital Inovasi"
                       className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition"
@@ -2680,6 +2783,9 @@ export default function Home() {
                           setSelectedPackage('SINGLE');
                           setPaymentUrl(null);
                           setMayarPaymentId(null);
+                          if (typeof window !== 'undefined') {
+                            localStorage.removeItem('spkinstan_active_payment');
+                          }
                         }}
                         className={`p-3 rounded-xl border text-xs cursor-pointer flex items-center justify-between transition-all ${
                           selectedPackage === 'SINGLE'
@@ -2699,6 +2805,9 @@ export default function Home() {
                           setSelectedPackage('BUNDLING');
                           setPaymentUrl(null);
                           setMayarPaymentId(null);
+                          if (typeof window !== 'undefined') {
+                            localStorage.removeItem('spkinstan_active_payment');
+                          }
                         }}
                         className={`p-3 rounded-xl border text-xs cursor-pointer flex items-center justify-between transition-all ${
                           selectedPackage === 'BUNDLING'
