@@ -21,6 +21,10 @@ export const metadata: Metadata = {
   verification: {
     google: 'E7yGOswW_pAZnFjX0NHo85CLGSiRKKFXaM_qDSSbax4',
   },
+  icons: {
+    icon: '/logo.jpg', // Mengarah ke public/logo.png
+    apple: '/logo.jpg', // Untuk tampilan saat di-bookmark di iPhone/Safari
+  },
 };
 
 export default function RootLayout({
