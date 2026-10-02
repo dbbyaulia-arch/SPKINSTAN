@@ -1,14 +1,21 @@
 import type { Metadata } from 'next';
 import { Plus_Jakarta_Sans } from 'next/font/google';
 import Script from 'next/script';
-import { Analytics } from '@vercel/analytics/next'; // 👈 Impor Vercel Analytics
+import { Analytics } from '@vercel/analytics/next';
 import './globals.css';
 
 const plusJakartaSans = Plus_Jakarta_Sans({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'SPKInstan',
-  description: 'Hasilkan SPK, NDA, & BAST sah perdata dalam 2 menit.',
+  title: 'SPKInstan - Generator Perjanjian Kerja Sama Digital Resmi',
+  description: 'Buat dokumen SPK, NDA, dan BAST hukum perdata Indonesia secara instan tanpa registrasi.',
+  openGraph: {
+    title: 'SPKInstan - LegalTech Platform',
+    description: 'Buat dokumen SPK, NDA, dan BAST hukum perdata Indonesia secara instan.',
+    url: 'https://spkinstan.my.id',
+    siteName: 'SPKInstan',
+    type: 'website',
+  },
 };
 
 export default function RootLayout({
@@ -44,7 +51,7 @@ export default function RootLayout({
       </head>
       <body className={plusJakartaSans.className}>
         {children}
-        <Analytics /> {/* 👈 Komponen Vercel Analytics */}
+        <Analytics />
       </body>
     </html>
   );
