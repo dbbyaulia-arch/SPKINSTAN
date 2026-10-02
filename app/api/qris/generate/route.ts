@@ -1,4 +1,3 @@
-// app/api/qris/generate/route.ts
 import { NextResponse } from 'next/server';
 import { redis } from '@/lib/redis';
 
@@ -7,45 +6,33 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { sessionId, packageType, amount, docType } = body;
 
-    // 1. Ekstraksi & sanitasi nama pembayar (Mendukung properti 'name' atau 'customerName')
-    const rawName = body.name || body.customerName;
-    const finalCustomerName =
-      rawName && typeof rawName === 'string' && rawName.trim() !== ''
-        ? rawName.trim()
-        : 'Penerima Kuitansi SPKInstan';
-
-    // 2. Ekstraksi & sanitasi email serta nomor WhatsApp
-    const rawEmail = body.email || body.customerEmail;
-    const finalCustomerEmail =
-      rawEmail && typeof rawEmail === 'string' && rawEmail.trim() !== ''
-        ? rawEmail.trim()
-        : `client-${Date.now()}@spkinstan.com`;
-
-    const rawMobile = body.mobile || body.customerMobile;
-    const finalCustomerMobile =
-      rawMobile && typeof rawMobile === 'string' && rawMobile.trim() !== ''
-        ? rawMobile.trim()
-        : '081234567890';
+    // 1. Ambil nama, email, & nomor WhatsApp aktual dari request frontend
+    const customerName = body.name || body.customerName || 'Pihak Kedua';
+    const customerEmail = body.email || body.customerEmail || 'pembayar@spkinstan.com';
+    const customerMobile = body.mobile || body.customerMobile || '081234567890';
 
     const MAYAR_API_KEY = process.env.MAYAR_API_KEY || '';
 
-    // 3. Panggil API Mayar untuk membuat link pembayaran dengan identitas dinamis
+    // 2. Buat struktur payload untuk Mayar API
+    const mayarPayload = {
+      name: customerName,
+      email: customerEmail,
+      mobile: customerMobile,
+      amount: Number(amount) || 1000,
+      description: `Lisensi Dokumen ${docType || 'SPKInstan'} - ${packageType || 'Dokumen'}`,
+      redirectUrl: process.env.NEXT_PUBLIC_BASE_URL
+        ? `${process.env.NEXT_PUBLIC_BASE_URL}/payment-success`
+        : 'https://spkinstan.vercel.app/payment-success',
+    };
+
+    // 3. Panggil API Mayar untuk membuat link/tagihan pembayaran
     const mayarRes = await fetch('https://api.mayar.id/hl/v1/payment/create', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${MAYAR_API_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        name: finalCustomerName,
-        email: finalCustomerEmail,
-        mobile: finalCustomerMobile,
-        amount: Number(amount) || 1000,
-        description: `Lisensi Dokumen ${docType || 'SPKInstan'} - ${packageType || 'Dokumen'}`,
-        redirectUrl: process.env.NEXT_PUBLIC_BASE_URL
-          ? `${process.env.NEXT_PUBLIC_BASE_URL}/payment-success`
-          : 'https://spkinstan.vercel.app/payment-success',
-      }),
+      body: JSON.stringify(mayarPayload),
     });
 
     const mayarData = await mayarRes.json();
@@ -73,8 +60,8 @@ export async function POST(request: Request) {
       docType,
       packageType,
       amount,
-      customerName: finalCustomerName,
-      customerEmail: finalCustomerEmail,
+      customerName,
+      customerEmail,
       createdAt: new Date().toISOString(),
     };
 
