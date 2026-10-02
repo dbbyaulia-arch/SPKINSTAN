@@ -1,3 +1,4 @@
+// app/api/qris/generate/route.ts
 import { NextResponse } from 'next/server';
 import { redis } from '@/lib/redis';
 
@@ -6,14 +7,29 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { sessionId, packageType, amount, docType } = body;
 
-    // 1. Ambil nama, email, & nomor WhatsApp aktual dari request frontend
-    const customerName = body.name || body.customerName || 'Pihak Kedua';
-    const customerEmail = body.email || body.customerEmail || 'pembayar@spkinstan.com';
-    const customerMobile = body.mobile || body.customerMobile || '081234567890';
+    // 1. Sanitasi Nama Pembayar (Cegah nama kosong/statis)
+    const rawName = body.name || body.customerName;
+    const customerName =
+      rawName && typeof rawName === 'string' && rawName.trim() !== ''
+        ? rawName.trim()
+        : 'Pihak Kedua';
+
+    // 2. Sanitasi Email (Jika kosong, buat email acak unik agar Mayar TIDAK menyimpan profil terpusat)
+    const rawEmail = body.email || body.customerEmail;
+    const customerEmail =
+      rawEmail && typeof rawEmail === 'string' && rawEmail.trim() !== ''
+        ? rawEmail.trim()
+        : `trx-${Date.now()}@spkinstan.com`; // Email unik per transaksi
+
+    const rawMobile = body.mobile || body.customerMobile;
+    const customerMobile =
+      rawMobile && typeof rawMobile === 'string' && rawMobile.trim() !== ''
+        ? rawMobile.trim()
+        : '081234567890';
 
     const MAYAR_API_KEY = process.env.MAYAR_API_KEY || '';
 
-    // 2. Buat struktur payload untuk Mayar API
+    // 3. Payload ke Mayar API
     const mayarPayload = {
       name: customerName,
       email: customerEmail,
@@ -25,7 +41,7 @@ export async function POST(request: Request) {
         : 'https://spkinstan.vercel.app/payment-success',
     };
 
-    // 3. Panggil API Mayar untuk membuat link/tagihan pembayaran
+    // 4. Panggil API Mayar
     const mayarRes = await fetch('https://api.mayar.id/hl/v1/payment/create', {
       method: 'POST',
       headers: {
@@ -37,7 +53,6 @@ export async function POST(request: Request) {
 
     const mayarData = await mayarRes.json();
 
-    // Validasi penanganan error dari respon API Mayar
     if (!mayarRes.ok) {
       console.error('Mayar API Error:', mayarData);
       return NextResponse.json(
@@ -52,7 +67,7 @@ export async function POST(request: Request) {
     const paymentId = mayarData?.data?.id || mayarData?.id || mayarData?.data?.paymentId;
     const paymentUrl = mayarData?.data?.link || mayarData?.link || mayarData?.data?.url;
 
-    // 4. Simpan status transaksi awal ke Redis
+    // 5. Simpan transaksi ke Redis
     const transactionData = {
       sessionId,
       mayarPaymentId: paymentId,
