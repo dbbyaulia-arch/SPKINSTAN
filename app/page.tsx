@@ -231,21 +231,21 @@ export default function Home() {
   const page2ContentRef = useRef<HTMLDivElement | null>(null);
   const [heightNeedsPage2, setHeightNeedsPage2] = useState(false);
 
-  // Initial Master Clauses dengan Landasan Hukum Indonesia Terlengkap
+  // Initial Master Clauses dengan Landasan Hukum Indonesia Terlengkap & Presisi Legally Sound
   const [clauses, setClauses] = useState<Clause[]>([
     // --- PASAL-PASAL DOKUMEN SPK ---
     {
       id: 'spk-1',
       docType: 'SPK',
       title: 'Ruang Lingkup Pekerjaan & Asas Iktikad Baik',
-      content: 'Sesuai Pasal 17 ayat (2) & Pasal 18A ayat (2) UU No. 1 Tahun 2024 (UU ITE), Para Pihak sepakat melaksanakan pengerjaan proyek sesuai dengan acuan spesifikasi teknis dan deliverables yang disepakati.',
+      content: 'Sesuai Pasal 1338 ayat (3) KUHPerdata jo. Pasal 3 & Pasal 18 UU ITE (UU No. 1 Tahun 2024), Para Pihak sepakat melaksanakan pengerjaan proyek sesuai dengan acuan spesifikasi teknis dan deliverables yang disepakati secara beriktikad baik.',
       isEnabled: true,
     },
     {
       id: 'spk-2',
       docType: 'SPK',
       title: 'Keabsahan Kontrak & Tanda Tangan Elektronik',
-      content: 'Berdasarkan Pasal 5 ayat (1) UU No. 1 Tahun 2024 jo. Pasal 1 angka 17 UU No. 19 Tahun 2016, Kontrak Elektronik dan Tanda Tangan Elektronik ini merupakan alat bukti hukum yang sah dan mengikat Para Pihak sejak dibubuhi tanda tangan secara elektronik maupun fisik.',
+      content: 'Berdasarkan Pasal 5 ayat (1), Pasal 11 ayat (1), dan Pasal 18 ayat (1) UU ITE (UU No. 1 Tahun 2024), Kontrak Elektronik dan Tanda Tangan Elektronik ini merupakan alat bukti hukum yang sah serta mengikat Para Pihak sejak dibubuhi tanda tangan secara elektronik maupun fisik.',
       isEnabled: true,
     },
     {
@@ -280,21 +280,21 @@ export default function Home() {
       id: 'spk-7',
       docType: 'SPK',
       title: 'Pembatalan & Uang Muka (DP) Non-Refundable',
-      content: 'Sesuai ketentuan Pasal 1464 KUHPerdata, apabila pembatalan perjanjian dilakukan secara sepihak oleh PIHAK KEDUA, maka Uang Muka (DP) yang telah dibayarkan dianggap hangus dan tidak dapat ditarik kembali (non-refundable).',
+      content: 'Sesuai Pasal 1338 ayat (1) jo. Pasal 1249 KUHPerdata, apabila pembatalan perjanjian dilakukan secara sepihak oleh PIHAK KEDUA, maka Uang Muka (DP) yang telah dibayarkan dianggap hangus sebagai ganti rugi dan tidak dapat ditarik kembali (non-refundable).',
       isEnabled: true,
     },
     {
       id: 'spk-8',
       docType: 'SPK',
       title: 'Keamanan Akses Sistem & Larangan Akses Ilegal',
-      content: 'PIHAK KEDUA wajib menyediakan akses kredensial server/hosting/API yang diperlukan. Sesuai ketentuan pidana akses ilegal sistem elektronik (UU ITE jo. KUHP), dilarang keras melakukan pengaksesan tanpa hak atas server atau kode sumber sebelum atau sesudah penyerahan resmi.',
+      content: 'PIHAK KEDUA wajib menyediakan akses kredensial server/hosting/API yang diperlukan untuk pengerjaan proyek. Sesuai Pasal 30 jo. Pasal 46 UU ITE (UU No. 11 Tahun 2008 jo. UU No. 1 Tahun 2024), dilarang keras melakukan pengaksesan tanpa hak atau melampaui wewenang atas server, kode sumber, maupun sistem elektronik milik pihak lain baik sebelum maupun sesudah penyerahan resmi.',
       isEnabled: true,
     },
     {
       id: 'spk-9',
       docType: 'SPK',
       title: 'Hukum Yang Berlaku & Penyelesaian Sengketa',
-      content: 'Sesuai Pasal 18A ayat (1) UU No. 1 Tahun 2024, Kontrak Elektronik ini tunduk pada hukum Republik Indonesia. Setiap sengketa akan diselesaikan secara musyawarah untuk mufakat, dan apabila tidak tercapai kesepakatan, diselesaikan melalui domisili Pengadilan Negeri yang berwenang.',
+      content: 'Berdasarkan Pasal 1338 KUHPerdata jo. Pasal 18 ayat (1) UU ITE (UU No. 1 Tahun 2024), Perjanjian ini tunduk pada dan ditafsirkan menurut hukum Republik Indonesia. Setiap sengketa yang timbul akan diselesaikan secara musyawarah untuk mufakat, dan apabila tidak tercapai kesepakatan, diselesaikan melalui domisili Pengadilan Negeri yang berwenang.',
       isEnabled: true,
     },
 
@@ -303,21 +303,21 @@ export default function Home() {
       id: 'nda-1',
       docType: 'NDA',
       title: 'Definisi Rahasia Dagang & Informasi Rahasia',
-      content: 'Sesuai Pasal 1 angka 1 & Pasal 4 huruf b UU No. 30 Tahun 2000 tentang Rahasia Dagang, Informasi Rahasia mencakup seluruh data teknis, kode sumber, skema database, aset desain, strategi bisnis, serta data finansial yang dijaga kerahasiaannya oleh Pemilik Informasi.',
+      content: 'Sesuai Pasal 1 angka 1 jo. Pasal 2 UU No. 30 Tahun 2000 tentang Rahasia Dagang, Informasi Rahasia mencakup seluruh data teknis, Source Code, Schema Database, Aset Desain Figma, API Key, strategi bisnis, serta data finansial yang diberikan oleh Pemilik Informasi.',
       isEnabled: true,
     },
     {
       id: 'nda-2',
       docType: 'NDA',
       title: 'Kewajiban & Pembatasan Pengungkapan',
-      content: 'Berdasarkan Pasal 13 UU No. 30 Tahun 2000, Penerima Informasi dilarang keras mengutarakan, membocorkan, menyebarluaskan, atau memanfaatkan Informasi Rahasia kepada pihak ketiga tanpa persetujuan tertulis dari Pemilik Informasi.',
+      content: 'Berdasarkan Pasal 4 huruf b jo. Pasal 13 UU No. 30 Tahun 2000 tentang Rahasia Dagang, Penerima Informasi dilarang keras mengungkapkan, menyebarluaskan, atau memanfaatkan Informasi Rahasia kepada pihak ketiga serta wajib menjaga kerahasiaannya sesuai kesepakatan tertulis ini.',
       isEnabled: true,
     },
     {
       id: 'nda-3',
       docType: 'NDA',
       title: 'Pelindungan Data Pribadi Para Pihak',
-      content: 'Sesuai Pasal 20 ayat (2) huruf b, Pasal 22 ayat (1)-(2), dan Pasal 36 UU No. 27 Tahun 2022 tentang Pelindungan Data Pribadi (UU PDP), Pengendali Data Pribadi wajib menjaga kerahasiaan Data Pribadi Para Pihak yang diperoleh dalam rangka pemenuhan perjanjian.',
+      content: 'Sesuai Pasal 20 ayat (2) huruf b jo. Pasal 36 UU No. 27 Tahun 2022 tentang Pelindungan Data Pribadi (UU PDP), pemrosesan Data Pribadi dilakukan dalam rangka pemenuhan perjanjian, dan Pengendali Data Pribadi wajib menjaga kerahasiaan Data Pribadi Para Pihak yang diperoleh selama pelaksanaan kerja sama ini.',
       isEnabled: true,
     },
     {
@@ -548,7 +548,7 @@ export default function Home() {
         if (c.id === 'spk-1') {
           return {
             ...c,
-            content: `Sesuai Pasal 17 ayat (2) & Pasal 18A ayat (2) UU No. 1 Tahun 2024 (UU ITE), Para Pihak sepakat melaksanakan pekerjaan "${spkData.projectTitle || 'Pengembangan Aplikasi Web & API Integration'}" dengan iktikad baik, transparan, dan jelas sesuai acuan spesifikasi teknis dan deliverables yang disepakati.`,
+            content: `Sesuai Pasal 1338 ayat (3) KUHPerdata jo. Pasal 3 & Pasal 18 UU ITE (UU No. 1 Tahun 2024), Para Pihak sepakat melaksanakan pekerjaan "${spkData.projectTitle || 'Pengembangan Aplikasi Web Dashboard'}" dengan iktikad baik, transparan, dan jelas sesuai acuan spesifikasi teknis dan deliverables yang disepakati.`,
           };
         }
         if (c.id === 'spk-3') {
@@ -560,7 +560,7 @@ export default function Home() {
         if (c.id === 'nda-1') {
           return {
             ...c,
-            content: `Sesuai Pasal 1 angka 1 & Pasal 4 huruf b UU No. 30 Tahun 2000 tentang Rahasia Dagang, Informasi Rahasia mencakup seluruh data teknis, "${ndaData.ndaScope || 'Source Code, Skema Database, Aset Desain Figma, & Strategi Bisnis'}", kode sumber, strategi pemasaran, serta data finansial yang diberikan oleh Pemilik Informasi.`,
+            content: `Sesuai Pasal 1 angka 1 jo. Pasal 2 UU No. 30 Tahun 2000 tentang Rahasia Dagang, Informasi Rahasia mencakup seluruh data teknis, "${ndaData.ndaScope || 'Source Code, Skema Database, Aset Desain Figma, & API Key'}", kode sumber, strategi pemasaran, serta data finansial yang diberikan oleh Pemilik Informasi.`,
           };
         }
         if (c.id === 'nda-4') {
@@ -1274,7 +1274,7 @@ export default function Home() {
         .a4-page.export-pdf-mode {
           display: flex !important;
           flex-direction: column !important;
-          justify-between: space-between !important;
+          justify-content: space-between !important;
           padding: 40px !important;
           box-sizing: border-box !important;
         }
