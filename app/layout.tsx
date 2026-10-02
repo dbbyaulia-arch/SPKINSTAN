@@ -16,6 +16,10 @@ export const metadata: Metadata = {
     siteName: 'SPKInstan',
     type: 'website',
   },
+  // TAMBAHKAN BAGIAN INI:
+  verification: {
+    google: 'E7yGOswW_pAZnFjX0NHo85CLGSiRKKFXaM_qDSSbax4',
+  },
 };
 
 export default function RootLayout({
