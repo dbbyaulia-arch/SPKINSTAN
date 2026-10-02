@@ -95,6 +95,7 @@ export default function Home() {
   // ---------------------------------------------------------
   // ALL STATES & REFS
   // ---------------------------------------------------------
+  const [isLoaded, setIsLoaded] = useState(false); // Flag pelacak status restore/reset awal
   const [activeDocTab, setActiveDocTab] = useState<DocType>('SPK');
   const [selectedPackage, setSelectedPackage] = useState<'SINGLE' | 'BUNDLING'>('SINGLE');
   const [currentWizardStep, setCurrentWizardStep] = useState(1);
@@ -144,7 +145,7 @@ export default function Home() {
     return emailRegex.test(email.trim());
   };
 
-  // HELPER FORMAT TANGGAL INDONESIA KUSTOM (YYYY-MM-DD -> 2 Oktober 2026)
+  // HELPER FORMAT TANGGAL INDONESIA KUSTOM
   const formatIndonesianDate = (dateString: string) => {
     if (!dateString) return '-';
     const dateObj = new Date(dateString);
@@ -425,22 +426,129 @@ export default function Home() {
   ]);
 
   // ---------------------------------------------------------
-  // SOLUSI PENCEGAHAN REFRESH & PERSISTENSI STATE PEMBAYARAN
+  // PERBAIKAN RESET & RESTORE DRAF BERURUTAN (ISLOADED)
   // ---------------------------------------------------------
 
-  // 0. RESET OTOMATIS VIA QUERY URL (?reset=true)
+  // 1. Logika Reset & Restore Draf dalam SATU useEffect berurutan
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
     const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('reset') === 'true') {
+    const isReset = urlParams.get('reset') === 'true';
+
+    if (isReset) {
+      // Bersihkan seluruh LocalStorage
       localStorage.clear();
+
+      // Reset State React di Memori ke Nilai Default Kosong
+      setDocsData({
+        SPK: {
+          docNumber: '001/SPK/IX/2026',
+          docDate: new Date().toISOString().split('T')[0],
+          projectTitle: '',
+          freelancerName: '',
+          freelancerEmail: '',
+          freelancerWa: '',
+          clientName: '',
+          clientWa: '',
+          signerFirstParty: '',
+          signerSecondParty: '',
+          signatureFirstParty: null,
+          signatureSecondParty: null,
+          projectAmount: '7500000',
+          dpPercent: '50',
+          bankInfo: '',
+          ndaScope: '',
+          ndaYears: '',
+          ndaPenalty: '',
+          bastRef: '',
+          bastWarranty: '',
+          bastDate: '',
+        },
+        NDA: {
+          docNumber: '001/NDA/IX/2026',
+          docDate: new Date().toISOString().split('T')[0],
+          projectTitle: '',
+          freelancerName: '',
+          freelancerEmail: '',
+          freelancerWa: '',
+          clientName: '',
+          clientWa: '',
+          signerFirstParty: '',
+          signerSecondParty: '',
+          signatureFirstParty: null,
+          signatureSecondParty: null,
+          projectAmount: '',
+          dpPercent: '',
+          bankInfo: '',
+          ndaScope: 'Source Code, Schema Database, Aset Desain Figma, & API Key',
+          ndaYears: '2',
+          ndaPenalty: '25000000',
+          bastRef: '',
+          bastWarranty: '',
+          bastDate: '',
+        },
+        BAST: {
+          docNumber: '001/BAST/IX/2026',
+          docDate: new Date().toISOString().split('T')[0],
+          projectTitle: '',
+          freelancerName: '',
+          freelancerEmail: '',
+          freelancerWa: '',
+          clientName: '',
+          clientWa: '',
+          signerFirstParty: '',
+          signerSecondParty: '',
+          signatureFirstParty: null,
+          signatureSecondParty: null,
+          projectAmount: '',
+          dpPercent: '',
+          bankInfo: '',
+          ndaScope: '',
+          ndaYears: '',
+          ndaPenalty: '',
+          bastRef: '001/SPK/IX/2026',
+          bastWarranty: '14',
+          bastDate: '2026-09-25',
+        },
+      });
+
+      setReceiptEmail('');
+      setReceiptName('');
       window.history.replaceState({}, document.title, window.location.pathname);
+      setIsLoaded(true);
       alert('Cache draf dan pembayaran berhasil dibersihkan otomatis!');
+      return;
     }
+
+    // Jika bukan reset, pulihkan draf dari LocalStorage
+    const savedDraft = localStorage.getItem('spkinstan_form_draft');
+    if (savedDraft) {
+      try {
+        const parsed = JSON.parse(savedDraft);
+        if (parsed.docsData && parsed.docsData.SPK && parsed.docsData.NDA && parsed.docsData.BAST) {
+          setDocsData(parsed.docsData);
+          if (parsed.clauses && Array.isArray(parsed.clauses)) {
+            setClauses(parsed.clauses);
+          }
+        }
+      } catch (e) {
+        console.error('Gagal memulihkan draf:', e);
+        localStorage.removeItem('spkinstan_form_draft');
+      }
+    }
+    setIsLoaded(true);
   }, []);
 
-  // 1. Peringatan Browser Saat Refresh / Tutup Tab ketika Modal/Popup Aktif
+  // 2. Simpan Draf HANYA jika proses restore/reset (isLoaded) sudah selesai
+  useEffect(() => {
+    if (isLoaded && typeof window !== 'undefined') {
+      const draftData = { docsData, clauses };
+      localStorage.setItem('spkinstan_form_draft', JSON.stringify(draftData));
+    }
+  }, [docsData, clauses, isLoaded]);
+
+  // 3. Peringatan Browser Saat Refresh / Tutup Tab ketika Modal/Popup Aktif
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (showCheckoutModal || showDownloadPopup) {
@@ -456,7 +564,7 @@ export default function Home() {
     };
   }, [showCheckoutModal, showDownloadPopup]);
 
-  // 2. Simpan State Pembayaran Aktif ke localStorage Secara Real-Time dengan Timestamp (createdAt)
+  // 4. Simpan State Pembayaran Aktif ke localStorage Secara Real-Time dengan Timestamp
   useEffect(() => {
     if (showCheckoutModal && modalStep === 'qris' && paymentUrl && sessionId) {
       localStorage.setItem(
@@ -467,13 +575,13 @@ export default function Home() {
           paidDocTarget,
           receiptEmail,
           receiptName,
-          createdAt: Date.now(), // Simpan waktu pembuatan transaksi
+          createdAt: Date.now(),
         })
       );
     }
   }, [showCheckoutModal, modalStep, paymentUrl, sessionId, paidDocTarget, receiptEmail, receiptName]);
 
-  // 3. Auto-Restore dengan Pembatasan Usia Cache (Auto-Expire 15 Menit)
+  // 5. Auto-Restore Sesi Pembayaran dengan Auto-Expire 15 Menit
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -485,7 +593,6 @@ export default function Home() {
         const cacheAge = currentTime - (data.createdAt || 0);
         const MAX_AGE = 15 * 60 * 1000; // 15 Menit
 
-        // Jika cache sudah lebih dari 15 menit, HAPUS OTOMATIS
         if (cacheAge > MAX_AGE) {
           localStorage.removeItem('spkinstan_active_payment');
           return;
@@ -498,11 +605,9 @@ export default function Home() {
           if (data.receiptEmail) setReceiptEmail(data.receiptEmail);
           if (data.receiptName) setReceiptName(data.receiptName);
 
-          // Buka kembali modal otomatis
           setModalStep('qris');
           setShowCheckoutModal(true);
 
-          // Jalankan kembali polling status pembayaran
           startPollingStatus(data.sessionId);
         }
       } catch (e) {
@@ -556,7 +661,7 @@ export default function Home() {
     }
   }, [activeDocTab, currentWizardStep, docsData]);
 
-  // Restore State dari LocalStorage saat Mount / Refresh
+  // Restore State dari LocalStorage saat Mount
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -633,42 +738,6 @@ export default function Home() {
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
   }, [sessionId, selectedPackage, paidDocTarget]);
-
-  // Menyimpan Draf Form
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const draftData = { docsData, clauses };
-      localStorage.setItem('spkinstan_form_draft', JSON.stringify(draftData));
-    }
-  }, [docsData, clauses]);
-
-  // Memulihkan Draf Form
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedDraft = localStorage.getItem('spkinstan_form_draft');
-      if (savedDraft) {
-        try {
-          const parsed = JSON.parse(savedDraft);
-          if (parsed.docsData && parsed.docsData.SPK && parsed.docsData.NDA && parsed.docsData.BAST) {
-            const normalizedDocsData = {
-              SPK: { docDate: new Date().toISOString().split('T')[0], ...parsed.docsData.SPK },
-              NDA: { docDate: new Date().toISOString().split('T')[0], ...parsed.docsData.NDA },
-              BAST: { docDate: new Date().toISOString().split('T')[0], ...parsed.docsData.BAST },
-            };
-            setDocsData(normalizedDocsData);
-            if (parsed.clauses && Array.isArray(parsed.clauses)) {
-              setClauses(parsed.clauses);
-            }
-          } else {
-            localStorage.removeItem('spkinstan_form_draft');
-          }
-        } catch (e) {
-          console.error('Gagal memulihkan draf form, menghapus cache lama:', e);
-          localStorage.removeItem('spkinstan_form_draft');
-        }
-      }
-    }
-  }, []);
 
   // Sync Dinamis Variabel ke Dalam Teks Pasal Terkait
   useEffect(() => {
@@ -884,12 +953,11 @@ export default function Home() {
     setSessionId(generateNewSessionId());
   }, []);
 
-  // Fitur Proteksi Keamanan Draf (Bypass pada Mode Development Lokal)
+  // Fitur Proteksi Keamanan Draf
   useEffect(() => {
     const isPaid = paidDocs[activeDocTab];
     if (isPaid) return;
 
-    // Izinkan F12 jika sedang running di lingkungan development lokal
     if (process.env.NODE_ENV === 'development') return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -931,7 +999,7 @@ export default function Home() {
     }
   }, [showCheckoutModal]);
 
-  // FUNGSI BERSIH-BERSIH MODAL DITUTUP MANUAL (HANGUSKAN LINK PAYMENT TERKAIT & REMOVE ACTIVE PAYMENT CACHE)
+  // FUNGSI BERSIH-BERSIH MODAL DITUTUP MANUAL
   const handleCloseModal = () => {
     setShowCheckoutModal(false);
     setPaymentUrl(null);
@@ -949,7 +1017,6 @@ export default function Home() {
   const handlePaymentSuccess = () => {
     stopPolling();
 
-    // Hapus cache pembayaran aktif setelah berhasil lunas
     if (typeof window !== 'undefined') {
       localStorage.removeItem('spkinstan_active_payment');
     }
@@ -1007,8 +1074,7 @@ export default function Home() {
     });
   };
 
-  // FUNGSI HELPER: GENERATE PDF BLOB WITH CLEAN FILE NAMING
-  // Format File Bersih: <doctype>_<nama_pihak_pertama>.pdf (contoh: spk_budi_santoso.pdf)
+  // FUNGSI HELPER: GENERATE PDF BLOB WITH CLEAN FILE NAMING (<doctype>_<nama_pihak_pertama>.pdf)
   const generatePdfBlob = async (
     docType: DocType
   ): Promise<{ blob: Blob; fileName: string } | null> => {
@@ -1225,17 +1291,15 @@ export default function Home() {
     }, 2500);
   };
 
-  // PEMBAYARAN MAYAR EMBEDDED IFRAME DENGAN VALIDASI EMAIL & FRESH SESSION ID
+  // PEMBAYARAN MAYAR EMBEDDED IFRAME
   const handleRequestQris = async () => {
     if (isLoadingQris) return;
 
-    // VALIDASI EMAIL SEBELUM LANJUT PAYMENT
     if (!receiptEmail.trim() || !isValidEmail(receiptEmail)) {
       setEmailError('Mohon masukkan alamat email yang valid (contoh: nama@email.com)');
       return;
     }
 
-    // PAKSA HAPUS CACHE PEMBAYARAN LAMA SECARA EKSPLISIT
     setPaymentUrl(null);
     setMayarPaymentId(null);
     if (typeof window !== 'undefined') {
@@ -1246,10 +1310,8 @@ export default function Home() {
     setIsLoadingQris(true);
     setPaidDocTarget(activeDocTab);
 
-    // 1. Reset state pembayaran sebelumnya
     setQrCodeData(null);
 
-    // 2. Generate Session ID baru unik per klik
     const freshSessionId = generateNewSessionId();
     setSessionId(freshSessionId);
     setTimeLeft(899);
@@ -1692,6 +1754,7 @@ export default function Home() {
                           </label>
                           <input
                             type="text"
+                            autoComplete="off"
                             value={docsData[activeDocTab].docNumber}
                             onChange={(e) => handleDocInputChange(activeDocTab, 'docNumber', e.target.value)}
                             placeholder={`cth: 001/${activeDocTab}/IX/2026`}
@@ -1705,6 +1768,7 @@ export default function Home() {
                           </label>
                           <input
                             type="date"
+                            autoComplete="off"
                             value={docsData[activeDocTab].docDate}
                             onChange={(e) => handleDocInputChange(activeDocTab, 'docDate', e.target.value)}
                             className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
@@ -1723,6 +1787,7 @@ export default function Home() {
                           </label>
                           <input
                             type="text"
+                            autoComplete="off"
                             value={docsData[activeDocTab].freelancerName}
                             onChange={(e) => handleDocInputChange(activeDocTab, 'freelancerName', e.target.value)}
                             placeholder="cth: Budi Santoso"
@@ -1733,6 +1798,7 @@ export default function Home() {
                           <label className="block text-xs font-semibold text-slate-700 mb-1">Email</label>
                           <input
                             type="email"
+                            autoComplete="off"
                             value={docsData[activeDocTab].freelancerEmail}
                             onChange={(e) => handleDocInputChange(activeDocTab, 'freelancerEmail', e.target.value)}
                             placeholder="cth: budi@gmail.com"
@@ -1743,6 +1809,7 @@ export default function Home() {
                           <label className="block text-xs font-semibold text-slate-700 mb-1">Nomor WhatsApp</label>
                           <input
                             type="text"
+                            autoComplete="off"
                             value={docsData[activeDocTab].freelancerWa}
                             onChange={(e) => handleDocInputChange(activeDocTab, 'freelancerWa', e.target.value)}
                             placeholder="cth: 081234567890"
@@ -1762,6 +1829,7 @@ export default function Home() {
                           </label>
                           <input
                             type="text"
+                            autoComplete="off"
                             value={docsData[activeDocTab].clientName}
                             onChange={(e) => handleDocInputChange(activeDocTab, 'clientName', e.target.value)}
                             placeholder="cth: PT Digital Inovasi Nusantara"
@@ -1772,6 +1840,7 @@ export default function Home() {
                           <label className="block text-xs font-semibold text-slate-700 mb-1">Nomor WhatsApp</label>
                           <input
                             type="text"
+                            autoComplete="off"
                             value={docsData[activeDocTab].clientWa}
                             onChange={(e) => handleDocInputChange(activeDocTab, 'clientWa', e.target.value)}
                             placeholder="cth: 089876543210"
@@ -1790,6 +1859,7 @@ export default function Home() {
                             <label className="block text-xs font-semibold text-slate-700 mb-1">Judul Pekerjaan / Proyek (SPK)</label>
                             <input
                               type="text"
+                              autoComplete="off"
                               value={docsData.SPK.projectTitle}
                               onChange={(e) => handleDocInputChange('SPK', 'projectTitle', e.target.value)}
                               placeholder="cth: Pengembangan Aplikasi Web Dashboard"
@@ -1801,6 +1871,7 @@ export default function Home() {
                               <label className="block text-xs font-semibold text-slate-700 mb-1">Nilai Imbalan (Rp)</label>
                               <input
                                 type="number"
+                                autoComplete="off"
                                 value={docsData.SPK.projectAmount}
                                 onChange={(e) => handleDocInputChange('SPK', 'projectAmount', e.target.value)}
                                 placeholder="cth: 7500000"
@@ -1811,6 +1882,7 @@ export default function Home() {
                               <label className="block text-xs font-semibold text-slate-700 mb-1">Uang Muka DP (%)</label>
                               <input
                                 type="number"
+                                autoComplete="off"
                                 value={docsData.SPK.dpPercent}
                                 onChange={(e) => handleDocInputChange('SPK', 'dpPercent', e.target.value)}
                                 placeholder="cth: 50"
@@ -1822,6 +1894,7 @@ export default function Home() {
                             <label className="block text-xs font-semibold text-slate-700 mb-1">Rekening Tujuan Pelunasan</label>
                             <input
                               type="text"
+                              autoComplete="off"
                               value={docsData.SPK.bankInfo}
                               onChange={(e) => handleDocInputChange('SPK', 'bankInfo', e.target.value)}
                               placeholder="cth: BCA 1234567890 a.n Budi Santoso"
@@ -1837,6 +1910,7 @@ export default function Home() {
                             <label className="block text-xs font-semibold text-slate-700 mb-1">Judul / Perihal Kerahasiaan (NDA)</label>
                             <input
                               type="text"
+                              autoComplete="off"
                               value={docsData.NDA.projectTitle}
                               onChange={(e) => handleDocInputChange('NDA', 'projectTitle', e.target.value)}
                               placeholder="cth: Kerahasiaan Source Code & Database"
@@ -1847,6 +1921,7 @@ export default function Home() {
                             <label className="block text-xs font-semibold text-slate-700 mb-1">Cakupan Informasi Rahasia</label>
                             <input
                               type="text"
+                              autoComplete="off"
                               value={docsData.NDA.ndaScope}
                               onChange={(e) => handleDocInputChange('NDA', 'ndaScope', e.target.value)}
                               placeholder="cth: Source Code, Skema Database, Aset Desain"
@@ -1858,6 +1933,7 @@ export default function Home() {
                               <label className="block text-xs font-semibold text-slate-700 mb-1">Masa Kerahasiaan (Tahun)</label>
                               <input
                                 type="number"
+                                autoComplete="off"
                                 value={docsData.NDA.ndaYears}
                                 onChange={(e) => handleDocInputChange('NDA', 'ndaYears', e.target.value)}
                                 placeholder="cth: 2"
@@ -1868,6 +1944,7 @@ export default function Home() {
                               <label className="block text-xs font-semibold text-slate-700 mb-1">Denda Pelanggaran (Rp)</label>
                               <input
                                 type="number"
+                                autoComplete="off"
                                 value={docsData.NDA.ndaPenalty}
                                 onChange={(e) => handleDocInputChange('NDA', 'ndaPenalty', e.target.value)}
                                 placeholder="cth: 25000000"
@@ -1884,6 +1961,7 @@ export default function Home() {
                             <label className="block text-xs font-semibold text-slate-700 mb-1">Judul Serah Terima (BAST)</label>
                             <input
                               type="text"
+                              autoComplete="off"
                               value={docsData.BAST.projectTitle}
                               onChange={(e) => handleDocInputChange('BAST', 'projectTitle', e.target.value)}
                               placeholder="cth: Serah Terima Pekerjaan Web Dashboard"
@@ -1894,6 +1972,7 @@ export default function Home() {
                             <label className="block text-xs font-semibold text-slate-700 mb-1">Nomor Referensi SPK Utama</label>
                             <input
                               type="text"
+                              autoComplete="off"
                               value={docsData.BAST.bastRef}
                               onChange={(e) => handleDocInputChange('BAST', 'bastRef', e.target.value)}
                               placeholder="cth: 001/SPK/IX/2026"
@@ -1905,6 +1984,7 @@ export default function Home() {
                               <label className="block text-xs font-semibold text-slate-700 mb-1">Masa Garansi Bug (Hari)</label>
                               <input
                                 type="number"
+                                autoComplete="off"
                                 value={docsData.BAST.bastWarranty}
                                 onChange={(e) => handleDocInputChange('BAST', 'bastWarranty', e.target.value)}
                                 placeholder="cth: 14"
@@ -1915,6 +1995,7 @@ export default function Home() {
                               <label className="block text-xs font-semibold text-slate-700 mb-1">Tanggal Serah Terima</label>
                               <input
                                 type="date"
+                                autoComplete="off"
                                 value={docsData.BAST.bastDate}
                                 onChange={(e) => handleDocInputChange('BAST', 'bastDate', e.target.value)}
                                 className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
@@ -2012,6 +2093,7 @@ export default function Home() {
 
                               <input
                                 type="text"
+                                autoComplete="off"
                                 value={clause.title}
                                 onChange={(e) => handleUpdateClauseTitle(clause.id, e.target.value)}
                                 placeholder="Judul Pasal"
@@ -2049,6 +2131,7 @@ export default function Home() {
                         <div>
                           <input
                             type="text"
+                            autoComplete="off"
                             value={docsData[activeDocTab].signerFirstParty}
                             onChange={(e) => handleDocInputChange(activeDocTab, 'signerFirstParty', e.target.value)}
                             placeholder={docsData[activeDocTab].freelancerName || 'cth: Budi Santoso'}
@@ -2103,6 +2186,7 @@ export default function Home() {
                         <div>
                           <input
                             type="text"
+                            autoComplete="off"
                             value={docsData[activeDocTab].signerSecondParty}
                             onChange={(e) => handleDocInputChange(activeDocTab, 'signerSecondParty', e.target.value)}
                             placeholder={docsData[activeDocTab].clientName || 'cth: Nama Direktur'}
@@ -2223,7 +2307,7 @@ export default function Home() {
                       >
                         <div className="h-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 w-full rounded-full shadow-xs mb-3" />
 
-                        {/* Standard Typo Header Metadata (11px - 12px) */}
+                        {/* Standard Typo Header Metadata */}
                         <div className="flex items-start justify-between pb-2.5 border-b border-slate-200/80 gap-4">
                           <div className="space-y-0.5">
                             <span className="text-[11px] font-bold tracking-widest text-blue-600 uppercase">
@@ -2248,7 +2332,7 @@ export default function Home() {
                           </div>
                         </div>
 
-                        {/* Standard Typo Judul Utama Dokumen (18px - 20px) */}
+                        {/* Standard Typo Judul Utama Dokumen */}
                         <div className="border-l-4 border-blue-600 pl-3 sm:pl-4 py-0.5">
                           <h2 className="text-[18px] sm:text-[20px] font-extrabold tracking-wide text-slate-900 uppercase">
                             {activeDocTab === 'SPK' && 'PERJANJIAN KERJA SAMA PEKERJAAN JASA'}
@@ -2257,7 +2341,7 @@ export default function Home() {
                           </h2>
                         </div>
 
-                        {/* Standard Typo Identitas Pihak (12px - 13px) */}
+                        {/* Standard Typo Identitas Pihak */}
                         <div className="bg-slate-50/70 border border-slate-200/80 rounded-xl p-2.5 sm:p-3 space-y-1.5">
                           <p className="text-slate-700 text-[12px] sm:text-[13px]">
                             Pada hari ini, <strong>{formatIndonesianDate(docsData[activeDocTab].docDate)}</strong>, kami yang bertanda tangan di bawah ini secara sadar sepakat mengikatkan diri dalam perikatan hukum:
@@ -2274,7 +2358,7 @@ export default function Home() {
                           </div>
                         </div>
 
-                        {/* Standard Typo Judul Pasal (14px - 15px) & Isi Teks (12px - 13px) */}
+                        {/* Standard Typo Judul Pasal & Isi Teks */}
                         <div className="space-y-2 sm:space-y-2.5">
                           {page1Clauses.map((clause, index) => (
                             <div key={clause.id} className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
@@ -2289,7 +2373,7 @@ export default function Home() {
                           ))}
                         </div>
 
-                        {/* RENDER AREA TTD BERSIH (TANPA KOTAK PLACEHOLDER / GARIS PUTUS) */}
+                        {/* RENDER AREA TTD BERSIH */}
                         {!needsPage2 && (
                           <div className="pt-2 sm:pt-3 grid grid-cols-2 gap-3 sm:gap-4 text-center">
                             <div className="p-2.5 sm:p-3 space-y-1.5 min-h-[100px] flex flex-col justify-between">
@@ -2543,7 +2627,7 @@ export default function Home() {
               </div>
             </div>
 
-            {/* BANNER CATATAN PERINGATAN PENTING & PENJELASAN HANGUS / TANPA DATABASE */}
+            {/* BANNER CATATAN PERINGATAN PENTING */}
             <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-4 text-left space-y-1.5">
               <div className="flex items-center gap-2 font-extrabold text-amber-900 text-xs sm:text-sm">
                 <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
@@ -2753,7 +2837,7 @@ export default function Home() {
                   </button>
                 </div>
 
-                {/* FORM KONFIRMASI EMAIL & NAMA PENERIMA KUITANSI (MANUAL TANPA AUTOFILL) */}
+                {/* FORM KONFIRMASI EMAIL & NAMA PENERIMA KUITANSI */}
                 <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-3 text-left">
                   <span className="text-xs font-bold text-slate-800 uppercase tracking-wider block">
                     Konfirmasi Penerima Nota/Kuitansi Pembayaran
@@ -2765,10 +2849,11 @@ export default function Home() {
                     </label>
                     <input
                       type="email"
+                      autoComplete="off"
                       value={receiptEmail}
                       onChange={(e) => {
                         setReceiptEmail(e.target.value);
-                        setPaymentUrl(null); // Invalidate URL saat email kuitansi diubah
+                        setPaymentUrl(null);
                         setMayarPaymentId(null);
                         if (typeof window !== 'undefined') {
                           localStorage.removeItem('spkinstan_active_payment');
@@ -2793,10 +2878,11 @@ export default function Home() {
                     </label>
                     <input
                       type="text"
+                      autoComplete="off"
                       value={receiptName}
                       onChange={(e) => {
                         setReceiptName(e.target.value);
-                        setPaymentUrl(null); // Invalidate URL saat nama kuitansi diubah
+                        setPaymentUrl(null);
                         setMayarPaymentId(null);
                         if (typeof window !== 'undefined') {
                           localStorage.removeItem('spkinstan_active_payment');
@@ -2902,7 +2988,7 @@ export default function Home() {
                   </button>
                 </div>
 
-                {/* BANNER CATATAN PERINGATAN TEGAS (AMBER) */}
+                {/* BANNER CATATAN PERINGATAN TEGAS */}
                 <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-3 text-left space-y-1">
                   <div className="flex items-center gap-1.5 font-extrabold text-amber-900 text-xs">
                     <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
