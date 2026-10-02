@@ -1156,9 +1156,13 @@ export default function Home() {
           packageType: selectedPackage,
           amount,
           docType: activeDocTab,
+          // Kirim kunci 'name' dan 'customerName' secara bersamaan untuk mencegah nilai "auto"
+          name: targetName,
           customerName: targetName,
-          customerMobile: targetMobile,
+          email: targetEmail,
           customerEmail: targetEmail,
+          mobile: targetMobile,
+          customerMobile: targetMobile,
         }),
       });
 
@@ -2624,7 +2628,7 @@ export default function Home() {
                   <span className="text-xs font-bold text-slate-800 uppercase tracking-wider block">
                     Konfirmasi Penerima Nota/Kuitansi Pembayaran
                   </span>
-                  
+
                   <div>
                     <label className="block text-[11px] font-semibold text-slate-600 mb-1 flex items-center gap-1">
                       <Mail className="w-3 h-3 text-blue-600" /> Email Penerima Kuitansi Mayar <span className="text-red-500">*</span>

@@ -5,11 +5,28 @@ import { redis } from '@/lib/redis';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { sessionId, packageType, amount, docType, customerName, customerMobile, customerEmail } = body;
+    const { sessionId, packageType, amount, docType } = body;
+
+    // 1. Tangkap nama dinamis dari form (Mendukung properti 'name' atau 'customerName')
+    const rawName = body.name || body.customerName;
+    const finalCustomerName = rawName && typeof rawName === 'string' && rawName.trim() !== ''
+      ? rawName.trim()
+      : 'Penerima Kuitansi SPKInstan';
+
+    // 2. Tangkap email & nomor HP dengan sanitize & fallback
+    const rawEmail = body.email || body.customerEmail;
+    const finalCustomerEmail = rawEmail && typeof rawEmail === 'string' && rawEmail.trim() !== ''
+      ? rawEmail.trim()
+      : `client-${Date.now()}@spkinstan.com`;
+
+    const rawMobile = body.mobile || body.customerMobile;
+    const finalCustomerMobile = rawMobile && typeof rawMobile === 'string' && rawMobile.trim() !== ''
+      ? rawMobile.trim()
+      : '081234567890';
 
     const MAYAR_API_KEY = process.env.MAYAR_API_KEY || '';
 
-    // 1. Panggil API Mayar untuk membuat link pembayaran
+    // 3. Panggil API Mayar untuk membuat link pembayaran
     const mayarRes = await fetch('https://api.mayar.id/hl/v1/payment/create', {
       method: 'POST',
       headers: {
@@ -17,21 +34,35 @@ export async function POST(request: Request) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        name: customerName || 'Klien SPKInstan',
-        email: customerEmail || `client-${Date.now()}@spkinstan.com`,
-        mobile: customerMobile || '081234567890',
-        amount: amount || 1000,
-        description: `Lisensi Dokumen ${docType} - ${packageType}`,
-        // RedirectUrl mengarah ke halaman callback khusus
-        redirectUrl: 'https://spkinstan.vercel.app/payment-success',
+        name: finalCustomerName,
+        email: finalCustomerEmail,
+        mobile: finalCustomerMobile,
+        amount: Number(amount) || 1000,
+        description: `Lisensi Dokumen ${docType || 'SPKInstan'} - ${packageType || 'Dokumen'}`,
+        redirectUrl: process.env.NEXT_PUBLIC_BASE_URL 
+          ? `${process.env.NEXT_PUBLIC_BASE_URL}/payment-success` 
+          : 'https://spkinstan.vercel.app/payment-success',
       }),
     });
 
     const mayarData = await mayarRes.json();
+
+    // Validasi penanganan error dari respon Mayar
+    if (!mayarRes.ok) {
+      console.error('Mayar API Error:', mayarData);
+      return NextResponse.json(
+        { 
+          success: false, 
+          message: mayarData.message || 'Gagal membuat transaksi pembayaran di Mayar' 
+        },
+        { status: mayarRes.status }
+      );
+    }
+
     const paymentId = mayarData?.data?.id || mayarData?.id || mayarData?.data?.paymentId;
     const paymentUrl = mayarData?.data?.link || mayarData?.link || mayarData?.data?.url;
 
-    // 2. SIMPAN KE REDIS dengan status 'PENDING'
+    // 4. SIMPAN KE REDIS dengan status 'PENDING'
     const transactionData = {
       sessionId,
       mayarPaymentId: paymentId,
@@ -39,12 +70,16 @@ export async function POST(request: Request) {
       docType,
       packageType,
       amount,
+      customerName: finalCustomerName,
+      customerEmail: finalCustomerEmail,
       createdAt: new Date().toISOString(),
     };
 
-    // Simpan key berdasarkan Session ID dan Mayar ID agar mudah dicari oleh Webhook
-    await redis.set(`txn:${sessionId}`, JSON.stringify(transactionData), { ex: 86400 });
-    if (paymentId) {
+    // Simpan key berdasarkan Session ID dan Mayar ID agar dapat dicari oleh Webhook
+    if (sessionId) {
+      await redis.set(`txn:${sessionId}`, JSON.stringify(transactionData), { ex: 86400 });
+    }
+    if (paymentId && sessionId) {
       await redis.set(`mayar_mapping:${paymentId}`, sessionId, { ex: 86400 });
     }
 
@@ -54,8 +89,11 @@ export async function POST(request: Request) {
       mayarPaymentId: paymentId,
       sessionId,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error generate QRIS:', error);
-    return NextResponse.json({ success: false, message: 'Gagal membuat pembayaran' }, { status: 500 });
+    return NextResponse.json(
+      { success: false, message: error?.message || 'Gagal membuat pembayaran' },
+      { status: 500 }
+    );
   }
 }
