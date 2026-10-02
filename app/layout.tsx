@@ -24,9 +24,6 @@ export const metadata: Metadata = {
     icon: [
       { url: '/icon.svg', type: 'image/svg+xml' },
     ],
-    apple: [
-      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
-    ],
   },
 };
 
@@ -39,6 +36,18 @@ export default function RootLayout({
 
   return (
     <html lang="id">
+      <head>
+        {/* Tag manual dengan Absolute URL & Cache Buster untuk kompatibilitas penuh iOS Safari */}
+        <link 
+          rel="apple-touch-icon" 
+          sizes="180x180" 
+          href="https://www.spkinstan.my.id/apple-touch-icon.png?v=3" 
+        />
+        <link 
+          rel="apple-touch-icon-precomposed" 
+          href="https://www.spkinstan.my.id/apple-touch-icon.png?v=3" 
+        />
+      </head>
       <body className={plusJakartaSans.className}>
         {pixelId && (
           <Script
