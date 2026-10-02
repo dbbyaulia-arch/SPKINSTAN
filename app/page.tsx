@@ -249,6 +249,7 @@ export default function Home() {
     }));
 
     // RESET LINK PEMBAYARAN LAMA (INVALIDATE INVOICE EXPIRED)
+    // Mencegah Mayar Gateway menggunakan data lama (misal: "Pt coba coba")
     setPaymentUrl(null);
     setMayarPaymentId(null);
   };
@@ -561,7 +562,6 @@ export default function Home() {
         try {
           const parsed = JSON.parse(savedDraft);
           if (parsed.docsData && parsed.docsData.SPK && parsed.docsData.NDA && parsed.docsData.BAST) {
-            // Pastikan fallback docDate terisi untuk draf lama
             const normalizedDocsData = {
               SPK: { docDate: new Date().toISOString().split('T')[0], ...parsed.docsData.SPK },
               NDA: { docDate: new Date().toISOString().split('T')[0], ...parsed.docsData.NDA },
@@ -647,18 +647,25 @@ export default function Home() {
     setClauses((prev) =>
       prev.map((c) => (c.id === id ? { ...c, isEnabled: !c.isEnabled } : c))
     );
+    // Invalidate payment link saat pasal diubah
+    setPaymentUrl(null);
+    setMayarPaymentId(null);
   };
 
   const handleUpdateClauseTitle = (id: string, title: string) => {
     setClauses((prev) =>
       prev.map((c) => (c.id === id ? { ...c, title } : c))
     );
+    setPaymentUrl(null);
+    setMayarPaymentId(null);
   };
 
   const handleUpdateClauseContent = (id: string, content: string) => {
     setClauses((prev) =>
       prev.map((c) => (c.id === id ? { ...c, content } : c))
     );
+    setPaymentUrl(null);
+    setMayarPaymentId(null);
   };
 
   const handleAddCustomClause = () => {
@@ -671,15 +678,21 @@ export default function Home() {
       isCustom: true,
     };
     setClauses((prev) => [...prev, newClause]);
+    setPaymentUrl(null);
+    setMayarPaymentId(null);
   };
 
   const handleRemoveClause = (id: string) => {
     setClauses((prev) => prev.filter((c) => c.id !== id));
+    setPaymentUrl(null);
+    setMayarPaymentId(null);
   };
 
   // Preset Dinamis Sesuai Active Tab
   const handleApplyPreset = (presetType: 'web' | 'design' | 'all') => {
     setActivePreset(presetType);
+    setPaymentUrl(null);
+    setMayarPaymentId(null);
 
     setClauses((prev) =>
       prev.map((c) => {
@@ -878,6 +891,7 @@ export default function Home() {
   };
 
   // FUNGSI HELPER: GENERATE PDF BLOB WITH CLEAN FILE NAMING
+  // Format File Bersih: <doctype>_<nama_pihak_pertama>.pdf (contoh: spk_budi_santoso.pdf)
   const generatePdfBlob = async (
     docType: DocType
   ): Promise<{ blob: Blob; fileName: string } | null> => {
@@ -1409,7 +1423,11 @@ export default function Home() {
                 <div className="flex flex-col sm:flex-row p-1.5 bg-slate-200/70 rounded-2xl sm:rounded-full w-full sm:w-auto shadow-inner border border-slate-300/40 gap-1.5 sm:gap-0">
                   <button
                     type="button"
-                    onClick={() => setSelectedPackage('SINGLE')}
+                    onClick={() => {
+                      setSelectedPackage('SINGLE');
+                      setPaymentUrl(null);
+                      setMayarPaymentId(null);
+                    }}
                     className={`w-full sm:w-auto px-4 py-2.5 rounded-xl sm:rounded-full text-xs sm:text-sm font-semibold transition-all duration-200 text-center ${
                       selectedPackage === 'SINGLE'
                         ? 'bg-white text-slate-900 shadow-sm'
@@ -1420,7 +1438,11 @@ export default function Home() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setSelectedPackage('BUNDLING')}
+                    onClick={() => {
+                      setSelectedPackage('BUNDLING');
+                      setPaymentUrl(null);
+                      setMayarPaymentId(null);
+                    }}
                     className={`w-full sm:w-auto px-4 py-2.5 rounded-xl sm:rounded-full text-xs sm:text-sm font-semibold transition-all duration-200 flex items-center justify-center gap-1.5 ${
                       selectedPackage === 'BUNDLING'
                         ? 'bg-white text-slate-900 shadow-sm'
@@ -2136,7 +2158,7 @@ export default function Home() {
                           ))}
                         </div>
 
-                        {/* RENDER AREA TTD BERSIH (TANPA KOTAK PLACEHOLDER) */}
+                        {/* RENDER AREA TTD BERSIH (TANPA KOTAK PLACEHOLDER / GARIS PUTUS) */}
                         {!needsPage2 && (
                           <div className="pt-2 sm:pt-3 grid grid-cols-2 gap-3 sm:gap-4 text-center">
                             <div className="p-2.5 sm:p-3 space-y-1.5 min-h-[100px] flex flex-col justify-between">
@@ -2615,7 +2637,9 @@ export default function Home() {
                       value={receiptEmail}
                       onChange={(e) => {
                         setReceiptEmail(e.target.value);
-                        if (emailError) setEmailError(''); // Reset error saat diketik ulang
+                        setPaymentUrl(null); // Invalidate URL saat email kuitansi diubah
+                        setMayarPaymentId(null);
+                        if (emailError) setEmailError('');
                       }}
                       placeholder="cth: emailpembayar@gmail.com"
                       className={`w-full px-3 py-2 text-xs bg-white border rounded-xl focus:outline-none transition ${
@@ -2636,7 +2660,11 @@ export default function Home() {
                     <input
                       type="text"
                       value={receiptMobile}
-                      onChange={(e) => setReceiptMobile(e.target.value)}
+                      onChange={(e) => {
+                        setReceiptMobile(e.target.value);
+                        setPaymentUrl(null); // Invalidate URL saat WA kuitansi diubah
+                        setMayarPaymentId(null);
+                      }}
                       placeholder="cth: 081234567890"
                       className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition"
                     />
@@ -2647,7 +2675,11 @@ export default function Home() {
                   <div className="p-4 rounded-2xl border-2 border-emerald-500/80 bg-emerald-50/40 space-y-3">
                     <div className="space-y-2 pt-1">
                       <div
-                        onClick={() => setSelectedPackage('SINGLE')}
+                        onClick={() => {
+                          setSelectedPackage('SINGLE');
+                          setPaymentUrl(null);
+                          setMayarPaymentId(null);
+                        }}
                         className={`p-3 rounded-xl border text-xs cursor-pointer flex items-center justify-between transition-all ${
                           selectedPackage === 'SINGLE'
                             ? 'bg-white border-emerald-600 font-bold shadow-sm'
@@ -2662,7 +2694,11 @@ export default function Home() {
                       </div>
 
                       <div
-                        onClick={() => setSelectedPackage('BUNDLING')}
+                        onClick={() => {
+                          setSelectedPackage('BUNDLING');
+                          setPaymentUrl(null);
+                          setMayarPaymentId(null);
+                        }}
                         className={`p-3 rounded-xl border text-xs cursor-pointer flex items-center justify-between transition-all ${
                           selectedPackage === 'BUNDLING'
                             ? 'bg-white border-emerald-600 font-bold shadow-sm'
