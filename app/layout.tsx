@@ -7,7 +7,6 @@ import './globals.css';
 const plusJakartaSans = Plus_Jakarta_Sans({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  // Tambahkan metadataBase agar resolusi URL Next.js konsisten
   metadataBase: new URL('https://www.spkinstan.my.id'),
   title: 'SPKInstan',
   description: 'Buat dokumen SPK, NDA, dan BAST hukum perdata Indonesia secara instan tanpa registrasi.',
@@ -26,8 +25,7 @@ export const metadata: Metadata = {
       { url: '/icon.svg', type: 'image/svg+xml' },
     ],
     apple: [
-      // Tambahkan ?v=2 di akhir URL untuk memutus cache Apple
-      { url: '/apple-icon.png?v=2', sizes: '180x180', type: 'image/png' },
+      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
     ],
   },
 };
@@ -41,7 +39,6 @@ export default function RootLayout({
 
   return (
     <html lang="id">
-      {/* Tag <head> manual dihapus agar Next.js mengelola metadata secara bersih */}
       <body className={plusJakartaSans.className}>
         {pixelId && (
           <Script
