@@ -41,6 +41,7 @@ type DocType = 'SPK' | 'NDA' | 'BAST';
 // Data Khusus per Jenis Dokumen (Independen & Terisolasi)
 interface SingleDocDetails {
   docNumber: string;
+  docDate: string; // Properti untuk tanggal dokumen kustom
   projectTitle: string;
 
   // Field Identitas Pihak
@@ -118,11 +119,12 @@ export default function Home() {
   // POPUP & MODAL CONTROL STATES
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [modalStep, setModalStep] = useState<'download_choice' | 'qris'>('download_choice');
-  const [showDownloadPopup, setShowDownloadPopup] = useState(false); // POPUP OVERLAY PASCA-BAYAR PERSISTEN
+  const [showDownloadPopup, setShowDownloadPopup] = useState(false);
 
-  // STATE BARU: KONFIRMASI RECEIPT EMAIL & WA UNTUK NOTA MAYAR
+  // STATE RECEIPT EMAIL, WA, & VALIDASI ERROR
   const [receiptEmail, setReceiptEmail] = useState('');
   const [receiptMobile, setReceiptMobile] = useState('');
+  const [emailError, setEmailError] = useState('');
 
   const [mobileViewMode, setMobileViewMode] = useState<'form' | 'preview'>('form');
   const [isExporting, setIsExporting] = useState(false);
@@ -137,12 +139,33 @@ export default function Home() {
   const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
+  // HELPER VALIDASI FORMAT EMAIL
+  const isValidEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email.trim());
+  };
+
+  // HELPER FORMAT TANGGAL INDONESIA KUSTOM (YYYY-MM-DD -> 2 Oktober 2026)
+  const formatIndonesianDate = (dateString: string) => {
+    if (!dateString) return '-';
+    const dateObj = new Date(dateString);
+    if (isNaN(dateObj.getTime())) return dateString;
+
+    return dateObj.toLocaleDateString('id-ID', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+  };
+
   // ---------------------------------------------------------
   // KEYED DICTIONARY STATE IMPLEMENTATION (TERPISAH PER DOKUMEN)
   // ---------------------------------------------------------
   const [docsData, setDocsData] = useState<Record<DocType, SingleDocDetails>>({
     SPK: {
       docNumber: '001/SPK/IX/2026',
+      docDate: new Date().toISOString().split('T')[0],
       projectTitle: 'Pengembangan Aplikasi Web Dashboard',
       freelancerName: '',
       freelancerEmail: '',
@@ -165,6 +188,7 @@ export default function Home() {
     },
     NDA: {
       docNumber: '001/NDA/IX/2026',
+      docDate: new Date().toISOString().split('T')[0],
       projectTitle: 'Kerahasiaan Source Code & Database',
       freelancerName: '',
       freelancerEmail: '',
@@ -187,6 +211,7 @@ export default function Home() {
     },
     BAST: {
       docNumber: '001/BAST/IX/2026',
+      docDate: new Date().toISOString().split('T')[0],
       projectTitle: 'Serah Terima Pekerjaan Web Dashboard',
       freelancerName: '',
       freelancerEmail: '',
@@ -536,7 +561,13 @@ export default function Home() {
         try {
           const parsed = JSON.parse(savedDraft);
           if (parsed.docsData && parsed.docsData.SPK && parsed.docsData.NDA && parsed.docsData.BAST) {
-            setDocsData(parsed.docsData);
+            // Pastikan fallback docDate terisi untuk draf lama
+            const normalizedDocsData = {
+              SPK: { docDate: new Date().toISOString().split('T')[0], ...parsed.docsData.SPK },
+              NDA: { docDate: new Date().toISOString().split('T')[0], ...parsed.docsData.NDA },
+              BAST: { docDate: new Date().toISOString().split('T')[0], ...parsed.docsData.BAST },
+            };
+            setDocsData(normalizedDocsData);
             if (parsed.clauses && Array.isArray(parsed.clauses)) {
               setClauses(parsed.clauses);
             }
@@ -598,7 +629,7 @@ export default function Home() {
         if (c.id === 'bast-2') {
           return {
             ...c,
-            content: `PIHAK PERTAMA menyatakan telah menyerahkan seluruh hasil pengerjaan proyek, dan PIHAK KEDUA menyatakan telah menerima pengerjaan tersebut secara resmi pada tanggal ${bastData.bastDate || '25 September 2026'}.`,
+            content: `PIHAK PERTAMA menyatakan telah menyerahkan seluruh hasil pengerjaan proyek, dan PIHAK KEDUA menyatakan telah menerima pengerjaan tersebut secara resmi pada tanggal ${bastData.bastDate ? formatIndonesianDate(bastData.bastDate) : '25 September 2026'}.`,
           };
         }
         if (c.id === 'bast-4') {
@@ -785,6 +816,7 @@ export default function Home() {
     setPaymentUrl(null);
     setMayarPaymentId(null);
     setModalStep('download_choice');
+    setEmailError('');
     stopPolling();
   };
 
@@ -1062,10 +1094,17 @@ export default function Home() {
     }, 2500);
   };
 
-  // PEMBAYARAN MAYAR EMBEDDED IFRAME DENGAN FRESH SESSION ID
+  // PEMBAYARAN MAYAR EMBEDDED IFRAME DENGAN VALIDASI EMAIL & FRESH SESSION ID
   const handleRequestQris = async () => {
     if (isLoadingQris) return;
 
+    // VALIDASI EMAIL SEBELUM LANJUT PAYMENT
+    if (!receiptEmail.trim() || !isValidEmail(receiptEmail)) {
+      setEmailError('Mohon masukkan alamat email yang valid (contoh: nama@email.com)');
+      return; // Stop proses, tidak memanggil API Mayar
+    }
+
+    setEmailError('');
     setIsLoadingQris(true);
     setPaidDocTarget(activeDocTab);
 
@@ -1089,13 +1128,7 @@ export default function Home() {
 
     const currentDocDetails = docsData[activeDocTab];
     const targetName = currentDocDetails.clientName || currentDocDetails.freelancerName || 'Pihak Kedua SPKInstan';
-    const cleanName = targetName.toLowerCase().replace(/[^a-z0-9]/g, '');
-    
-    // Gunakan receiptEmail & receiptMobile jika diisi di Modal Checkout, atau Fallback
-    const targetEmail =
-      receiptEmail.trim() ||
-      currentDocDetails.freelancerEmail.trim() ||
-      (cleanName ? `${cleanName}@spkinstan.com` : `client-${Date.now()}@spkinstan.com`);
+    const targetEmail = receiptEmail.trim();
 
     const targetMobile =
       receiptMobile.trim() ||
@@ -1140,11 +1173,6 @@ export default function Home() {
   };
 
   const formatRupiah = (val: string) => (val ? parseInt(val, 10).toLocaleString('id-ID') : '0');
-
-  const getTodayFormattedDate = () => {
-    const options: Intl.DateTimeFormatOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-    return new Date().toLocaleDateString('id-ID', options);
-  };
 
   // HANDLER TANDA TANGAN DIGITAL PADA CANVAS
   const startDraw1 = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
@@ -1503,17 +1531,32 @@ export default function Home() {
                 <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
                   {currentWizardStep === 1 && (
                     <div className="space-y-4">
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-700 mb-1">
-                          Nomor Dokumen / Surat ({activeDocTab})
-                        </label>
-                        <input
-                          type="text"
-                          value={docsData[activeDocTab].docNumber}
-                          onChange={(e) => handleDocInputChange(activeDocTab, 'docNumber', e.target.value)}
-                          placeholder={`cth: 001/${activeDocTab}/IX/2026`}
-                          className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-mono font-medium"
-                        />
+                      {/* Grid Input Nomor Dokumen & Tanggal Kustom */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1">
+                            Nomor Dokumen / Surat ({activeDocTab})
+                          </label>
+                          <input
+                            type="text"
+                            value={docsData[activeDocTab].docNumber}
+                            onChange={(e) => handleDocInputChange(activeDocTab, 'docNumber', e.target.value)}
+                            placeholder={`cth: 001/${activeDocTab}/IX/2026`}
+                            className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-mono font-medium"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1">
+                            Tanggal Dokumen / Surat
+                          </label>
+                          <input
+                            type="date"
+                            value={docsData[activeDocTab].docDate}
+                            onChange={(e) => handleDocInputChange(activeDocTab, 'docDate', e.target.value)}
+                            className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all font-medium"
+                          />
+                        </div>
                       </div>
 
                       {/* PIHAK PERTAMA */}
@@ -2046,7 +2089,9 @@ export default function Home() {
                             <p className="font-mono text-[12px] sm:text-[13px] font-extrabold text-slate-900">
                               {docsData[activeDocTab].docNumber || `001/${activeDocTab}/IX/2026`}
                             </p>
-                            <p className="text-[11px] text-slate-500 pt-0.5">{getTodayFormattedDate()}</p>
+                            <p className="text-[11px] text-slate-500 pt-0.5">
+                              {formatIndonesianDate(docsData[activeDocTab].docDate)}
+                            </p>
                           </div>
                         </div>
 
@@ -2062,7 +2107,7 @@ export default function Home() {
                         {/* Standard Typo Identitas Pihak (12px - 13px) */}
                         <div className="bg-slate-50/70 border border-slate-200/80 rounded-xl p-2.5 sm:p-3 space-y-1.5">
                           <p className="text-slate-700 text-[12px] sm:text-[13px]">
-                            Pada hari ini, <strong>{getTodayFormattedDate()}</strong>, kami yang bertanda tangan di bawah ini secara sadar sepakat mengikatkan diri dalam perikatan hukum:
+                            Pada hari ini, <strong>{formatIndonesianDate(docsData[activeDocTab].docDate)}</strong>, kami yang bertanda tangan di bawah ini secara sadar sepakat mengikatkan diri dalam perikatan hukum:
                           </p>
                           <div className="grid grid-cols-2 gap-2 pt-0.5">
                             <div className="bg-white p-2 rounded-lg border border-slate-200/60">
@@ -2555,7 +2600,7 @@ export default function Home() {
                   </button>
                 </div>
 
-                {/* FORM KONFIRMASI EMAIL & WA PENERIMA KUITANSI */}
+                {/* FORM KONFIRMASI EMAIL & WA PENERIMA KUITANSI DENGAN VALIDASI ERROR */}
                 <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-3 text-left">
                   <span className="text-xs font-bold text-slate-800 uppercase tracking-wider block">
                     Konfirmasi Penerima Nota/Kuitansi Pembayaran
@@ -2563,15 +2608,25 @@ export default function Home() {
                   
                   <div>
                     <label className="block text-[11px] font-semibold text-slate-600 mb-1 flex items-center gap-1">
-                      <Mail className="w-3 h-3 text-blue-600" /> Email Penerima Kuitansi Mayar
+                      <Mail className="w-3 h-3 text-blue-600" /> Email Penerima Kuitansi Mayar <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="email"
                       value={receiptEmail}
-                      onChange={(e) => setReceiptEmail(e.target.value)}
+                      onChange={(e) => {
+                        setReceiptEmail(e.target.value);
+                        if (emailError) setEmailError(''); // Reset error saat diketik ulang
+                      }}
                       placeholder="cth: emailpembayar@gmail.com"
-                      className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition"
+                      className={`w-full px-3 py-2 text-xs bg-white border rounded-xl focus:outline-none transition ${
+                        emailError ? 'border-red-500 focus:ring-2 focus:ring-red-200' : 'border-slate-200 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600'
+                      }`}
                     />
+                    {emailError && (
+                      <p className="text-[10px] font-bold text-red-500 mt-1 flex items-center gap-1">
+                        ⚠ {emailError}
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -2629,9 +2684,9 @@ export default function Home() {
 
                     <button
                       type="button"
-                      disabled={isLoadingQris}
+                      disabled={isLoadingQris || !receiptEmail.trim() || !isValidEmail(receiptEmail)}
                       onClick={handleRequestQris}
-                      className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white font-bold rounded-xl text-xs transition-all shadow-md flex items-center justify-center gap-1.5"
+                      className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold rounded-xl text-xs transition-all shadow-md flex items-center justify-center gap-1.5"
                     >
                       {isLoadingQris ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -2726,7 +2781,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* Floating WhatsApp Widget dengan Pesan Minta Bantuan CS */}
+      {/* Floating WhatsApp Widget */}
       <a
         href={`https://wa.me/${adminWaNumber}?text=${encodeURIComponent("Halo Admin SPKInstan, saya butuh bantuan mengenai pembuatan dokumen.")}`}
         target="_blank"
