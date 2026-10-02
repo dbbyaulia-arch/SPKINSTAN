@@ -26,8 +26,7 @@ import {
   AlertTriangle,
   Sliders,
   RefreshCw,
-  Mail,
-  Phone
+  Mail
 } from 'lucide-react';
 
 declare global {
@@ -121,9 +120,9 @@ export default function Home() {
   const [modalStep, setModalStep] = useState<'download_choice' | 'qris'>('download_choice');
   const [showDownloadPopup, setShowDownloadPopup] = useState(false);
 
-  // STATE RECEIPT EMAIL, WA, & VALIDASI ERROR
+  // STATE RECEIPT EMAIL, NAMA (MANUAL TANPA AUTOFILL), & VALIDASI ERROR
   const [receiptEmail, setReceiptEmail] = useState('');
-  const [receiptMobile, setReceiptMobile] = useState('');
+  const [receiptName, setReceiptName] = useState(''); // Default Kosong Manual Input
   const [emailError, setEmailError] = useState('');
 
   const [mobileViewMode, setMobileViewMode] = useState<'form' | 'preview'>('form');
@@ -161,6 +160,7 @@ export default function Home() {
 
   // ---------------------------------------------------------
   // KEYED DICTIONARY STATE IMPLEMENTATION (TERPISAH PER DOKUMEN)
+  // Multi-Doc State Nomor Surat Terisolasi Mandiri
   // ---------------------------------------------------------
   const [docsData, setDocsData] = useState<Record<DocType, SingleDocDetails>>({
     SPK: {
@@ -249,7 +249,6 @@ export default function Home() {
     }));
 
     // RESET LINK PEMBAYARAN LAMA (INVALIDATE INVOICE EXPIRED)
-    // Mencegah Mayar Gateway menggunakan data lama (misal: "Pt coba coba")
     setPaymentUrl(null);
     setMayarPaymentId(null);
   };
@@ -422,17 +421,16 @@ export default function Home() {
     },
   ]);
 
-  // Autofill Default Email & WA Penerima Kuitansi saat Checkout Modal Dibuka
+  // Autofill Email Penerima Kuitansi (Tetap Kosongkan Nama Penerima Kuitansi untuk Input Manual)
   useEffect(() => {
     if (showCheckoutModal) {
       const currentDocDetails = docsData[activeDocTab];
-      const defaultEmail = currentDocDetails.freelancerEmail.trim() || currentDocDetails.clientName
+      const defaultEmail = currentDocDetails.freelancerEmail.trim() || (currentDocDetails.clientName
         ? `${currentDocDetails.clientName.toLowerCase().replace(/[^a-z0-9]/g, '')}@spkinstan.com`
-        : '';
-      const defaultMobile = currentDocDetails.freelancerWa.trim() || currentDocDetails.clientWa.trim() || '';
+        : '');
 
       if (!receiptEmail) setReceiptEmail(defaultEmail);
-      if (!receiptMobile) setReceiptMobile(defaultMobile);
+      // receiptName dibiarkan kosong secara default untuk diisi pengguna
     }
   }, [showCheckoutModal, activeDocTab, docsData]);
 
@@ -647,7 +645,6 @@ export default function Home() {
     setClauses((prev) =>
       prev.map((c) => (c.id === id ? { ...c, isEnabled: !c.isEnabled } : c))
     );
-    // Invalidate payment link saat pasal diubah
     setPaymentUrl(null);
     setMayarPaymentId(null);
   };
@@ -823,7 +820,7 @@ export default function Home() {
     }
   }, [showCheckoutModal]);
 
-  // FUNGSI BERSIH-BERSIH MODAL DITUTUP MANUAL
+  // FUNGSI BERSIH-BERSIH MODAL DITUTUP MANUAL (HANGUSKAN LINK PAYMENT TERKAIT)
   const handleCloseModal = () => {
     setShowCheckoutModal(false);
     setPaymentUrl(null);
@@ -1115,7 +1112,7 @@ export default function Home() {
     // VALIDASI EMAIL SEBELUM LANJUT PAYMENT
     if (!receiptEmail.trim() || !isValidEmail(receiptEmail)) {
       setEmailError('Mohon masukkan alamat email yang valid (contoh: nama@email.com)');
-      return; // Stop proses, tidak memanggil API Mayar
+      return;
     }
 
     setEmailError('');
@@ -1141,11 +1138,11 @@ export default function Home() {
     }
 
     const currentDocDetails = docsData[activeDocTab];
-    const targetName = currentDocDetails.clientName || currentDocDetails.freelancerName || 'Pihak Kedua SPKInstan';
+    // Menggunakan receiptName jika diisi manual oleh pengguna, fallback ke identitas form
+    const targetName = receiptName.trim() || currentDocDetails.clientName || currentDocDetails.freelancerName || 'Pihak Kedua SPKInstan';
     const targetEmail = receiptEmail.trim();
 
     const targetMobile =
-      receiptMobile.trim() ||
       currentDocDetails.clientWa.trim() ||
       currentDocDetails.freelancerWa.trim() ||
       '081234567890';
@@ -1553,7 +1550,7 @@ export default function Home() {
                 <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
                   {currentWizardStep === 1 && (
                     <div className="space-y-4">
-                      {/* Grid Input Nomor Dokumen & Tanggal Kustom */}
+                      {/* Grid Input Nomor Dokumen & Tanggal Kustom (Multi-Doc State Terisolasi) */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                           <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -1836,7 +1833,7 @@ export default function Home() {
                             className={`py-1.5 px-2 rounded-xl text-[10px] font-bold border transition-all ${
                               activePreset === 'all'
                                 ? 'bg-blue-600 text-white border-blue-600'
-                                : 'bg-white text-blue-600 border-blue-200 hover:bg-slate-50'
+                                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                             }`}
                           >
                             Aktifkan Semua
@@ -2622,7 +2619,7 @@ export default function Home() {
                   </button>
                 </div>
 
-                {/* FORM KONFIRMASI EMAIL & WA PENERIMA KUITANSI DENGAN VALIDASI ERROR */}
+                {/* FORM KONFIRMASI EMAIL & NAMA PENERIMA KUITANSI (MANUAL TANPA AUTOFILL) */}
                 <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-3 text-left">
                   <span className="text-xs font-bold text-slate-800 uppercase tracking-wider block">
                     Konfirmasi Penerima Nota/Kuitansi Pembayaran
@@ -2655,17 +2652,17 @@ export default function Home() {
 
                   <div>
                     <label className="block text-[11px] font-semibold text-slate-600 mb-1 flex items-center gap-1">
-                      <Phone className="w-3 h-3 text-emerald-600" /> WhatsApp Penerima Nota
+                      <User className="w-3 h-3 text-blue-600" /> Nama Penerima Kuitansi / Invoice
                     </label>
                     <input
                       type="text"
-                      value={receiptMobile}
+                      value={receiptName}
                       onChange={(e) => {
-                        setReceiptMobile(e.target.value);
-                        setPaymentUrl(null); // Invalidate URL saat WA kuitansi diubah
+                        setReceiptName(e.target.value);
+                        setPaymentUrl(null); // Invalidate URL saat nama kuitansi diubah
                         setMayarPaymentId(null);
                       }}
-                      placeholder="cth: 081234567890"
+                      placeholder="cth: Budi Santoso / PT Digital Inovasi"
                       className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition"
                     />
                   </div>
