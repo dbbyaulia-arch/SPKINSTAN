@@ -428,6 +428,18 @@ export default function Home() {
   // SOLUSI PENCEGAHAN REFRESH & PERSISTENSI STATE PEMBAYARAN
   // ---------------------------------------------------------
 
+  // 0. RESET OTOMATIS VIA QUERY URL (?reset=true)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('reset') === 'true') {
+      localStorage.clear();
+      window.history.replaceState({}, document.title, window.location.pathname);
+      alert('Cache draf dan pembayaran berhasil dibersihkan otomatis!');
+    }
+  }, []);
+
   // 1. Peringatan Browser Saat Refresh / Tutup Tab ketika Modal/Popup Aktif
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -444,7 +456,7 @@ export default function Home() {
     };
   }, [showCheckoutModal, showDownloadPopup]);
 
-  // 2. Simpan State Pembayaran Aktif ke localStorage Secara Real-Time
+  // 2. Simpan State Pembayaran Aktif ke localStorage Secara Real-Time dengan Timestamp (createdAt)
   useEffect(() => {
     if (showCheckoutModal && modalStep === 'qris' && paymentUrl && sessionId) {
       localStorage.setItem(
@@ -455,12 +467,13 @@ export default function Home() {
           paidDocTarget,
           receiptEmail,
           receiptName,
+          createdAt: Date.now(), // Simpan waktu pembuatan transaksi
         })
       );
     }
   }, [showCheckoutModal, modalStep, paymentUrl, sessionId, paidDocTarget, receiptEmail, receiptName]);
 
-  // 3. Auto-Restore Modal saat Halaman Ditinggal / Di-refresh
+  // 3. Auto-Restore dengan Pembatasan Usia Cache (Auto-Expire 15 Menit)
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -468,6 +481,16 @@ export default function Home() {
     if (savedActivePayment) {
       try {
         const data = JSON.parse(savedActivePayment);
+        const currentTime = Date.now();
+        const cacheAge = currentTime - (data.createdAt || 0);
+        const MAX_AGE = 15 * 60 * 1000; // 15 Menit
+
+        // Jika cache sudah lebih dari 15 menit, HAPUS OTOMATIS
+        if (cacheAge > MAX_AGE) {
+          localStorage.removeItem('spkinstan_active_payment');
+          return;
+        }
+
         if (data.sessionId && data.paymentUrl) {
           setSessionId(data.sessionId);
           setPaymentUrl(data.paymentUrl);
@@ -484,6 +507,7 @@ export default function Home() {
         }
       } catch (e) {
         console.error('Gagal memulihkan sesi pembayaran:', e);
+        localStorage.removeItem('spkinstan_active_payment');
       }
     }
   }, []);
@@ -860,10 +884,13 @@ export default function Home() {
     setSessionId(generateNewSessionId());
   }, []);
 
-  // Fitur Proteksi Keamanan Draf
+  // Fitur Proteksi Keamanan Draf (Bypass pada Mode Development Lokal)
   useEffect(() => {
     const isPaid = paidDocs[activeDocTab];
     if (isPaid) return;
+
+    // Izinkan F12 jika sedang running di lingkungan development lokal
+    if (process.env.NODE_ENV === 'development') return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (
@@ -1208,13 +1235,19 @@ export default function Home() {
       return;
     }
 
+    // PAKSA HAPUS CACHE PEMBAYARAN LAMA SECARA EKSPLISIT
+    setPaymentUrl(null);
+    setMayarPaymentId(null);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('spkinstan_active_payment');
+    }
+
     setEmailError('');
     setIsLoadingQris(true);
     setPaidDocTarget(activeDocTab);
 
     // 1. Reset state pembayaran sebelumnya
     setQrCodeData(null);
-    setPaymentUrl(null);
 
     // 2. Generate Session ID baru unik per klik
     const freshSessionId = generateNewSessionId();
