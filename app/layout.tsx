@@ -22,8 +22,10 @@ export const metadata: Metadata = {
     google: 'E7yGOswW_pAZnFjX0NHo85CLGSiRKKFXaM_qDSSbax4',
   },
   icons: {
-    icon: '/logo.jpg', // Mengarah ke public/logo.png
-    apple: '/logo.jpg', // Untuk tampilan saat di-bookmark di iPhone/Safari
+    icon: [
+      { url: '/logo.jpg', type: 'image/jpeg' },
+    ],
+    apple: '/logo.jpg',
   },
 };
 
