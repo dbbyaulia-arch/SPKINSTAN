@@ -21,7 +21,14 @@ export const metadata: Metadata = {
   verification: {
     google: 'E7yGOswW_pAZnFjX0NHo85CLGSiRKKFXaM_qDSSbax4',
   },
-
+icons: {
+    icon: [
+      { url: '/logo.svg', type: 'image/svg+xml' }, // Untuk browser biasa (Chrome, Firefox, Edge)
+    ],
+    apple: [
+      { url: '/apple-icon.png?v=2', sizes: '180x180', type: 'image/png' }, // Wajib PNG untuk Apple Ecosystem
+    ],
+  },
 };
 
 export default function RootLayout({
