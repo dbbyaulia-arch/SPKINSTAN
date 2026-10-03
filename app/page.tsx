@@ -121,11 +121,12 @@ export default function Home() {
   const [modalStep, setModalStep] = useState<'download_choice' | 'qris'>('download_choice');
   const [showDownloadPopup, setShowDownloadPopup] = useState(false);
 
-  // STATE RECEIPT EMAIL, NAMA, WA, & VALIDASI ERROR
+  // STATE RECEIPT EMAIL, NAMA, WA, VALIDASI ERROR & PERSETUJUAN TERMS OF SERVICE
   const [receiptEmail, setReceiptEmail] = useState('');
   const [receiptName, setReceiptName] = useState(''); // Default Kosong Manual Input
   const [receiptWa, setReceiptWa] = useState(''); // State Nomor WA Penerima Nota Mayar
   const [emailError, setEmailError] = useState('');
+  const [agreedToTerms, setAgreedToTerms] = useState(false); // Mitigasi Risiko Hukum Skenario 3
 
   const [mobileViewMode, setMobileViewMode] = useState<'form' | 'preview'>('form');
   const [isExporting, setIsExporting] = useState(false);
@@ -517,6 +518,7 @@ export default function Home() {
       setReceiptEmail('');
       setReceiptName('');
       setReceiptWa('');
+      setAgreedToTerms(false);
       window.history.replaceState({}, document.title, window.location.pathname);
       setIsLoaded(true);
       alert('Cache draf dan pembayaran berhasil dibersihkan otomatis!');
@@ -1033,6 +1035,7 @@ export default function Home() {
     setMayarPaymentId(null);
     setModalStep('download_choice');
     setEmailError('');
+    setAgreedToTerms(false);
     stopPolling();
 
     if (typeof window !== 'undefined') {
@@ -1324,6 +1327,11 @@ export default function Home() {
 
     if (!receiptEmail.trim() || !isValidEmail(receiptEmail)) {
       setEmailError('Mohon masukkan alamat email yang valid (contoh: nama@email.com)');
+      return;
+    }
+
+    if (!agreedToTerms) {
+      alert('Anda wajib menyetujui Syarat & Ketentuan serta Disclaimer sebelum melanjutkan pembayaran.');
       return;
     }
 
@@ -2484,8 +2492,12 @@ export default function Home() {
                         )}
                       </div>
 
-                      <div className="pt-2 border-t border-slate-200 flex justify-between items-center text-[10px] sm:text-[11px] text-slate-500 font-mono">
-                        <span>Hal 1 dari {totalPages}</span>
+                      {/* FOOTER A4 DENGAN CLAUSE DISCLAIMER HUKUM TEGAS */}
+                      <div className="pt-2 border-t border-slate-200 flex flex-col sm:flex-row justify-between items-center text-[9px] sm:text-[10px] text-slate-400 font-mono gap-1">
+                        <span className="text-[9px] text-slate-400 italic text-center sm:text-left">
+                          Disclaimer: SPKInstan adalah platform penyedia template dokumen hukum independen dan bukan merupakan kantor konsultan hukum. Dokumen yang diterbitkan bersifat umum berbasis Hukum Perdata Indonesia.
+                        </span>
+                        <span className="shrink-0 font-bold">Hal 1 dari {totalPages}</span>
                       </div>
                     </div>
 
@@ -2560,8 +2572,12 @@ export default function Home() {
                           </div>
                         </div>
 
-                        <div className="pt-2 border-t border-slate-200 flex justify-between items-center text-[10px] sm:text-[11px] text-slate-500 font-mono">
-                          <span>Hal 2 dari 2</span>
+                        {/* FOOTER A4 DENGAN CLAUSE DISCLAIMER HUKUM TEGAS */}
+                        <div className="pt-2 border-t border-slate-200 flex flex-col sm:flex-row justify-between items-center text-[9px] sm:text-[10px] text-slate-400 font-mono gap-1">
+                          <span className="text-[9px] text-slate-400 italic text-center sm:text-left">
+                            Disclaimer: SPKInstan adalah platform penyedia template dokumen hukum independen dan bukan merupakan kantor konsultan hukum. Dokumen yang diterbitkan bersifat umum berbasis Hukum Perdata Indonesia.
+                          </span>
+                          <span className="shrink-0 font-bold">Hal 2 dari 2</span>
                         </div>
                       </div>
                     )}
@@ -3051,9 +3067,24 @@ export default function Home() {
                       </div>
                     </div>
 
+                    {/* KOTAK PERSETUJUAN TERMS OF SERVICE & DISCLAIMER (SKENARIO 3 MITIGASI HUKUM) */}
+                    <div className="p-3 bg-amber-50/70 rounded-xl border border-amber-200/80 text-left">
+                      <label className="flex items-start gap-2.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={agreedToTerms}
+                          onChange={(e) => setAgreedToTerms(e.target.checked)}
+                          className="mt-0.5 rounded text-blue-600 focus:ring-blue-500 w-4 h-4 shrink-0"
+                        />
+                        <span className="text-[11px] text-slate-700 leading-relaxed font-medium">
+                          Saya menyetujui <strong>Syarat & Ketentuan</strong>. Saya memahami bahwa <strong>SPKInstan adalah platform penyedia template dokumen hukum independen dan bukan merupakan kantor konsultan hukum</strong>. Dokumen yang diterbitkan bersifat umum berbasis Hukum Perdata Indonesia.
+                        </span>
+                      </label>
+                    </div>
+
                     <button
                       type="button"
-                      disabled={isLoadingQris || !receiptEmail.trim() || !isValidEmail(receiptEmail)}
+                      disabled={isLoadingQris || !agreedToTerms || !receiptEmail.trim() || !isValidEmail(receiptEmail)}
                       onClick={handleRequestQris}
                       className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold rounded-xl text-xs transition-all shadow-md flex items-center justify-center gap-1.5"
                     >
@@ -3188,7 +3219,7 @@ export default function Home() {
         </button>
       </div>
 
-      {/* Footer */}
+      {/* Footer Utama Website dengan Disclaimer Hukum Tegas */}
       <footer className="bg-slate-900 text-slate-400 py-12 border-t border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
@@ -3243,7 +3274,10 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="pt-8 border-t border-slate-800 text-center text-xs text-slate-500">
+          <div className="pt-8 border-t border-slate-800 text-center text-xs text-slate-500 space-y-2">
+            <p className="max-w-3xl mx-auto text-[11px] text-slate-400 leading-relaxed italic">
+              <strong>Disclaimer Hukum:</strong> SPKInstan adalah platform penyedia template dokumen hukum independen dan bukan merupakan kantor konsultan hukum. Dokumen yang diterbitkan bersifat umum berbasis Hukum Perdata Indonesia.
+            </p>
             <p>© 2026 SPKInstan Platform.</p>
           </div>
         </div>
