@@ -6,6 +6,6 @@ export default function robots(): MetadataRoute.Robots {
       userAgent: '*',
       allow: '/',
     },
-    sitemap: 'https://www.spkinstan.my.id/sitemap.xml', // <--- URL sitemap.xml dimasukkan di sini
+    sitemap: 'https://www.spkinstan.my.id/sitemap.xml',
   };
 }
