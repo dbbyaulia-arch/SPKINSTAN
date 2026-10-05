@@ -1335,6 +1335,10 @@ export default function Home() {
       return;
     }
 
+    const mayarDirectUrl = selectedPackage === 'SINGLE'
+      ? 'https://spkinstan.myr.id/pl/penerbitan-dokumen-legal-spkinstan'
+      : 'https://spkinstan.myr.id/pl/paket-lengkap-legal-freelancer-spk-nda-bast';
+
     setPaymentUrl(null);
     setMayarPaymentId(null);
     if (typeof window !== 'undefined') {
@@ -1360,7 +1364,6 @@ export default function Home() {
 
     const currentDocDetails = docsData[activeDocTab];
 
-    // Prioritaskan Nama Penerima dari input modal -> Nama Pihak Kedua -> Nama Pihak Pertama
     const targetName =
       receiptName.trim() ||
       currentDocDetails.clientName.trim() ||
@@ -1390,6 +1393,7 @@ export default function Home() {
           customerEmail: targetEmail,
           mobile: targetMobile,
           customerMobile: targetMobile,
+          mayarUrl: mayarDirectUrl,
         }),
       });
 
@@ -1398,18 +1402,22 @@ export default function Home() {
         const realMayarId = data.mayarPaymentId || data.paymentId || data.id || freshSessionId;
         setMayarPaymentId(realMayarId);
 
-        if (data.paymentUrl) {
-          setPaymentUrl(data.paymentUrl);
-          setModalStep('qris');
-          startPollingStatus(freshSessionId);
-        }
+        const finalUrl = data.paymentUrl || mayarDirectUrl;
+        setPaymentUrl(finalUrl);
+        setModalStep('qris');
+        startPollingStatus(freshSessionId);
       } else {
-        console.error('Mayar Payment Error:', data.message);
-        alert('Gagal membuat transaksi pembayaran: ' + (data.message || 'Terjadi kesalahan.'));
+        // Fallback langsung ke Mayar Direct Link
+        setPaymentUrl(mayarDirectUrl);
+        setModalStep('qris');
+        startPollingStatus(freshSessionId);
       }
     } catch (err) {
       console.error('Network error during Mayar payment generation:', err);
-      alert('Gagal terhubung ke gateway pembayaran.');
+      // Fallback langsung ke Mayar Direct Link
+      setPaymentUrl(mayarDirectUrl);
+      setModalStep('qris');
+      startPollingStatus(freshSessionId);
     }
     setIsLoadingQris(false);
   };
@@ -1727,6 +1735,11 @@ export default function Home() {
                   mobileViewMode === 'preview' ? 'hidden lg:block' : 'block'
                 }`}
               >
+                {/* Teks Informasi Gratis Isi & Pratinjau */}
+                <p className="text-xs text-slate-500 font-medium mb-3 text-center sm:text-left bg-blue-50/60 p-2.5 rounded-xl border border-blue-100/80">
+                  Gratis isi & pratinjau draf. Pembayaran dilakukan saat mengunduh PDF resmi.
+                </p>
+
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
                     1. Jenis Dokumen Hukum
