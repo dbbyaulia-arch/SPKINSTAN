@@ -3244,54 +3244,56 @@ export default function Home() {
                 </span>
               </div>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Platform generator perjanjian legal perdata instan bagi profesional & agensi mikro Indonesia.
+                Platform LegalTech independen untuk pembuatan dokumen perjanjian kerja sama (SPK, NDA, & BAST) berbasis Hukum Perdata Indonesia secara instan, aman, tanpa login, dan bebas database.
               </p>
             </div>
 
             <div>
-              <h4 className="text-xs font-bold uppercase tracking-wider text-white mb-3">
-                Landasan Hukum
+              <h4 className="text-xs font-bold text-white uppercase tracking-wider mb-3">
+                Dokumen Legal
               </h4>
               <ul className="space-y-2 text-xs">
-                <li>Pasal 1320 & 1338 KUHPerdata</li>
-                <li>UU No. 28/2014 (Hak Cipta)</li>
-                <li>UU No. 30/2000 (Rahasia Dagang)</li>
-                <li>UU No. 27/2022 (Pelindungan Data)</li>
-                <li>UU No. 1/2024 (ITE & Kontrak Digital)</li>
+                <li><a href="#editor" onClick={() => setActiveDocTab('SPK')} className="hover:text-white transition-colors">Surat Perjanjian Kerja Sama (SPK)</a></li>
+                <li><a href="#editor" onClick={() => setActiveDocTab('NDA')} className="hover:text-white transition-colors">Non-Disclosure Agreement (NDA)</a></li>
+                <li><a href="#editor" onClick={() => setActiveDocTab('BAST')} className="hover:text-white transition-colors">Berita Acara Serah Terima (BAST)</a></li>
               </ul>
             </div>
 
             <div>
-              <h4 className="text-xs font-bold uppercase tracking-wider text-white mb-3">
-                Keamanan
+              <h4 className="text-xs font-bold text-white uppercase tracking-wider mb-3">
+                Bantuan & Kontak
               </h4>
               <ul className="space-y-2 text-xs">
-                <li>Zero Database (Strict Local Privacy)</li>
-                <li>Tanda Tangan Digital & Fisik Manual</li>
+                <li>
+                  <a
+                    href={`https://wa.me/${adminWaNumber}?text=${encodeURIComponent("Halo Admin SPKInstan, saya butuh bantuan mengenai pembuatan dokumen.")}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="hover:text-white transition-colors flex items-center gap-1.5"
+                  >
+                    <MessageCircle className="w-3.5 h-3.5 text-emerald-500" />
+                    <span>Customer Support WA</span>
+                  </a>
+                </li>
+                <li className="text-slate-400">Jam Operasional: 08.00 - 21.00 WIB</li>
               </ul>
             </div>
 
             <div>
-              <h4 className="text-xs font-bold uppercase tracking-wider text-white mb-3">
-                Dukungan
+              <h4 className="text-xs font-bold text-white uppercase tracking-wider mb-3">
+                Keamanan & Privasi
               </h4>
-              <a
-                href={`https://wa.me/${adminWaNumber}?text=${encodeURIComponent("Halo Admin SPKInstan, saya butuh bantuan mengenai pembuatan dokumen.")}`}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 rounded-xl text-xs font-semibold border border-emerald-500/30 transition-all"
-              >
-                <MessageCircle className="w-4 h-4" />
-                <span>Hubungi CS WA</span>
-              </a>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                SPKInstan menerapkan arsitektur <strong>Zero Database</strong>. Data identitas dan isi dokumen Anda diproses sepenuhnya di browser lokal Anda dan tidak disimpan di server kami.
+              </p>
             </div>
           </div>
 
-          <div className="pt-8 border-t border-slate-800 text-center text-xs text-slate-500 space-y-2">
-            <p className="max-w-3xl mx-auto text-[11px] text-slate-400 leading-relaxed italic">
-              <strong>Disclaimer Hukum:</strong> SPKInstan adalah platform penyedia template dokumen hukum independen dan bukan merupakan kantor konsultan hukum. Dokumen yang diterbitkan bersifat umum berbasis Hukum Perdata Indonesia.
+          <div className="pt-8 border-t border-slate-800 flex flex-col sm:flex-row justify-between items-center text-xs text-slate-500 gap-4">
+            <p>© {new Date().getFullYear()} SPKInstan. Hak Cipta Dilindungi Undang-Undang.</p>
+            <p className="italic text-[11px] text-center sm:text-right max-w-md">
+              Disclaimer: SPKInstan adalah penyedia template dokumen hukum mandiri dan bukan kantor pengacara/konsultan hukum.
             </p>
-            <p>© 2026 SPKInstan Platform.</p>
           </div>
         </div>
       </footer>
