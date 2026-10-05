@@ -19,6 +19,9 @@ export const metadata: Metadata = {
   },
   verification: {
     google: 'E7yGOswW_pAZnFjX0NHo85CLGSiRKKFXaM_qDSSbax4',
+    other: {
+      'facebook-domain-verification': 't492cwwopjqmdtt5il0u1zqu3idn1h',
+    },
   },
   icons: {
     icon: [
