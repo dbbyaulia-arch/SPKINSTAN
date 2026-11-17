@@ -1,4 +1,36 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SPKInstan
+
+**SPKInstan** ([spkinstan.my.id](https://spkinstan.my.id)) is a self-service LegalTech web application built to simplify how independent professionals create formal project agreements. Instead of editing messy Word templates from scratch or hiring expensive legal counsel for routine projects, users can generate clean, structured, and ready-to-sign Indonesian legal documents in minutes.
+
+## What Problem Does It Solve?
+
+Many freelancers and small studios skip formal contracts because drafting them takes too much time or feels overly intimidating—leaving them vulnerable to scope creep, delayed payments, or unverified project handovers. SPKInstan bridges this gap by turning standard legal clauses into a fast, guided form with instant document output.
+
+## Target Users
+
+- **Freelancers & Solopreneurs:** Web/mobile developers, UI/UX designers, graphic designers, copywriters, and digital marketers.
+- **Micro-Agencies & Creative Studios:** Small teams that need standardized client agreements without enterprise legal overhead.
+- **Consultants & Project Vendors:** Independent professionals who require formal work orders and handover sign-offs from clients.
+
+## Key Features
+
+- **Guided Contract Builder:** Input project scope, timelines, payment milestones, and party details through a straightforward, mobile-friendly form.
+- **Real-Time Live Preview:** Inspect the formatted legal document dynamically as you fill in the fields before finalizing.
+- **Core Project Lifecycle Templates:** Supports essential Indonesian business documents:
+  - **SPK (*Surat Perintah Kerja*):** Work Order / Service Agreement.
+  - **NDA (*Non-Disclosure Agreement*):** Confidentiality agreement for sensitive project data.
+  - **BAST (*Berita Acara Serah Terima*):** Official project completion and handover report.
+- **Zero-Friction & Pay-Per-Use:** No bloated monthly SaaS subscriptions—users can draft immediately and unlock/download documents on demand via integrated payment processing (Mayar).
+- **Print & PDF-Ready Output:** Clean typography and formal document structure ready for digital signatures or physical printing.
+
+---
+
+## Tech Stack
+
+- **Framework:** [Next.js](https://nextjs.org) (App Router)
+- **Styling:** Tailwind CSS
+- **Typography:** [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) with [Geist](https://vercel.com/font)
+- **Payments:** Mayar Payment Gateway
 
 ## Getting Started
 
@@ -17,20 +49,3 @@ bun dev
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
